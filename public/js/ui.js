@@ -266,11 +266,102 @@ window.HLM = window.HLM || {};
     } catch (e) { box.innerHTML = `<div class="empty" style="padding:40px;">${esc(e.message)}</div>`; }
   }
 
+  // ===== 审批 =====
+  const nl = (v) => String(v == null ? '' : (typeof v === 'string' ? v : JSON.stringify(v, null, 1))).replace(/\\n/g, '\n');
+  const APPROVAL_LABEL = { pending: '待审批', approved: '已批准', rejected: '已驳回' };
+
+  async function renderApprovals(list, box) {
+    box.innerHTML = `<div class="card"><div class="card-body-flush"><div class="tbl-wrap"><table class="data">
+      <thead><tr><th>单号</th><th>资源</th><th>规格/数量</th><th>用途</th><th>状态</th><th>申请人</th><th>创建时间</th><th>操作</th></tr></thead>
+      <tbody>${list.map(a => `
+        <tr>
+          <td class="nowrap"><span class="mono">${esc(a.approval_no)}</span></td>
+          <td><strong>${esc(a.resource)}</strong></td>
+          <td>${esc(a.amount || '-')}</td>
+          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(a.purpose || '')}</td>
+          <td><span class="tag ${a.status}">${APPROVAL_LABEL[a.status] || a.status}</span></td>
+          <td>${esc(a.requester || '-')}</td>
+          <td class="nowrap">${fmt(a.created_at)}</td>
+          <td class="nowrap"><button class="btn sm" onclick="window.HLM.UI.openApproval(${a.id})">处理</button></td>
+        </tr>`).join('') || '<tr><td colspan="8" class="empty">暂无审批单</td></tr>'}
+      </tbody></table></div></div></div>`;
+  }
+
+  async function openApproval(id) {
+    try {
+      const r = await API.get('/approvals/' + id);
+      const a = r.data;
+      openModal(`审批 #${a.approval_no}`, `
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <span class="tag ${a.status}">${APPROVAL_LABEL[a.status] || a.status}</span>
+          <span class="chip">申请人: ${esc(a.requester || '-')}</span>
+          ${a.project_code ? `<span class="chip">项目: ${esc(a.project_code)}</span>` : ''}
+        </div>
+        <div class="ctx"><div class="k">资源</div><pre>${esc(a.resource)}${a.amount ? ' · ' + esc(a.amount) : ''}</pre></div>
+        ${a.purpose ? `<div class="ctx"><div class="k">用途</div><pre>${esc(nl(a.purpose))}</pre></div>` : ''}
+        ${a.detail ? `<div class="ctx"><div class="k">详情</div><pre>${esc(nl(a.detail))}</pre></div>` : ''}
+        ${a.provided ? `<div class="ctx" style="border-left:3px solid var(--success);"><div class="k">人类提供的资源 / 说明</div><pre>${esc(nl(a.provided))}</pre></div>` : ''}
+        ${a.reject_reason ? `<div class="ctx" style="border-left:3px solid var(--danger);"><div class="k">驳回原因</div><pre>${esc(nl(a.reject_reason))}</pre></div>` : ''}
+      `, approvalActions(a), 'lg');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function approvalActions(a) {
+    if (a.status !== 'pending') return `<button class="btn" onclick="window.HLM.UI.closeModal()">关闭</button>`;
+    const id = a.id;
+    return `<button class="btn" onclick="window.HLM.UI.closeModal()">关闭</button>
+      <button class="btn success" onclick="window.HLM.UI.promptApprove(${id})">批准并提供</button>
+      <button class="btn danger" onclick="window.HLM.UI.promptApproveReject(${id})">驳回</button>`;
+  }
+
+  function promptApprove(id) {
+    openModal('批准并提供资源', `
+      <div class="form-group">
+        <label class="form-label">提供的资源 / 准备说明（将返回给 AI）</label>
+        <textarea class="form-textarea" id="approveProvided" rows="4" placeholder="如：已申请 2C4G 测试服务器，IP 192.168.168.x，凭据已发至安全邮箱"></textarea>
+      </div>`,
+      `<button class="btn" onclick="window.HLM.UI.closeModal()">取消</button>
+       <button class="btn success" onclick="window.HLM.UI.submitApprove(${id})">批准</button>`);
+  }
+
+  async function submitApprove(id) {
+    const provided = $('#approveProvided').value;
+    try {
+      await API.post('/approvals/' + id + '/approve', { provided });
+      toast('已批准并记录提供说明', 'success');
+      closeModal();
+      window.HLM.refresh && window.HLM.refresh();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function promptApproveReject(id) {
+    openModal('驳回审批', `
+      <div class="form-group">
+        <label class="form-label">驳回原因（将返回给 AI）</label>
+        <textarea class="form-textarea" id="approveRejectReason" rows="3" placeholder="如：预算未批复 / 资源不足 / 需补充理由"></textarea>
+      </div>`,
+      `<button class="btn" onclick="window.HLM.UI.closeModal()">取消</button>
+       <button class="btn danger" onclick="window.HLM.UI.submitApproveReject(${id})">确认驳回</button>`,
+      'sm');
+  }
+
+  async function submitApproveReject(id) {
+    const reason = $('#approveRejectReason').value.trim();
+    if (!reason) { toast('请填写驳回原因', 'warning'); return; }
+    try {
+      await API.post('/approvals/' + id + '/reject', { reason });
+      toast('已驳回', 'success');
+      closeModal();
+      window.HLM.refresh && window.HLM.refresh();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   window.HLM.UI = {
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
     promptReopen, submitReopen,
     renderUsers, showUserForm, saveUser, delUser, renderLogs,
+    renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
     closeModal,
   };
 })();

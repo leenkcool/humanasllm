@@ -39,18 +39,23 @@ scripts/seed.js        # 种子账户
 - `GET  /v1/models` → `human-llm` + AI 中继模型列表
 - `POST /v1/chat/completions` → 支持 `stream:false` 一次性返回 与 `stream:true` SSE 流式
 - **AI 降级路由**：model 匹配 `AI_RELAY_MODELS`（如 `deepseek-v4-flash`）→ 中继转发到真实 LLM（DeepSeek）；否则走人工
+- **AI 提审批** `POST /v1/approvals` → 申请服务器/环境/权限等资源，挂起等待人类批准/驳回，返回审批结果（`status: approved|rejected` + 人类提供说明）
 - 可选 `UPSTREAM_API_KEY` 校验（配置后需 `Authorization: Bearer <key>`）
 
 ### 工作台（JWT 认证）
 - `POST /api/auth/login`（admin/engineer1/engineer2，密码 admin123）
 - `/api/workbench/summary | queue | mine`
-- `/api/tasks` + `/api/tasks/:id/{claim|complete|reject|pause|resume|requeue|cancel}`
+- `/api/tasks` + `/api/tasks/:id/{claim|complete|reject|pause|resume|requeue|reopen|cancel}`
+- `/api/approvals` + `/api/approvals/:id/{approve|reject}`（审批列表/批准并提供资源/驳回）
 - `/api/logs/requests | tasks`、`/api/users`
 
 ## 任务状态机
 `pending → processing → completed | returned | paused`；驳回/超时 → `returned` 可改上下文重派（`pending`）。
 超时：待接单默认 60 分钟、处理中默认 120 分钟（`.env` 可调），由 `queueService.startTimeoutScanner()` 每 30 秒扫描。
 超时降级：**待接单超时无人接单 → 自动用 AI 代答**（`aiRelay` 中继 DeepSeek，带 `aiRelay:true` 标记）完成兜底；AI 不可用则回落 `returned` + 告警。处理中超时仍 `returned`。
+
+## 审批状态机
+`pending → approved | rejected`（AI 提审批 → 人类批准并提供资源 / 驳回并附原因 → 返回结果给 AI）。待审批超 24h 自动提醒。产出质量：complete 时校验空/过短/占位乱答；`reopen` 打回重做（completed → returned）。
 
 ## 环境变量（.env）
 `PORT=39000`、`DB_TYPE=pg`、`PG_DATABASE=p390`、`JWT_SECRET`、`HUMAN_LLM_MODEL=human-llm`、

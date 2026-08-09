@@ -38,6 +38,7 @@ window.HLM = window.HLM || {};
     { id: 'queue', label: '任务队列', icon: 'queue', show: () => true, badge: () => window._pendingCount || 0 },
     { id: 'mine', label: '我的任务', icon: 'mine', show: () => true },
     { id: 'logs', label: '请求日志', icon: 'logs', show: () => true },
+    { id: 'approvals', label: '审批', icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
     { id: 'users', label: '用户管理', icon: 'users', show: () => (currentUser.role === 'admin') },
   ];
 
@@ -163,8 +164,34 @@ window.HLM = window.HLM || {};
     await UI.renderUsers($('#usersBox'), currentUser.role === 'admin');
   }
 
+  // ===== 审批页 =====
+  async function renderApprovals() {
+    const content = $('#content');
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">审批</div><div class="page-desc">AI 资源 / 权限审批 · 人类采购或准备后提供</div></div>
+        <div class="spacer"></div>
+        <select class="form-select" id="aStatus" style="width:130px;">
+          <option value="">全部状态</option><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已驳回</option>
+        </select>
+        <button class="btn" onclick="window.HLM.App.loadApprovals()">筛选</button></div>
+      <div id="approvalsBox"></div>`;
+    await loadApprovals();
+  }
+
+  async function loadApprovals() {
+    const status = $('#aStatus') ? $('#aStatus').value : '';
+    const params = new URLSearchParams({ size: 50 });
+    if (status) params.set('status', status);
+    try {
+      const r = await API.get('/approvals?' + params.toString());
+      window._pendingApprovals = r.data.data.filter(a => a.status === 'pending').length;
+      updateBadges();
+      UI.renderApprovals(r.data.data, $('#approvalsBox'));
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');
@@ -183,12 +210,16 @@ window.HLM = window.HLM || {};
     WS.on('new', () => { toast('有新任务进入队列', 'info'); updateBadges(); refresh(); });
     WS.on('update', (d) => { toast(`任务 #${d.id} 状态更新为 ${STATUS_LABEL[d.status] || d.status}`, 'info'); refresh(); });
     WS.on('timeout', (d) => { toast(`任务 #${d.id} 超时告警`, 'warning'); refresh(); });
+    WS.on('approval:new', () => { toast('有新审批请求，请处理', 'info'); refresh(); });
+    WS.on('approval:update', () => { toast('审批状态已更新', 'info'); refresh(); });
+    WS.on('approval:overdue', (d) => { toast(`审批 #${d.id} 已超 24h 未处理`, 'warning'); refresh(); });
   }
 
   function updateBadges() {
     document.querySelectorAll('.nav-item .badge').forEach(b => {
       const n = b.dataset.badge;
-      const cnt = n === 'queue' ? (window._pendingCount || 0) : 0;
+      const cnt = n === 'queue' ? (window._pendingCount || 0)
+        : n === 'approvals' ? (window._pendingApprovals || 0) : 0;
       b.style.display = cnt > 0 ? 'block' : 'none';
       b.textContent = cnt;
     });
@@ -216,7 +247,7 @@ window.HLM = window.HLM || {};
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, refresh };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, refresh };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

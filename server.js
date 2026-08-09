@@ -11,6 +11,7 @@ const routes = require('./routes/index');
 const { securityHeaders, corsOptions, createGlobalLimiter } = require('./middleware/security');
 const wsService = require('./services/websocket');
 const queue = require('./services/queueService');
+const approval = require('./services/approvalService');
 
 const app = express();
 const PORT = parseInt(process.env.PORT) || 39000;
@@ -81,6 +82,9 @@ async function start() {
 
     queue.startTimeoutScanner();
     console.log('[队列] 超时扫描已启动');
+
+    approval.startApprovalScanner();
+    console.log('[审批] 超时提醒已启动');
 
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`Human-as-LLM 人工代理网关已启动: http://0.0.0.0:${PORT}`);

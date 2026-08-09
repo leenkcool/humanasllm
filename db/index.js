@@ -71,6 +71,27 @@ CREATE TABLE IF NOT EXISTS request_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_request_logs_task ON request_logs(task_id);
+
+CREATE TABLE IF NOT EXISTS approvals (
+  id SERIAL PRIMARY KEY,
+  approval_no VARCHAR(32),
+  resource VARCHAR(128) NOT NULL,
+  amount VARCHAR(64),
+  purpose TEXT,
+  detail TEXT,
+  requester VARCHAR(64),
+  project_code TEXT,
+  meta_tags JSONB,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  provider_id INTEGER REFERENCES users(id),
+  provider_name VARCHAR(64),
+  provided TEXT,
+  reject_reason TEXT,
+  decided_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status);
 `;
 
 function createAdapter() {
