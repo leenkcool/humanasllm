@@ -43,10 +43,12 @@ window.HLM = window.HLM || {};
       const messages = Array.isArray(p.messages) ? p.messages : [];
 
       const metaHtml = Object.entries(t.meta_tags || {}).map(([k, v]) => `<span class="tag medium" style="margin-right:6px;">${esc(k)}: ${esc(v)}</span>`).join('');
+      // 内容渲染：字面 \n 与真实换行统一转 <br>（人类可读，兼容手动/脚本派单）
+      const nl = (v) => String(v == null ? '' : (typeof v === 'string' ? v : JSON.stringify(v, null, 1))).replace(/\\n/g, '\n');
       const msgsHtml = messages.map(m => `
         <div class="msg-row ${esc(m.role)}">
           <div class="role">${esc(m.role)}</div>
-          <div class="content">${esc(jsonStr(m.content)).replace(/\n/g, '<br>')}</div>
+          <div class="content">${nl(m.content).split('\n').map(esc).join('<br>')}</div>
         </div>`).join('');
 
       const params = ['max_tokens', 'temperature', 'top_p', 'stop', 'user']
@@ -54,10 +56,10 @@ window.HLM = window.HLM || {};
 
       let resultHtml = '';
       if (t.status === 'completed' && t.result_text) {
-        resultHtml = `<div class="ctx"><div class="k">人工产出结果</div><pre>${esc(t.result_text)}</pre></div>`;
+        resultHtml = `<div class="ctx"><div class="k">人工产出结果</div><pre>${esc(nl(t.result_text))}</pre></div>`;
       }
       if (t.reject_reason) {
-        resultHtml += `<div class="ctx" style="border-left:3px solid var(--danger);"><div class="k">驳回原因</div><pre>${esc(t.reject_reason)}</pre></div>`;
+        resultHtml += `<div class="ctx" style="border-left:3px solid var(--danger);"><div class="k">驳回原因</div><pre>${esc(nl(t.reject_reason))}</pre></div>`;
       }
 
       const body = `
