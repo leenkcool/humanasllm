@@ -102,6 +102,7 @@ window.HLM = window.HLM || {};
     }
     if (t.status === 'returned') btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('claim', ${id})">重新接单</button>`;
     if (t.status === 'returned' || t.status === 'paused') btns += `<button class="btn" onclick="window.HLM.UI.promptRequeue(${id})">改上下文重派</button>`;
+    if (t.status === 'completed' && isOwner) btns += `<button class="btn danger" onclick="window.HLM.UI.promptReopen(${id})">打回重做</button>`;
     if (!['completed', 'cancelled'].includes(t.status)) btns += `<button class="btn danger" onclick="window.HLM.UI.promptCancel(${id})">取消</button>`;
     return btns;
   }
@@ -168,6 +169,23 @@ window.HLM = window.HLM || {};
 
   function promptCancel(id) {
     confirmDialog('取消任务', '确定取消该任务吗？', () => doAction('cancel', id), true);
+  }
+
+  // 打回重做：产出不合格/乱答
+  function promptReopen(id) {
+    openModal('打回重做', `
+      <div class="form-group">
+        <label class="form-label">打回原因（产出不合格 / 乱答 / 未实现实际内容）</label>
+        <textarea class="form-textarea" id="reopenReason" rows="3" placeholder="如：产出为占位乱答，未包含实际实现内容"></textarea>
+      </div>`,
+      `<button class="btn" onclick="window.HLM.UI.closeModal()">取消</button>
+       <button class="btn danger" onclick="window.HLM.UI.submitReopen(${id})">确认打回</button>`,
+      'sm');
+  }
+  function submitReopen(id) {
+    const reason = $('#reopenReason').value.trim();
+    if (!reason) { toast('请填写打回原因', 'warning'); return; }
+    doAction('reopen', id, { reason });
   }
 
   // ===== 用户管理 =====
@@ -251,6 +269,7 @@ window.HLM = window.HLM || {};
   window.HLM.UI = {
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
+    promptReopen, submitReopen,
     renderUsers, showUserForm, saveUser, delUser, renderLogs,
     closeModal,
   };

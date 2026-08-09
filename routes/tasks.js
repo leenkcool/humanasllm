@@ -152,4 +152,24 @@ router.post('/:id/cancel', authenticate, async (req, res) => {
   }
 });
 
+// 打回重做：completed → returned（产出不合格/乱答，管理员或原处理人可打回）
+router.post('/:id/reopen', authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const task = await queue.getTask(id);
+    if (!task) return res.status(404).json({ success: false, message: '任务不存在' });
+    const isAdmin = req.user.role === 'admin';
+    const isOwner = task.assignee_id === req.user.id;
+    if (!isAdmin && !isOwner) return res.status(403).json({ success: false, message: '无权限打回该任务' });
+    const reason = (req.body.reason || '').toString().trim();
+    if (!reason) return res.status(400).json({ success: false, message: '请填写打回原因' });
+    const r = await queue.reopenTask(id, reason, { id: req.user.id, name: req.user.name || req.user.username });
+    if (!r.ok) return res.status(400).json({ success: false, message: r.message });
+    res.json({ success: true, data: r.task });
+  } catch (err) {
+    console.error('[打回失败]', err.message);
+    res.status(500).json({ success: false, message: '打回失败' });
+  }
+});
+
 module.exports = router;

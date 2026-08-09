@@ -21,12 +21,13 @@ const STATUS = {
 
 // 状态机合法转换表
 // pending → completed 用于「待接单超时 · AI 降级代答」直达终态（无人接单由 AI 兜底完成）
+// completed → returned 用于「产出不合格 · 打回重做」（人工乱答/占位可打回重新派发）
 const TRANSITIONS = {
   pending: ['processing', 'returned', 'cancelled', 'completed'],
   processing: ['completed', 'returned', 'paused'],
   returned: ['pending', 'processing', 'cancelled'],
   paused: ['processing', 'returned', 'cancelled'],
-  completed: [],
+  completed: ['returned'],
   cancelled: [],
 };
 
@@ -52,6 +53,17 @@ function rows(result) {
     }
     return obj;
   });
+}
+
+/** 人工产出质量校验：拦截空 / 过短 / 占位乱答 */
+const MIN_RESULT_LEN = 20;
+const PLACEHOLDER_RE = /^(完成|已完|已ok|ok|done|finish|好的|嗯|你检查吧|稍后|待会儿|待补|待完善)[。．.！!\s]*$/i;
+function qualityCheck(content) {
+  const c = String(content == null ? '' : content).trim();
+  if (!c) return '提交内容不能为空';
+  if (c.length < MIN_RESULT_LEN) return `产出过短（${c.length} 字符，至少 ${MIN_RESULT_LEN}），请补充实际实现内容`;
+  if (PLACEHOLDER_RE.test(c)) return '疑似占位/乱答复，请提交实际实现内容';
+  return null;
 }
 
 async function getTask(id) {
@@ -141,8 +153,10 @@ async function claimTask(taskId, engineerId, engineerName) {
   });
 }
 
-/** 提交结果：processing → completed */
+/** 提交结果：processing → completed（先过质量校验） */
 async function completeTask(taskId, content, actor) {
+  const bad = qualityCheck(content);
+  if (bad) return { ok: false, message: bad };
   const t = await transition(taskId, STATUS.COMPLETED, actor, '提交结果', {
     result_text: content,
     result_payload: JSON.stringify({ content }),
@@ -207,6 +221,19 @@ function escapeSql(s) { return String(s).replace(/'/g, "''"); }
 /** 取消：任意非终态 → cancelled */
 async function cancelTask(taskId, actor) {
   return transition(taskId, STATUS.CANCELLED, actor, '取消任务', { timeout_at: null });
+}
+
+/** 打回重做：completed → returned（产出不合格/乱答，清空结果重新派发） */
+async function reopenTask(taskId, reason, actor) {
+  return transition(taskId, STATUS.RETURNED, actor, reason || '产出不合格打回重做', {
+    reject_reason: reason || '产出不合格，打回重做',
+    assignee_id: null,
+    claimed_at: null,
+    completed_at: null,
+    result_text: null,
+    result_payload: null,
+    timeout_at: afterMin(PENDING_MIN()),
+  });
 }
 
 /** /v1 接口挂起等待（Promise，超时兜底） */
@@ -292,6 +319,6 @@ function startTimeoutScanner() {
 module.exports = {
   STATUS, TRANSITIONS, getTask, rows, addLog, logRequest,
   createTaskFromRequest, transition, claimTask, completeTask,
-  rejectTask, pauseTask, resumeTask, requeueTask, cancelTask,
-  waitForTask, startTimeoutScanner, timeoutTask,
+  rejectTask, pauseTask, resumeTask, requeueTask, cancelTask, reopenTask,
+  qualityCheck, waitForTask, startTimeoutScanner, timeoutTask,
 };
