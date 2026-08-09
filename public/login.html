@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · 人工代理网关</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%232563eb'/><path d='M10 22l6-6 4 4 8-9v5h-2v4H26l2-2 2 2z' fill='white'/></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+      </div>
+      <h1>人工代理网关</h1>
+      <p>Human-as-LLM 工程师工作台</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label">用户名</label>
+          <input class="form-input" id="username" placeholder="admin / engineer1 / engineer2" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">密码</label>
+          <input class="form-input" id="password" type="password" placeholder="默认 admin123" autocomplete="current-password" required>
+        </div>
+        <button class="btn primary" type="submit" id="loginBtn">登 录</button>
+        <p id="errMsg" style="color:var(--danger);font-size:13px;margin-top:12px;min-height:18px;"></p>
+      </form>
+      <p style="color:var(--muted);font-size:12px;margin-top:16px;">测试账户：admin / engineer1 / engineer2，密码 admin123</p>
+    </div>
+  </div>
+  <script src="/js/utils.js"></script>
+  <script>
+    (function () {
+      var form = document.getElementById('loginForm');
+      var err = document.getElementById('errMsg');
+      var btn = document.getElementById('loginBtn');
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var username = document.getElementById('username').value.trim();
+        var password = document.getElementById('password').value;
+        if (!username || !password) { err.textContent = '请输入用户名和密码'; return; }
+        btn.disabled = true; err.textContent = '';
+        try {
+          var res = await fetch(window.location.origin + '/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify({ username: username, password: password })
+          });
+          var data = await res.json();
+          if (!res.ok || !data.success) { throw new Error(data.message || '登录失败'); }
+          localStorage.setItem('hlm_token', data.data.token);
+          localStorage.setItem('hlm_user', JSON.stringify(data.data.user));
+          window.location.href = '/index.html';
+        } catch (ex) {
+          err.textContent = ex.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
