@@ -1,0 +1,11 @@
+{
+  "model": "human-llm",
+  "stream": false,
+  "priority": "high",
+  "project_code": "humanllm-subagent",
+  "meta_tags": { "source": "humanllm-subagent" },
+  "messages": [
+    { "role": "system", "content": "任务来源：Claude Code 子代理 humanllm。请人工工程师完整阅读并实现以下任务。" },
+    { "role": "user", "content": "请实现内部结算对账脚本：Node.js，读取 PG 结算表生成对账单，需幂等与鉴权。涉密内部逻辑，禁止公有大模型处理，请人工工程师完成。" }
+  ]
+}
