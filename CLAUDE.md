@@ -36,8 +36,9 @@ scripts/seed.js        # 种子账户
 
 ## 接口
 ### OpenAI 兼容（上游直连）
-- `GET  /v1/models` → `{id:"human-llm"}`
+- `GET  /v1/models` → `human-llm` + AI 中继模型列表
 - `POST /v1/chat/completions` → 支持 `stream:false` 一次性返回 与 `stream:true` SSE 流式
+- **AI 降级路由**：model 匹配 `AI_RELAY_MODELS`（如 `deepseek-v4-flash`）→ 中继转发到真实 LLM（DeepSeek）；否则走人工
 - 可选 `UPSTREAM_API_KEY` 校验（配置后需 `Authorization: Bearer <key>`）
 
 ### 工作台（JWT 认证）
@@ -48,11 +49,13 @@ scripts/seed.js        # 种子账户
 
 ## 任务状态机
 `pending → processing → completed | returned | paused`；驳回/超时 → `returned` 可改上下文重派（`pending`）。
-超时：待接单默认 60 分钟、处理中默认 120 分钟（`.env` 可调），由 `queueService.startTimeoutScanner()` 每 30 秒扫描，超时自动归还 + Socket 告警。
+超时：待接单默认 60 分钟、处理中默认 120 分钟（`.env` 可调），由 `queueService.startTimeoutScanner()` 每 30 秒扫描。
+超时降级：**待接单超时无人接单 → 自动用 AI 代答**（`aiRelay` 中继 DeepSeek，带 `aiRelay:true` 标记）完成兜底；AI 不可用则回落 `returned` + 告警。处理中超时仍 `returned`。
 
 ## 环境变量（.env）
 `PORT=39000`、`DB_TYPE=pg`、`PG_DATABASE=p390`、`JWT_SECRET`、`HUMAN_LLM_MODEL=human-llm`、
-`TASK_PENDING_TIMEOUT_MIN`、`TASK_PROCESSING_TIMEOUT_MIN`、`UPSTREAM_API_KEY`(可选)
+`TASK_PENDING_TIMEOUT_MIN`、`TASK_PROCESSING_TIMEOUT_MIN`、`UPSTREAM_API_KEY`(可选)、
+`AI_RELAY_ENABLED`、`AI_RELAY_BASE_URL`、`AI_RELAY_API_KEY`、`AI_RELAY_MODELS`
 
 ## 命令
 - `npm install` → `npm run seed` → `npm start`（监听 `0.0.0.0:39000`）

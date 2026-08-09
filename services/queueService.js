@@ -8,6 +8,7 @@
 require('dotenv').config();
 const { getDb } = require('../db');
 const ws = require('./websocket');
+const aiRelay = require('./aiRelay');
 
 const STATUS = {
   PENDING: 'pending',
@@ -19,8 +20,9 @@ const STATUS = {
 };
 
 // 状态机合法转换表
+// pending → completed 用于「待接单超时 · AI 降级代答」直达终态（无人接单由 AI 兜底完成）
 const TRANSITIONS = {
-  pending: ['processing', 'returned', 'cancelled'],
+  pending: ['processing', 'returned', 'cancelled', 'completed'],
   processing: ['completed', 'returned', 'paused'],
   returned: ['pending', 'processing', 'cancelled'],
   paused: ['processing', 'returned', 'cancelled'],
@@ -227,9 +229,39 @@ function resolveWaiter(taskId, result) {
   }
 }
 
-/** 超时处理：pending/processing 超时 → returned + 告警 */
+/** 超时处理：待接单超时优先 AI 降级代答，失败回落 returned；处理中超时 → returned */
 async function timeoutTask(taskId, phase) {
   const label = phase === 'pending' ? '待接单' : '处理中';
+
+  // 待接单超时 → 尝试 AI 降级（人工无人接单时的兜底）
+  if (phase === 'pending') {
+    try {
+      const task = await getTask(taskId);
+      if (task && aiRelay.enabled() && task.request_payload) {
+        const data = await aiRelay.chat({ ...task.request_payload, stream: false });
+        const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        if (content) {
+          const t = await transition(taskId, STATUS.COMPLETED, null, '待接单超时·AI 降级代答', {
+            result_text: content,
+            result_payload: JSON.stringify({ content, source: 'ai-relay' }),
+            completed_at: now(),
+            timeout_at: null,
+          });
+          if (t.ok) {
+            await logRequest(taskId, 'out', { content, source: 'ai-relay' }, t.task.model);
+            ws.broadcast('task:update', { id: taskId, status: 'completed', aiRelay: true });
+            ws.broadcast('task:timeout', { id: taskId, phase, aiRelay: true });
+            resolveWaiter(taskId, { completed: true, content, model: t.task.model, task: t.task, aiRelay: true });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[AI 降级失败]', taskId, e.message);
+    }
+    // AI 降级不可用 / 失败 → 回落 returned
+  }
+
   const t = await transition(taskId, STATUS.RETURNED, null, `${label}超时自动归还`, {
     reject_reason: `${label}超时`,
     assignee_id: null,
@@ -261,5 +293,5 @@ module.exports = {
   STATUS, TRANSITIONS, getTask, rows, addLog, logRequest,
   createTaskFromRequest, transition, claimTask, completeTask,
   rejectTask, pauseTask, resumeTask, requeueTask, cancelTask,
-  waitForTask, startTimeoutScanner,
+  waitForTask, startTimeoutScanner, timeoutTask,
 };

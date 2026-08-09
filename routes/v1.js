@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const encoder = require('../services/openaiEncoder');
 const queue = require('../services/queueService');
+const aiRelay = require('../services/aiRelay');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
 function requireUpstreamKey(req, res, next) {
@@ -24,9 +25,15 @@ function requireUpstreamKey(req, res, next) {
 
 // GET /v1/models
 router.get('/models', requireUpstreamKey, (req, res) => {
+  const ids = [encoder.MODEL, ...aiRelay.getModels()];
   res.json({
     object: 'list',
-    data: [{ id: encoder.MODEL, object: 'model', owned_by: 'p390', permission: [] }],
+    data: ids.map(id => ({
+      id,
+      object: 'model',
+      owned_by: id === encoder.MODEL ? 'p390' : 'ai-relay',
+      permission: [],
+    })),
   });
 });
 
@@ -37,6 +44,25 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
     parsed = encoder.parseChatRequest(req.body);
   } catch (e) {
     return res.status(e.status || 400).json(encoder.makeError(e.status || 400, e.message));
+  }
+
+  // ===== AI 降级路由：模型名匹配 → 中继到真实 LLM（DeepSeek） =====
+  if (aiRelay.shouldRelay(parsed.model)) {
+    await queue.logRequest(null, 'in', req.body, parsed.model).catch(() => {});
+    try {
+      if (parsed.stream) {
+        await queue.logRequest(null, 'out', { relay: parsed.model }, parsed.model).catch(() => {});
+        return await aiRelay.relayStream(req, res);
+      }
+      const data = await aiRelay.chat(req.body);
+      await queue.logRequest(null, 'out',
+        { content: data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content },
+        parsed.model).catch(() => {});
+      return res.json(data);
+    } catch (e) {
+      console.error('[AI 中继失败]', e.message);
+      return res.status(502).json(encoder.makeError(502, 'AI 中继失败: ' + e.message, 'server_error'));
+    }
   }
 
   const chatId = encoder.makeId();
