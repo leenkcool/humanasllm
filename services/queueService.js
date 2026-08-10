@@ -87,15 +87,16 @@ async function logRequest(taskId, direction, payload, model) {
 async function createTaskFromRequest({ parsed, chatId, created }) {
   const db = getDb();
   const priority = parsed.extra.priority || 'medium';
+  const category = parsed.extra.category || 'general';
   const projectCode = parsed.extra.project_code || null;
   const metaTags = parsed.extra.meta_tags || parsed.extra.meta || null;
   const payload = { ...parsed, created };
 
   const { lastId } = await db.run(
     `INSERT INTO tasks
-       (upstream_request_id, model, stream, priority, project_code, meta_tags, request_payload, status, timeout_at)
-     VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?)`,
-    [chatId, parsed.model, parsed.stream, priority, projectCode,
+       (upstream_request_id, model, stream, priority, category, project_code, meta_tags, request_payload, status, timeout_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?)`,
+    [chatId, parsed.model, parsed.stream, priority, category, projectCode,
       metaTags ? JSON.stringify(metaTags) : null,
       JSON.stringify(payload),
       PENDING_MIN()]
@@ -245,10 +246,11 @@ async function timeoutTask(taskId, phase) {
   const label = phase === 'pending' ? '待接单' : '处理中';
 
   // 待接单超时 → 尝试 AI 降级（人工无人接单时的兜底）
+  // 分级策略：仅 general（常规）类允许 AI 代答；涉密/运维类上下文不得喂给公有大模型，直接回落 returned
   if (phase === 'pending') {
     try {
       const task = await getTask(taskId);
-      if (task && aiRelay.enabled() && task.request_payload) {
+      if (task && task.category === 'general' && aiRelay.enabled() && task.request_payload) {
         const data = await aiRelay.chat({ ...task.request_payload, stream: false });
         const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
         if (content) {

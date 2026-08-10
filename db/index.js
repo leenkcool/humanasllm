@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   model VARCHAR(64) NOT NULL DEFAULT 'human-llm',
   stream BOOLEAN NOT NULL DEFAULT false,
   priority VARCHAR(10) NOT NULL DEFAULT 'medium',
+  category VARCHAR(20) NOT NULL DEFAULT 'general',
   project_code TEXT,
   meta_tags JSONB,
   request_payload JSONB NOT NULL DEFAULT '{}',
@@ -130,6 +131,7 @@ async function initDatabase() {
   // ===== 兼容迁移（对已存在的表补列） =====
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(128)`);
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'general'`);
   return db;
 }
 

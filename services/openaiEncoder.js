@@ -6,6 +6,9 @@ const { v4: uuidv4 } = require('uuid');
 
 const MODEL = process.env.HUMAN_LLM_MODEL || 'human-llm';
 
+/** 人工任务场景分类（涉密/运维类禁止 AI 兜底，见 queueService.timeoutTask） */
+const CATEGORIES = ['general', 'confidential', 'ops'];
+
 function makeId() {
   return 'chatcmpl-' + uuidv4().replace(/-/g, '').slice(0, 24);
 }
@@ -16,6 +19,8 @@ function parseChatRequest(body = {}) {
   if (messages.length === 0) {
     throw Object.assign(new Error('Invalid \'messages\': must be a non-empty array.'), { status: 400 });
   }
+  const extra = pickExtra(body);
+  if (!CATEGORIES.includes(extra.category)) extra.category = 'general';
   return {
     model: body.model || MODEL,
     stream: !!body.stream,
@@ -25,13 +30,13 @@ function parseChatRequest(body = {}) {
     top_p: body.top_p ?? null,
     stop: body.stop ?? null,
     user: body.user ?? null,
-    extra: pickExtra(body),      // 元标签/项目编号/优先级/文件描述等
+    extra,      // 元标签/项目编号/优先级/场景分类/文件描述等
   };
 }
 
 /** 提取业务扩展字段（全透传，工作台展示用） */
 function pickExtra(body) {
-  const keys = ['project_code', 'project', 'meta_tags', 'meta', 'priority', 'files', 'attachments', 'metadata'];
+  const keys = ['category', 'project_code', 'project', 'meta_tags', 'meta', 'priority', 'files', 'attachments', 'metadata'];
   const out = {};
   for (const k of keys) {
     if (body[k] !== undefined) out[k] = body[k];
@@ -94,6 +99,6 @@ function summarizeMessages(messages) {
 }
 
 module.exports = {
-  MODEL, makeId, parseChatRequest, makeChatCompletion,
+  MODEL, CATEGORIES, makeId, parseChatRequest, makeChatCompletion,
   makeStreamChunks, makeError, summarizeMessages,
 };

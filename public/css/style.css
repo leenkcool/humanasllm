@@ -84,6 +84,9 @@ td .mono { font-family: Consolas, monospace; font-size: 12px; background: var(--
 .tag.high { background: rgba(220,38,38,.1); color: var(--danger); }
 .tag.medium { background: rgba(217,119,6,.12); color: var(--warning); }
 .tag.low { background: rgba(107,114,128,.12); color: var(--muted); }
+/* 任务分类（涉密/运维类禁止 AI 兜底） */
+.tag.confidential { background: rgba(147,51,234,.12); color: #9333ea; }
+.tag.ops { background: rgba(59,130,246,.12); color: #2563eb; }
 
 /* ===== 按钮 ===== */
 .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer; transition: .15s; }

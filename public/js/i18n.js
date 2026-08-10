@@ -25,6 +25,13 @@ window.HLM = window.HLM || {};
     'approval.status.approved': '已批准',
     'approval.status.rejected': '已驳回',
 
+    // 任务分类（涉密/运维类禁止 AI 兜底，见 queueService.timeoutTask）
+    'category.general': '常规',
+    'category.confidential': '涉密',
+    'category.ops': '运维',
+    'category.hint.confidential': '涉密/敏感任务，不 AI 代答',
+    'category.hint.ops': '运维/基础设施任务，不 AI 代答',
+
     // 主题
     'theme.light': '浅色',
     'theme.warm': '暖色',
@@ -315,6 +322,13 @@ window.HLM = window.HLM || {};
     'approval.status.pending': 'Pending approval',
     'approval.status.approved': 'Approved',
     'approval.status.rejected': 'Rejected',
+
+    // Task category (confidential/ops are never AI-fallback, see queueService.timeoutTask)
+    'category.general': 'General',
+    'category.confidential': 'Confidential',
+    'category.ops': 'Ops',
+    'category.hint.confidential': 'Confidential/sensitive — no AI fallback',
+    'category.hint.ops': 'Ops/infrastructure — no AI fallback',
 
     'theme.light': 'Light',
     'theme.warm': 'Warm',

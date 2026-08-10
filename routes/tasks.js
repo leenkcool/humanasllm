@@ -17,11 +17,11 @@ router.get('/export', authenticate, async (req, res) => {
   try {
     const db = getDb();
     const list = queue.rows(await db.exec(
-      `SELECT t.id, t.upstream_request_id, t.model, t.priority, t.project_code, t.status,
+      `SELECT t.id, t.upstream_request_id, t.model, t.priority, t.category, t.project_code, t.status,
               u.name AS assignee_name, t.result_text, t.reject_reason, t.created_at, t.completed_at
          FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id ORDER BY t.id`
     ));
-    const cols = ['id', 'upstream_request_id', 'model', 'priority', 'project_code', 'status', 'assignee_name', 'result_text', 'reject_reason', 'created_at', 'completed_at'];
+    const cols = ['id', 'upstream_request_id', 'model', 'priority', 'category', 'project_code', 'status', 'assignee_name', 'result_text', 'reject_reason', 'created_at', 'completed_at'];
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=tasks.csv');
     res.send('﻿' + toCSV(list, cols));

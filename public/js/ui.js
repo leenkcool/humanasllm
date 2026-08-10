@@ -19,7 +19,7 @@ window.HLM = window.HLM || {};
       const summary = task.request_payload?.messages?.find(m => m.role === 'user')?.content;
       return `<tr>
         <td class="nowrap"><span class="mono">#${task.id}</span></td>
-        <td><span class="tag ${task.priority}">${esc(task.priority)}</span></td>
+        <td><span class="tag ${task.priority}">${esc(task.priority)}</span>${task.category && task.category !== 'general' ? ` <span class="tag ${task.category}" title="${esc(t('category.hint.' + task.category))}">${t('category.' + task.category)}</span>` : ''}</td>
         <td><span class="tag ${task.status}">${STATUS_LABEL[task.status] || task.status}</span></td>
         <td>${esc(task.project_name || task.project_code || '-')}</td>
         <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(String(summary || '').slice(0, 60))}</td>
@@ -99,6 +99,7 @@ window.HLM = window.HLM || {};
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
           <span class="tag ${task.status}">${STATUS_LABEL[task.status] || task.status}</span>
           <span class="tag ${task.priority}">${esc(task.priority)}</span>
+          ${task.category && task.category !== 'general' ? `<span class="tag ${task.category}" title="${esc(t('category.hint.' + task.category))}">${t('category.' + task.category)}</span>` : ''}
           ${task.stream ? '<span class="tag pending">stream</span>' : ''}
           <span class="chip">model: ${esc(task.model)}</span>
           ${task.project_code ? `<span class="chip">${t('task.project')} ${esc(task.project_name || task.project_code)}</span>` : ''}

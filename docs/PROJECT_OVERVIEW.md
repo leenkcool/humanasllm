@@ -98,6 +98,7 @@
 | 项目 | 列表；管理员新建/编辑/归档；任何人**申请建项目**（走审批，批准自动创建）；任务可归属项目 |
 | 请求日志 | 请求入参/人工输出、任务审计轨迹 |
 | 用户管理 | 管理员维护工程师/管理员、启停、重置密码 |
+| **任务场景分级** | 上游 `category`（general/confidential/ops）标记；涉密/运维类**禁 AI 兜底**、超时回落 returned；列表/详情标签展示；CSV 导出含 category（详见 [HUMAN_ROUTES.md](./HUMAN_ROUTES.md)） |
 
 **任务状态机**
 `pending → processing → completed | returned | paused`；驳回/超时 → `returned` 可改上下文重派；`completed` 产出不合格可**打回重做**（`completed → returned`）；待接单超时无人接单 → 自动 AI 兜底代答。
@@ -130,7 +131,7 @@
 ### OpenAI 兼容（上游直连）
 ```
 GET  /v1/models
-POST /v1/chat/completions        # stream 支持；模型名路由
+POST /v1/chat/completions        # stream 支持；模型名路由；可选 category 标记任务场景（general/confidential/ops）
 POST /v1/approvals               # AI 提审批（资源/项目申请），挂起等待人类审批
 ```
 
@@ -177,7 +178,7 @@ GET  /api/users (+POST/PUT/DELETE)
 ## 六、技术架构
 
 - **后端**：Node.js + Express + Socket.IO
-- **数据库**：PostgreSQL 5433（库 `p390`）：`users` / `tasks` / `task_logs` / `request_logs` / `approvals` / `projects`
+- **数据库**：PostgreSQL 5433（库 `p390`）：`users` / `tasks`(含 category 分级) / `task_logs` / `request_logs` / `approvals` / `projects`
 - **认证**：JWT（jsonwebtoken + bcryptjs）；角色：admin / engineer
 - **前端**：Vanilla HTML/JS/CSS（IIFE 模块 `utils/api/ws/ui/app`），SVG 图标，4 套主题，响应式（≤768 / 769-1024 / ≥1025 portrait）
 - **服务**：`queueService`（状态机+等待者+超时扫描+AI 降级）、`approvalService`（审批状态机+超时提醒）、`aiRelay`（DeepSeek 中继）、`openaiEncoder`（OpenAI 封装）、`projectService`、`mailer`
@@ -201,6 +202,12 @@ GET  /api/users (+POST/PUT/DELETE)
 5. **安全**：按项目约定不启用 CSP/HSTS（仅 HTTP + 基础头）；若对外部署需补 HTTPS 与限流调优。
 6. **humanllm 子代理**需在 Claude Code 新会话中生效（agent 列表为会话启动快照）。
 7. **人工产出质量**靠"校验 + 打回"兜底，根治仍依赖工程师认真交付。
+
+---
+
+## 八、人工路由场景分级
+
+完整判断标准、场景清单、`category` 分级策略与上游接入方式见 **[HUMAN_ROUTES.md](./HUMAN_ROUTES.md)**。一句话：涉密 / 需人工判断 / 物理世界 / 合规留痕类任务走人工，常规任务走 AI，二者在同一调度池零切换共存。
 
 ---
 
