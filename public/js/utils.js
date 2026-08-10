@@ -2,6 +2,7 @@
 window.HLM = window.HLM || {};
 
 (function () {
+  const { t } = window.HLM.I18n;
   const Icons = {
     grid: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
     queue: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
@@ -21,7 +22,11 @@ window.HLM = window.HLM || {};
     folder: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
   };
 
-  const STATUS_LABEL = { pending: '待接单', processing: '处理中', completed: '已完成', returned: '驳回', paused: '已暂停', cancelled: '已取消' };
+  // 状态标签：getter 读 t()，切语言后自动跟随，调用点零改动
+  const STATUS_LABEL = {};
+  ['pending', 'processing', 'completed', 'returned', 'paused', 'cancelled'].forEach(k => {
+    Object.defineProperty(STATUS_LABEL, k, { enumerable: true, get: () => t('status.' + k) });
+  });
 
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
@@ -63,8 +68,8 @@ window.HLM = window.HLM || {};
   function confirmDialog(title, msg, onOk, danger) {
     openModal(title,
       `<p style="font-size:14px;line-height:1.7;color:var(--muted);">${esc(msg)}</p>`,
-      `<button class="btn" onclick="window.HLM.U.closeModal()">取消</button>
-       <button class="btn ${danger ? 'danger' : 'primary'}" id="confirmOk">确定</button>`,
+      `<button class="btn" onclick="window.HLM.U.closeModal()">${t('common.cancel')}</button>
+       <button class="btn ${danger ? 'danger' : 'primary'}" id="confirmOk">${t('common.confirm')}</button>`,
       'sm');
     confirmCb = onOk;
     $('#confirmOk').onclick = () => { closeModal(); const cb = confirmCb; confirmCb = null; if (cb) cb(); };

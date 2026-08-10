@@ -12,6 +12,7 @@ const { securityHeaders, corsOptions, createGlobalLimiter } = require('./middlew
 const wsService = require('./services/websocket');
 const queue = require('./services/queueService');
 const approval = require('./services/approvalService');
+const { translateJson } = require('./services/i18n');
 
 const app = express();
 const PORT = parseInt(process.env.PORT) || 39000;
@@ -56,6 +57,9 @@ app.use(createGlobalLimiter());
 // 基础中间件
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+// i18n：按 Accept-Language 翻译用户可见 message（en 时）
+app.use(translateJson);
 
 // 静态文件服务
 app.use(express.static(path.join(__dirname, 'public')));

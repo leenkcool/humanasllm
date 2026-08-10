@@ -4,6 +4,7 @@ window.HLM = window.HLM || {};
 (function () {
   const U = window.HLM.U;
   const { Icons, $, esc, toast, STATUS_LABEL } = U;
+  const { t, lang, setLang, applyStatic } = window.HLM.I18n;
   const API = window.HLM.API;
   const UI = window.HLM.UI;
   const WS = window.HLM.WS;
@@ -11,10 +12,10 @@ window.HLM = window.HLM || {};
   let currentUser = null;
 
   const THEMES = [
-    { id: 'light', label: '浅色' },
-    { id: 'warm', label: '暖色' },
-    { id: 'mori', label: '莫兰迪' },
-    { id: 'dark', label: '深色' },
+    { id: 'light', label: () => t('theme.light') },
+    { id: 'warm', label: () => t('theme.warm') },
+    { id: 'mori', label: () => t('theme.mori') },
+    { id: 'dark', label: () => t('theme.dark') },
   ];
 
   // ===== 认证 =====
@@ -34,30 +35,47 @@ window.HLM = window.HLM || {};
 
   // ===== 导航 =====
   const NAV = [
-    { id: 'dashboard', label: '工作台', icon: 'grid', show: () => true },
-    { id: 'queue', label: '任务队列', icon: 'queue', show: () => true, badge: () => window._pendingCount || 0 },
-    { id: 'mine', label: '我的任务', icon: 'mine', show: () => true },
-    { id: 'logs', label: '请求日志', icon: 'logs', show: () => true },
-    { id: 'approvals', label: '审批', icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
-    { id: 'projects', label: '项目', icon: 'folder', show: () => true },
-    { id: 'users', label: '用户管理', icon: 'users', show: () => (currentUser.role === 'admin') },
+    { id: 'dashboard', label: () => t('nav.dashboard'), icon: 'grid', show: () => true },
+    { id: 'queue', label: () => t('nav.queue'), icon: 'queue', show: () => true, badge: () => window._pendingCount || 0 },
+    { id: 'mine', label: () => t('nav.mine'), icon: 'mine', show: () => true },
+    { id: 'logs', label: () => t('nav.logs'), icon: 'logs', show: () => true },
+    { id: 'approvals', label: () => t('nav.approvals'), icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
+    { id: 'projects', label: () => t('nav.projects'), icon: 'folder', show: () => true },
+    { id: 'users', label: () => t('nav.users'), icon: 'users', show: () => (currentUser.role === 'admin') },
   ];
 
   function renderSidebar() {
     const nav = $('#nav');
     nav.innerHTML = NAV.filter(n => n.show()).map(n => `
       <a class="nav-item" data-page="${n.id}" href="#/${n.id}">
-        ${Icons[n.icon]}<span class="txt">${n.label}</span>
+        ${Icons[n.icon]}<span class="txt">${n.label()}</span>
         <span class="badge" data-badge="${n.id}" style="display:none"></span>
       </a>`).join('');
     const foot = $('#sidebarFoot');
+    const otherLang = lang() === 'en' ? '中文' : 'English';
     foot.innerHTML = `
       <div class="chip"><span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block"></span><span id="wsStatus"></span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">${THEMES.map(t => `<button class="btn sm" data-theme-btn="${t.id}">${t.label}</button>`).join('')}</div>
-      <button class="btn sm" onclick="window.HLM.App.logout()">${Icons.logout} 退出登录</button>`;
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">${THEMES.map(th => `<button class="btn sm" data-theme-btn="${th.id}">${th.label()}</button>`).join('')}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn sm" onclick="window.HLM.App.switchLang()">${otherLang}</button>
+        <button class="btn sm" onclick="window.HLM.App.logout()">${Icons.logout} ${t('app.logout')}</button>
+      </div>`;
     foot.querySelectorAll('[data-theme-btn]').forEach(b => {
       b.onclick = () => setTheme(b.dataset.themeBtn);
     });
+  }
+
+  function switchLang() {
+    setLang(lang() === 'en' ? 'zh' : 'en');
+    applyStatic();
+    applyUserBadge();
+    renderSidebar();
+    refresh();
+  }
+
+  function applyUserBadge() {
+    $('#userName').textContent = currentUser.name || currentUser.username || '';
+    $('#userRole').textContent = currentUser.role === 'admin' ? t('role.admin') : t('role.engineer');
   }
 
   function setTheme(id) {
@@ -74,21 +92,21 @@ window.HLM = window.HLM || {};
   async function renderDashboard() {
     const content = $('#content');
     content.innerHTML = `
-      <div class="topbar"><div><div class="page-title">工作台</div><div class="page-desc">人工代理网关 · Human-as-LLM 任务监控</div></div>
+      <div class="topbar"><div><div class="page-title">${t('page.dashboard.title')}</div><div class="page-desc">${t('page.dashboard.desc')}</div></div>
         <div class="spacer"></div><span class="chip">model: ${esc('human-llm')}</span>
         <button class="icon-btn" onclick="window.HLM.App.route()">${Icons.refresh}</button></div>
       <div class="stats" id="statsBox"></div>
-      <div class="card"><div class="card-head"><span class="t">待接单队列</span>
-        <button class="btn sm" onclick="window.HLM.App.route()">刷新</button></div>
+      <div class="card"><div class="card-head"><span class="t">${t('page.dashboard.queue')}</span>
+        <button class="btn sm" onclick="window.HLM.App.route()">${t('common.refresh')}</button></div>
         <div class="card-body-flush"><div class="tbl-wrap"><table class="data">
-          <thead><tr><th>ID</th><th>优先级</th><th>状态</th><th>项目</th><th>需求摘要</th><th>指派人</th><th>创建时间</th><th>超时剩余</th><th>操作</th></tr></thead>
+          <thead><tr><th>${t('table.id')}</th><th>${t('table.priority')}</th><th>${t('table.status')}</th><th>${t('table.project')}</th><th>${t('table.summary')}</th><th>${t('table.assignee')}</th><th>${t('table.createdAt')}</th><th>${t('table.timeoutLeft')}</th><th>${t('table.action')}</th></tr></thead>
           <tbody id="queueBody"></tbody></table></div></div></div>`;
     try {
       const s = await API.get('/workbench/summary');
       const st = s.data.stats;
-      const order = [['pending', '待接单'], ['processing', '处理中'], ['completed', '已完成'], ['returned', '驳回'], ['paused', '暂停']];
-      $('#statsBox').innerHTML = order.map(([k, label]) => `
-        <div class="stat ${k}"><div class="num">${st[k] || 0}</div><div class="lbl">${label}</div></div>`).join('');
+      const order = ['pending', 'processing', 'completed', 'returned', 'paused'];
+      $('#statsBox').innerHTML = order.map(k => `
+        <div class="stat ${k}"><div class="num">${st[k] || 0}</div><div class="lbl">${t('stat.' + k)}</div></div>`).join('');
       window._pendingCount = st.pending || 0;
       updateBadges();
       const q = await API.get('/workbench/queue');
@@ -99,18 +117,18 @@ window.HLM = window.HLM || {};
   async function renderQueue() {
     const content = $('#content');
     content.innerHTML = `
-      <div class="topbar"><div><div class="page-title">任务队列</div><div class="page-desc">全部人工任务</div></div>
+      <div class="topbar"><div><div class="page-title">${t('page.queue.title')}</div><div class="page-desc">${t('page.queue.desc')}</div></div>
         <div class="spacer"></div>
         <select class="form-select" id="fStatus" style="width:140px;">
-          <option value="">全部状态</option>${Object.entries(STATUS_LABEL).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+          <option value="">${t('common.all')}</option>${Object.entries(STATUS_LABEL).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
         </select>
         <select class="form-select" id="fPriority" style="width:120px;">
-          <option value="">全部优先级</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option>
+          <option value="">${t('common.allPriority')}</option><option value="high">${t('common.priority.high')}</option><option value="medium">${t('common.priority.medium')}</option><option value="low">${t('common.priority.low')}</option>
         </select>
-        <button class="btn" onclick="window.HLM.UI.exportCSV('/tasks/export')">导出</button>
-        <button class="btn" onclick="window.HLM.App.loadQueue()">筛选</button></div>
+        <button class="btn" onclick="window.HLM.UI.exportCSV('/tasks/export')">${t('common.export')}</button>
+        <button class="btn" onclick="window.HLM.App.loadQueue()">${t('common.filter')}</button></div>
       <div class="card"><div class="card-body-flush"><div class="tbl-wrap"><table class="data">
-        <thead><tr><th>ID</th><th>优先级</th><th>状态</th><th>项目</th><th>需求摘要</th><th>指派人</th><th>创建时间</th><th>超时剩余</th><th>操作</th></tr></thead>
+        <thead><tr><th>${t('table.id')}</th><th>${t('table.priority')}</th><th>${t('table.status')}</th><th>${t('table.project')}</th><th>${t('table.summary')}</th><th>${t('table.assignee')}</th><th>${t('table.createdAt')}</th><th>${t('table.timeoutLeft')}</th><th>${t('table.action')}</th></tr></thead>
         <tbody id="queueBody"></tbody></table></div></div></div>`;
   }
 
@@ -129,10 +147,10 @@ window.HLM = window.HLM || {};
   async function renderMine() {
     const content = $('#content');
     content.innerHTML = `
-      <div class="topbar"><div><div class="page-title">我的任务</div><div class="page-desc">我接单处理的任务</div></div>
-        <div class="spacer"></div><button class="btn" onclick="window.HLM.App.route()">刷新</button></div>
+      <div class="topbar"><div><div class="page-title">${t('page.mine.title')}</div><div class="page-desc">${t('page.mine.desc')}</div></div>
+        <div class="spacer"></div><button class="btn" onclick="window.HLM.App.route()">${t('common.refresh')}</button></div>
       <div class="card"><div class="card-body-flush"><div class="tbl-wrap"><table class="data">
-        <thead><tr><th>ID</th><th>优先级</th><th>状态</th><th>项目</th><th>需求摘要</th><th>创建时间</th><th>操作</th></tr></thead>
+        <thead><tr><th>${t('table.id')}</th><th>${t('table.priority')}</th><th>${t('table.status')}</th><th>${t('table.project')}</th><th>${t('table.summary')}</th><th>${t('table.createdAt')}</th><th>${t('table.action')}</th></tr></thead>
         <tbody id="mineBody"></tbody></table></div></div></div>`;
     try {
       const r = await API.get('/workbench/mine');
@@ -143,10 +161,10 @@ window.HLM = window.HLM || {};
   async function renderLogs() {
     const content = $('#content');
     content.innerHTML = `
-      <div class="topbar"><div><div class="page-title">日志</div><div class="page-desc">完整请求 / 人工输出 / 状态审计</div></div>
+      <div class="topbar"><div><div class="page-title">${t('page.logs.title')}</div><div class="page-desc">${t('page.logs.desc')}</div></div>
         <div class="spacer"></div>
-        <button class="btn sm" data-logtab="req">请求/输出</button>
-        <button class="btn sm" data-logtab="audit">任务审计</button></div>
+        <button class="btn sm" data-logtab="req">${t('log.tabReq')}</button>
+        <button class="btn sm" data-logtab="audit">${t('log.tabAudit')}</button></div>
       <div id="logBox"></div>`;
     content.querySelector('[data-logtab="req"]').onclick = () => renderLogInner('req');
     content.querySelector('[data-logtab="audit"]').onclick = () => renderLogInner('audit');
@@ -155,13 +173,13 @@ window.HLM = window.HLM || {};
 
   async function renderLogInner(kind) {
     const box = $('#logBox');
-    box.innerHTML = '<div class="empty" style="padding:40px;">加载中...</div>';
+    box.innerHTML = `<div class="empty" style="padding:40px;">${t('toast.loading')}</div>`;
     await UI.renderLogs(box, kind);
   }
 
   async function renderUsers() {
     const content = $('#content');
-    content.innerHTML = `<div class="topbar"><div><div class="page-title">用户管理</div><div class="page-desc">工程师账户管理</div></div>
+    content.innerHTML = `<div class="topbar"><div><div class="page-title">${t('page.users.title')}</div><div class="page-desc">${t('page.users.desc')}</div></div>
       <div class="spacer"></div></div><div id="usersBox"></div>`;
     await UI.renderUsers($('#usersBox'), currentUser.role === 'admin');
   }
@@ -170,13 +188,13 @@ window.HLM = window.HLM || {};
   async function renderApprovals() {
     const content = $('#content');
     content.innerHTML = `
-      <div class="topbar"><div><div class="page-title">审批</div><div class="page-desc">AI 资源 / 权限审批 · 人类采购或准备后提供</div></div>
+      <div class="topbar"><div><div class="page-title">${t('page.approvals.title')}</div><div class="page-desc">${t('page.approvals.desc')}</div></div>
         <div class="spacer"></div>
         <select class="form-select" id="aStatus" style="width:130px;">
-          <option value="">全部状态</option><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已驳回</option>
+          <option value="">${t('common.all')}</option><option value="pending">${t('approval.status.pending')}</option><option value="approved">${t('approval.status.approved')}</option><option value="rejected">${t('approval.status.rejected')}</option>
         </select>
-        <button class="btn" onclick="window.HLM.UI.exportCSV('/approvals/export')">导出</button>
-        <button class="btn" onclick="window.HLM.App.loadApprovals()">筛选</button></div>
+        <button class="btn" onclick="window.HLM.UI.exportCSV('/approvals/export')">${t('common.export')}</button>
+        <button class="btn" onclick="window.HLM.App.loadApprovals()">${t('common.filter')}</button></div>
       <div id="approvalsBox"></div>`;
     await loadApprovals();
   }
@@ -197,10 +215,10 @@ window.HLM = window.HLM || {};
   async function renderProjects() {
     const content = $('#content');
     content.innerHTML = `
-      <div class="topbar"><div><div class="page-title">项目管理</div><div class="page-desc">管理员管理项目 · 申请建项目走审批 · 任务可归属项目</div></div>
+      <div class="topbar"><div><div class="page-title">${t('page.projects.title')}</div><div class="page-desc">${t('page.projects.desc')}</div></div>
         <div class="spacer"></div>
-        <button class="btn" onclick="window.HLM.UI.promptApplyProject()">申请建项目</button>
-        ${currentUser.role === 'admin' ? '<button class="btn primary" onclick="window.HLM.UI.promptCreateProject()">新建项目</button>' : ''}</div>
+        <button class="btn" onclick="window.HLM.UI.promptApplyProject()">${t('project.applyTitle')}</button>
+        ${currentUser.role === 'admin' ? `<button class="btn primary" onclick="window.HLM.UI.promptCreateProject()">${t('project.createTitle')}</button>` : ''}</div>
       <div id="projectsBox"></div>`;
     await loadProjects();
   }
@@ -229,12 +247,12 @@ window.HLM = window.HLM || {};
 
   // ===== Socket 事件 =====
   function bindWS() {
-    WS.on('new', () => { toast('有新任务进入队列', 'info'); updateBadges(); refresh(); });
-    WS.on('update', (d) => { toast(`任务 #${d.id} 状态更新为 ${STATUS_LABEL[d.status] || d.status}`, 'info'); refresh(); });
-    WS.on('timeout', (d) => { toast(`任务 #${d.id} 超时告警`, 'warning'); refresh(); });
-    WS.on('approval:new', () => { toast('有新审批请求，请处理', 'info'); refresh(); });
-    WS.on('approval:update', () => { toast('审批状态已更新', 'info'); refresh(); });
-    WS.on('approval:overdue', (d) => { toast(`审批 #${d.id} 已超 24h 未处理`, 'warning'); refresh(); });
+    WS.on('new', () => { toast(t('toast.newTask'), 'info'); updateBadges(); refresh(); });
+    WS.on('update', (d) => { toast(t('toast.taskUpdate', { id: d.id, status: STATUS_LABEL[d.status] || d.status }), 'info'); refresh(); });
+    WS.on('timeout', (d) => { toast(t('toast.taskTimeout', { id: d.id }), 'warning'); refresh(); });
+    WS.on('approval:new', () => { toast(t('toast.newApproval'), 'info'); refresh(); });
+    WS.on('approval:update', () => { toast(t('toast.approvalUpdate'), 'info'); refresh(); });
+    WS.on('approval:overdue', (d) => { toast(t('toast.approvalOverdue', { id: d.id }), 'warning'); refresh(); });
   }
 
   function updateBadges() {
@@ -258,8 +276,8 @@ window.HLM = window.HLM || {};
   function init() {
     if (!checkAuth()) return;
     document.body.dataset.theme = localStorage.getItem('hlm_theme') || 'light';
-    $('#userName').textContent = currentUser.name || currentUser.username || '';
-    $('#userRole').textContent = currentUser.role === 'admin' ? '管理员' : '工程师';
+    applyStatic();
+    applyUserBadge();
     renderSidebar();
     initSidebar();
     WS.init();
@@ -270,7 +288,7 @@ window.HLM = window.HLM || {};
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

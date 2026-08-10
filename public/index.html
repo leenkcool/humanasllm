@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="i18n-title" content="meta.title.index">
   <title>人工代理网关 · 工程师工作台</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%232563eb'/><path d='M10 22l6-6 4 4 8-9v5h-2v4H26l2-2 2 2z' fill='white'/></svg>">
   <link rel="stylesheet" href="/css/style.css">
@@ -16,8 +17,8 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
         </div>
         <div style="min-width:0;">
-          <div class="title">人工代理网关</div>
-          <div class="sub">Human-as-LLM 工作台</div>
+          <div class="title" data-i18n="app.name">人工代理网关</div>
+          <div class="sub" data-i18n="app.sub">Human-as-LLM 工作台</div>
         </div>
       </div>
       <nav class="sidebar-nav" id="nav"></nav>
@@ -27,10 +28,10 @@
     <!-- 主区 -->
     <main class="main" id="main">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <button class="icon-btn menu-btn" id="menuBtn" title="菜单">
+        <button class="icon-btn menu-btn" id="menuBtn" data-i18n-title="app.menu" title="菜单">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-        <button class="icon-btn" id="collapseBtn" title="折叠侧栏">
+        <button class="icon-btn" id="collapseBtn" data-i18n-title="app.collapse" title="折叠侧栏">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div style="flex:1;display:flex;align-items:center;gap:8px;">
@@ -43,6 +44,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/i18n.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/ws.js"></script>

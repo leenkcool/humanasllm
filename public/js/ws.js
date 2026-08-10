@@ -29,7 +29,7 @@ window.HLM = window.HLM || {};
     const el = document.getElementById('wsStatus');
     if (el) {
       el.className = 'chip';
-      el.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${ok ? 'var(--success)' : 'var(--danger)'};display:inline-block"></span>${ok ? '实时已连接' : '实时断开'}`;
+      el.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${ok ? 'var(--success)' : 'var(--danger)'};display:inline-block"></span>${ok ? HLM.I18n.t('ws.connected') : HLM.I18n.t('ws.disconnected')}`;
     }
   }
 

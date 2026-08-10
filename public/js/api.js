@@ -3,12 +3,13 @@ window.HLM = window.HLM || {};
 
 (function () {
   const { toast } = window.HLM.U;
+  const { t, acceptHeader } = window.HLM.I18n;
 
   function getToken() { return localStorage.getItem('hlm_token'); }
   function getBase() { return window.location.origin + '/api'; }
 
   async function request(method, url, body) {
-    const headers = { 'Content-Type': 'application/json; charset=utf-8' };
+    const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Accept-Language': acceptHeader() };
     const token = getToken();
     if (token) headers['Authorization'] = 'Bearer ' + token;
 
@@ -23,10 +24,10 @@ window.HLM = window.HLM || {};
       localStorage.removeItem('hlm_token');
       localStorage.removeItem('hlm_user');
       if (window.location.pathname.indexOf('login.html') < 0) window.location.href = '/login.html';
-      throw new Error(data?.message || data?.error || '登录已过期');
+      throw new Error(data?.message || data?.error || t('api.expired'));
     }
     if (!res.ok) {
-      throw new Error(data?.message || data?.error || '请求失败');
+      throw new Error(data?.message || data?.error || t('api.requestFail'));
     }
     return data;
   }
