@@ -11,6 +11,33 @@ const project = require('../services/projectService');
 
 const VALID_STATUS = ['pending', 'processing', 'completed', 'returned', 'paused', 'cancelled'];
 
+function toCSV(rows, cols) {
+  const esc = (v) => {
+    const s = v == null ? '' : String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  return cols.join(',') + '\n' + rows.map(r => cols.map(c => esc(r[c])).join(',')).join('\n');
+}
+
+// 导出任务 CSV（utf-8 BOM，Excel 兼容）
+router.get('/export', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const list = queue.rows(await db.exec(
+      `SELECT t.id, t.upstream_request_id, t.model, t.priority, t.project_code, t.status,
+              u.name AS assignee_name, t.result_text, t.reject_reason, t.created_at, t.completed_at
+         FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id ORDER BY t.id`
+    ));
+    const cols = ['id', 'upstream_request_id', 'model', 'priority', 'project_code', 'status', 'assignee_name', 'result_text', 'reject_reason', 'created_at', 'completed_at'];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=tasks.csv');
+    res.send('﻿' + toCSV(list, cols));
+  } catch (e) {
+    console.error('[导出失败]', e.message);
+    res.status(500).json({ success: false, message: '导出失败' });
+  }
+});
+
 // 列表（状态/优先级/指派人筛选）
 router.get('/', authenticate, async (req, res) => {
   try {

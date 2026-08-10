@@ -107,6 +107,7 @@ window.HLM = window.HLM || {};
         <select class="form-select" id="fPriority" style="width:120px;">
           <option value="">全部优先级</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option>
         </select>
+        <button class="btn" onclick="window.HLM.UI.exportCSV('/tasks/export')">导出</button>
         <button class="btn" onclick="window.HLM.App.loadQueue()">筛选</button></div>
       <div class="card"><div class="card-body-flush"><div class="tbl-wrap"><table class="data">
         <thead><tr><th>ID</th><th>优先级</th><th>状态</th><th>项目</th><th>需求摘要</th><th>指派人</th><th>创建时间</th><th>超时剩余</th><th>操作</th></tr></thead>
@@ -174,6 +175,7 @@ window.HLM = window.HLM || {};
         <select class="form-select" id="aStatus" style="width:130px;">
           <option value="">全部状态</option><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已驳回</option>
         </select>
+        <button class="btn" onclick="window.HLM.UI.exportCSV('/approvals/export')">导出</button>
         <button class="btn" onclick="window.HLM.App.loadApprovals()">筛选</button></div>
       <div id="approvalsBox"></div>`;
     await loadApprovals();

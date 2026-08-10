@@ -491,6 +491,22 @@ window.HLM = window.HLM || {};
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  // 导出 CSV（带 token 下载）
+  async function exportCSV(url) {
+    try {
+      const token = localStorage.getItem('hlm_token');
+      const res = await fetch(window.location.origin + '/api' + url, { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok) throw new Error('导出失败');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = url.includes('approvals') ? 'approvals.csv' : 'tasks.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('导出成功', 'success');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   window.HLM.UI = {
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
@@ -499,7 +515,7 @@ window.HLM = window.HLM || {};
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
     renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,
     promptEditProject, submitEditProject, doArchiveProject,
-    promptTaskProject, submitTaskProject,
+    promptTaskProject, submitTaskProject, exportCSV,
     startCountdown,
     closeModal,
   };

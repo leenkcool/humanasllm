@@ -62,6 +62,28 @@ router.post('/approvals', requireUpstreamKey, async (req, res) => {
 
 // ===== 工作台 =====
 
+function toCSV(rows, cols) {
+  const esc = (v) => {
+    const s = v == null ? '' : String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  return cols.join(',') + '\n' + rows.map(r => cols.map(c => esc(r[c])).join(',')).join('\n');
+}
+
+// 导出审批 CSV（utf-8 BOM，Excel 兼容）
+router.get('/export', authenticate, async (req, res) => {
+  try {
+    const { data } = await approval.listApprovals({ status: req.query.status });
+    const cols = ['id', 'approval_no', 'type', 'resource', 'amount', 'purpose', 'requester', 'project_code', 'status', 'provider_name', 'provided', 'reject_reason', 'created_at', 'decided_at'];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=approvals.csv');
+    res.send('﻿' + toCSV(data, cols));
+  } catch (e) {
+    console.error('[导出失败]', e.message);
+    res.status(500).json({ success: false, message: '导出失败' });
+  }
+});
+
 // 审批列表
 router.get('/', authenticate, async (req, res) => {
   try {
