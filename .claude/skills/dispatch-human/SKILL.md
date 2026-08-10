@@ -22,11 +22,11 @@ description: 将涉密/私有逻辑/需人工判断/项目规则要求人工的�
    ```
    subagent_type: "humanllm"
    prompt: <任务原文 + 交人工原因标注>
-   run_in_background: false      // 同步等待人工结果；大任务可后台
+   run_in_background: false      // /v1 异步受理，humanllm 登记未完成、之后回查交付；大任务可后台
    ```
    humanllm 会按 `G:\dev\p390\.claude\agents\humanllm.md` 自动把任务整理成「完整上下文包」（【任务】【交人工原因】【项目与代码库】【接单流程】【环境约定】【要求】），写入 `data/human_task.json` 并提交 p390 网关。
-4. **等待** 人工工程师在工作台接单完成（最长约 9 分钟）。
-5. **回传**：把人工产出**逐字**返回给调用者（保留代码块与换行），并附任务编号与工作台地址。
+4. **登记未完成**：/v1 **异步受理**立即返回 `task_id`（人工小时级，不再挂起等待）。humanllm 把 task_id 登记到 `data/human_followup.json`（pending）。
+5. **回查交付**：后续做相关工作再次调用时，humanllm 先回查 `GET /v1/tasks/:id`——`completed` 把人工产出**逐字**返回（保留代码块与换行）；未完成则如实反馈状态、保留登记继续轮候。
 
 ## 委派参数速查
 
@@ -41,7 +41,9 @@ description: 将涉密/私有逻辑/需人工判断/项目规则要求人工的�
 
 - ✅ 确实调用了 `humanllm` agent（而非自行实现任务）。
 - ✅ 任务包六要素齐全（humanllm 保证）：【任务】【交人工原因】【项目与代码库】【接单流程】【环境约定】【要求】。
-- ✅ 回传内容是**人工产出原文**，未自行改写、未丢代码块/换行。
+- ✅ 拿到 `task_id` 已登记到 `data/human_followup.json`（未完成，防遗忘）。
+- ✅ 回传内容是**人工产出原文**（`completed` 回查），未自行改写、未丢代码块/换行。
+- ✅ 未完成任务如实反馈状态（pending/processing/returned），未谎称完成，继续轮候。
 - ✅ 附上了任务编号（如 #21）与工作台地址 `http://192.168.168.3:39000/login.html`。
 
 ---

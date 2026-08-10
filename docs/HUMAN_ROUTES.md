@@ -80,6 +80,20 @@
 - 与已有扩展字段 `priority` / `project_code` / `meta_tags` 并列，全量透传并落库。
 - 工作台任务列表 / 详情显示类别标签（涉密=紫、运维=蓝），工程师接单前即可识别。
 
+### 上游跟进契约（task_id）
+
+`human-llm` 任务为**异步受理**：`POST /v1/chat/completions` 创建任务后立即返回 `task_id` + `status: "pending"`，不阻塞等待人工完成（人工是**小时级**节奏，AI 是分钟级）。任何上游 Agent / vibe coding 工具必须遵守以下契约，否则任务结果会被遗忘：
+
+1. **提交** → 拿到 `task_id`。
+2. **登记未完成**：把 `task_id` 记入自己的未完成清单（防遗忘的关键一步）。
+3. **回查**：下次做与之相关工作前，`GET /v1/tasks/:id` 查询处理结果。
+4. **交付 / 轮候**：
+   - `status: completed` → 取 `content`（人工产出）交付，任务结清。
+   - `status: returned` → 转达驳回原因，补充上下文后可重新派单。
+   - `status: pending|processing|paused` → 如实反馈状态，**继续轮候**直到完成。
+
+**Claude Code 侧自动实现**：`humanllm` 子代理（`.claude/agents/humanllm.md`）+ `dispatch-human` skill 已按本契约工作——提交后把 `task_id` 登记到 `data/human_followup.json`，每次被调用先回查，完成即交付产出、未完成反馈状态继续轮候。
+
 ---
 
 ## 四、与既有机制配合
