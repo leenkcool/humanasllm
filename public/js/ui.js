@@ -4,7 +4,7 @@ window.HLM = window.HLM || {};
 (function () {
   const { API } = window.HLM;
   const U = window.HLM.U;
-  const { Icons, $, esc, fmt, jsonStr, toast, openModal, closeModal, confirmDialog, STATUS_LABEL } = U;
+  const { Icons, $, esc, fmt, jsonStr, nl, toast, openModal, closeModal, confirmDialog, STATUS_LABEL } = U;
 
   // ===== 任务表格 =====
   function renderTasks(list, containerId) {
@@ -77,8 +77,6 @@ window.HLM = window.HLM || {};
       const messages = Array.isArray(p.messages) ? p.messages : [];
 
       const metaHtml = Object.entries(t.meta_tags || {}).map(([k, v]) => `<span class="tag medium" style="margin-right:6px;">${esc(k)}: ${esc(v)}</span>`).join('');
-      // 内容渲染：字面 \n 与真实换行统一转 <br>（人类可读，兼容手动/脚本派单）
-      const nl = (v) => String(v == null ? '' : (typeof v === 'string' ? v : JSON.stringify(v, null, 1))).replace(/\\n/g, '\n');
       const msgsHtml = messages.map(m => `
         <div class="msg-row ${esc(m.role)}">
           <div class="role">${esc(m.role)}</div>
@@ -302,7 +300,6 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 审批 =====
-  const nl = (v) => String(v == null ? '' : (typeof v === 'string' ? v : JSON.stringify(v, null, 1))).replace(/\\n/g, '\n');
   const APPROVAL_LABEL = { pending: '待审批', approved: '已批准', rejected: '已驳回' };
 
   async function renderApprovals(list, box) {

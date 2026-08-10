@@ -8,16 +8,9 @@ const { getDb } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const queue = require('../services/queueService');
 const project = require('../services/projectService');
+const { toCSV } = require('../services/csv');
 
 const VALID_STATUS = ['pending', 'processing', 'completed', 'returned', 'paused', 'cancelled'];
-
-function toCSV(rows, cols) {
-  const esc = (v) => {
-    const s = v == null ? '' : String(v);
-    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  };
-  return cols.join(',') + '\n' + rows.map(r => cols.map(c => esc(r[c])).join(',')).join('\n');
-}
 
 // 导出任务 CSV（utf-8 BOM，Excel 兼容）
 router.get('/export', authenticate, async (req, res) => {

@@ -9,6 +9,7 @@ const approval = require('../services/approvalService');
 const project = require('../services/projectService');
 const { authenticate } = require('../middleware/auth');
 const encoder = require('../services/openaiEncoder');
+const { toCSV } = require('../services/csv');
 
 // 上游 API-Key 校验（同 /v1/chat/completions）
 function requireUpstreamKey(req, res, next) {
@@ -61,14 +62,6 @@ router.post('/approvals', requireUpstreamKey, async (req, res) => {
 });
 
 // ===== 工作台 =====
-
-function toCSV(rows, cols) {
-  const esc = (v) => {
-    const s = v == null ? '' : String(v);
-    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  };
-  return cols.join(',') + '\n' + rows.map(r => cols.map(c => esc(r[c])).join(',')).join('\n');
-}
 
 // 导出审批 CSV（utf-8 BOM，Excel 兼容）
 router.get('/export', authenticate, async (req, res) => {

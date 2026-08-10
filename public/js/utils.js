@@ -28,6 +28,10 @@ window.HLM = window.HLM || {};
   function esc(str) { const d = document.createElement('div'); d.textContent = str == null ? '' : String(str); return d.innerHTML; }
   function fmt(t) { if (!t) return '-'; const d = new Date(t); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
   function jsonStr(v) { if (v == null) return ''; return typeof v === 'string' ? v : JSON.stringify(v, null, 1); }
+  /** 内容换行归一：字面 \n（反斜杠+n）与真实换行统一为真实换行，便于渲染 */
+  function nl(v) {
+    return String(v == null ? '' : (typeof v === 'string' ? v : JSON.stringify(v, null, 1))).replace(/\\n/g, '\n');
+  }
 
   function toast(msg, type) {
     let box = $('#toastBox');
@@ -66,5 +70,5 @@ window.HLM = window.HLM || {};
     $('#confirmOk').onclick = () => { closeModal(); const cb = confirmCb; confirmCb = null; if (cb) cb(); };
   }
 
-  window.HLM.U = { Icons, STATUS_LABEL, $, $$, esc, fmt, jsonStr, toast, openModal, closeModal, confirmDialog };
+  window.HLM.U = { Icons, STATUS_LABEL, $, $$, esc, fmt, jsonStr, nl, toast, openModal, closeModal, confirmDialog };
 })();
