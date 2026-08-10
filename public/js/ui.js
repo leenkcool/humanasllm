@@ -11,7 +11,7 @@ window.HLM = window.HLM || {};
     const box = $(containerId);
     if (!box) return;
     if (!list.length) {
-      box.innerHTML = `<tr><td colspan="8" class="empty">暂无任务</td></tr>`;
+      box.innerHTML = `<tr><td colspan="9" class="empty">暂无任务</td></tr>`;
       return;
     }
     box.innerHTML = list.map(t => {
@@ -24,6 +24,7 @@ window.HLM = window.HLM || {};
         <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(String(summary || '').slice(0, 60))}</td>
         <td class="nowrap">${esc(t.assignee_name || '-')}</td>
         <td class="nowrap" style="color:var(--muted);font-size:12px;">${fmt(t.created_at)}</td>
+        <td class="nowrap" data-timeout="${t.timeout_at || ''}" data-status="${t.status}" style="font-size:12px;">${renderTimeoutCell(t.timeout_at, t.status)}</td>
         <td class="nowrap">
           <div style="display:flex;gap:6px;">
             <button class="btn sm" onclick="window.HLM.UI.openDetail(${t.id})">查看</button>
@@ -32,6 +33,39 @@ window.HLM = window.HLM || {};
         </td>
       </tr>`;
     }).join('');
+  }
+
+  // ===== 超时剩余时间倒计时 =====
+  function fmtRemain(ms) {
+    if (ms <= 0) return { label: '已超时', danger: true };
+    const s = Math.floor(ms / 1000);
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60), sec = s % 60;
+    let t = '';
+    if (d > 0) t += d + '天';
+    if (h > 0 || d > 0) t += h + '时';
+    if (m > 0 || h > 0 || d > 0) t += m + '分';
+    t += sec + '秒';
+    return { label: t, danger: false };
+  }
+  function renderTimeoutCell(timeoutAt, status) {
+    if (!timeoutAt || ['completed', 'cancelled'].includes(status)) return '-';
+    const ms = new Date(timeoutAt).getTime() - Date.now();
+    const r = fmtRemain(ms);
+    return r.danger
+      ? '<span style="color:var(--danger);font-weight:600;">已超时</span>'
+      : `<span style="color:var(--muted);">${r.label}</span>`;
+  }
+  function startCountdown() {
+    if (window._hlmCountdown) return;
+    window._hlmCountdown = true;
+    setInterval(() => {
+      document.querySelectorAll('[data-timeout]').forEach(td => {
+        const t = td.dataset.timeout;
+        const st = td.dataset.status || '';
+        td.innerHTML = renderTimeoutCell(t, st);
+      });
+    }, 1000);
   }
 
   // ===== 任务详情模态 =====
@@ -362,6 +396,7 @@ window.HLM = window.HLM || {};
     promptReopen, submitReopen,
     renderUsers, showUserForm, saveUser, delUser, renderLogs,
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
+    startCountdown,
     closeModal,
   };
 })();

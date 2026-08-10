@@ -6,4 +6,5 @@ data/backups/
 .env
 # humanllm 子代理运行时文件（每次派单覆盖，不入库）
 data/human_task.json
+data/human_approval.json
 data/.job_result

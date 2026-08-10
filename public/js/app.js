@@ -80,7 +80,7 @@ window.HLM = window.HLM || {};
       <div class="card"><div class="card-head"><span class="t">待接单队列</span>
         <button class="btn sm" onclick="window.HLM.App.route()">刷新</button></div>
         <div class="card-body-flush"><div class="tbl-wrap"><table class="data">
-          <thead><tr><th>ID</th><th>优先级</th><th>状态</th><th>项目</th><th>需求摘要</th><th>创建时间</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>优先级</th><th>状态</th><th>项目</th><th>需求摘要</th><th>指派人</th><th>创建时间</th><th>超时剩余</th><th>操作</th></tr></thead>
           <tbody id="queueBody"></tbody></table></div></div></div>`;
     try {
       const s = await API.get('/workbench/summary');
@@ -108,7 +108,7 @@ window.HLM = window.HLM || {};
         </select>
         <button class="btn" onclick="window.HLM.App.loadQueue()">筛选</button></div>
       <div class="card"><div class="card-body-flush"><div class="tbl-wrap"><table class="data">
-        <thead><tr><th>ID</th><th>优先级</th><th>状态</th><th>项目</th><th>需求摘要</th><th>指派人</th><th>创建时间</th><th>操作</th></tr></thead>
+        <thead><tr><th>ID</th><th>优先级</th><th>状态</th><th>项目</th><th>需求摘要</th><th>指派人</th><th>创建时间</th><th>超时剩余</th><th>操作</th></tr></thead>
         <tbody id="queueBody"></tbody></table></div></div></div>`;
   }
 
@@ -244,6 +244,7 @@ window.HLM = window.HLM || {};
     bindWS();
     window.addEventListener('hashchange', route);
     route();
+    UI.startCountdown();
     window.HLM.refresh = refresh;
   }
 

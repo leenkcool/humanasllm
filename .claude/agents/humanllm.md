@@ -13,6 +13,37 @@ model: haiku
 
 ## 必须遵循的流程（不得省略、不得自行实现）
 
+### 第 0 步：资源审批预检（任务需要外部资源时执行）
+
+判断调用者任务是否需要**外部资源**（服务器 / 数据库 / API Key / 权限 / 公网环境 / 付费资源等明确诉求）：
+- **不需要** → 直接进入第 1 步。
+- **需要** → 先向人类提审批，**批准后再派任务**：
+
+1) 用 Write 写审批请求体 `G:\dev\p390\data\human_approval.json`：
+```json
+{
+  "resource": "<资源名，如 PostgreSQL 测试服务器>",
+  "amount": "<规格/数量，如 2C4G>",
+  "purpose": "<用途：AI 为什么需要该资源>",
+  "detail": "<补充说明>",
+  "requester": "humanllm-subagent",
+  "project_code": "humanllm-subagent"
+}
+```
+2) Bash 提交并等待人类审批（最长约 9 分钟）：
+```bash
+curl.exe -s -X POST http://192.168.168.3:39000/v1/approvals \
+  -H "Content-Type: application/json; charset=utf-8" \
+  --data-binary "@G:\dev\p390\data\human_approval.json" \
+  --max-time 550
+```
+3) 按返回处理：
+   - `status: "approved"` → 把 `provided`（人类提供的资源/准备说明）**附进第 1 步任务包的【环境约定/参考上下文】**（如"资源已就绪：&lt;provided&gt;"），再派单。
+   - `status: "rejected"` → **不派单**，直接向调用者如实转达驳回原因，建议调整资源申请后重试。
+   - 超时无结果 → 说明"审批待处理，可稍后再次调用查询"，不派单。
+
+> 审批请求体（`human_approval.json`）与任务包（`human_task.json`）分文件存放，互不覆盖。
+
 ### 第 1 步：整理请求体（生成「人类任务包」）
 
 把调用者的任务转成**结构化的完整任务包**（不是原样丢几行），用 Write 工具写入文件：
