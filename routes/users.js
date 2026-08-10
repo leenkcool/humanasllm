@@ -15,8 +15,8 @@ router.get('/', authenticate, async (req, res) => {
     const db = getDb();
     const role = req.query.role;
     const sql = role
-      ? 'SELECT id, username, role, name, is_active, created_at FROM users WHERE role = ? ORDER BY id'
-      : 'SELECT id, username, role, name, is_active, created_at FROM users ORDER BY id';
+      ? 'SELECT id, username, email, role, name, is_active, created_at FROM users WHERE role = ? ORDER BY id'
+      : 'SELECT id, username, email, role, name, is_active, created_at FROM users ORDER BY id';
     const list = rows(await db.exec(sql, role ? [role] : []));
     res.json({ success: true, data: list });
   } catch (err) {

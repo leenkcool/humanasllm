@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const approval = require('../services/approvalService');
+const project = require('../services/projectService');
 const { authenticate } = require('../middleware/auth');
 const encoder = require('../services/openaiEncoder');
 
@@ -93,6 +94,16 @@ router.post('/:id/approve', authenticate, async (req, res) => {
     const provided = (req.body.provided || '').toString();
     const r = await approval.approve(id, provided, { id: req.user.id, name: req.user.name || req.user.username });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
+    // 项目创建申请批准后自动建项目
+    if (r.approval.type === 'project' && r.approval.status === 'approved') {
+      try {
+        const created = await project.createFromApproval(r.approval);
+        r.approval.project = created;
+      } catch (e) {
+        console.error('[批准建项目失败]', e.message);
+        r.approval.project_error = e.message;
+      }
+    }
     res.json({ success: true, data: r.approval });
   } catch (e) {
     console.error('[批准失败]', e.message);

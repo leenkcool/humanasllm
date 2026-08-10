@@ -10,6 +10,7 @@ const workbenchRoutes = require('./workbench');
 const logRoutes = require('./logs');
 const v1Routes = require('./v1');
 const approvalRoutes = require('./approvals');
+const projectRoutes = require('./projects');
 
 module.exports = function (app) {
   // 工作台 REST
@@ -25,6 +26,9 @@ module.exports = function (app) {
   // AI 提审批（OpenAI 兼容发起 + 工作台审批）
   app.use('/v1', approvalRoutes);
   app.use('/api/approvals', approvalRoutes);
+
+  // 项目管理
+  app.use('/api/projects', projectRoutes);
 
   // 健康检查
   const health = (req, res) => res.json({ status: 'ok', service: 'p390-human-llm', timestamp: new Date().toISOString() });

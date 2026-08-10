@@ -15,6 +15,7 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(64) UNIQUE NOT NULL,
+  email VARCHAR(128),
   password VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'engineer',
   name VARCHAR(64),
@@ -75,6 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_request_logs_task ON request_logs(task_id);
 CREATE TABLE IF NOT EXISTS approvals (
   id SERIAL PRIMARY KEY,
   approval_no VARCHAR(32),
+  type VARCHAR(20) NOT NULL DEFAULT 'resource',
   resource VARCHAR(128) NOT NULL,
   amount VARCHAR(64),
   purpose TEXT,
@@ -92,6 +94,18 @@ CREATE TABLE IF NOT EXISTS approvals (
 );
 
 CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status);
+
+CREATE TABLE IF NOT EXISTS projects (
+  id SERIAL PRIMARY KEY,
+  code VARCHAR(64) UNIQUE NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 `;
 
 function createAdapter() {
@@ -113,6 +127,9 @@ function createAdapter() {
 async function initDatabase() {
   db = createAdapter();
   await db.exec(SCHEMA);
+  // ===== 兼容迁移（对已存在的表补列） =====
+  await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(128)`);
+  await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
   return db;
 }
 

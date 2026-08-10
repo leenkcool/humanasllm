@@ -39,6 +39,7 @@ window.HLM = window.HLM || {};
     { id: 'mine', label: '我的任务', icon: 'mine', show: () => true },
     { id: 'logs', label: '请求日志', icon: 'logs', show: () => true },
     { id: 'approvals', label: '审批', icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
+    { id: 'projects', label: '项目', icon: 'folder', show: () => true },
     { id: 'users', label: '用户管理', icon: 'users', show: () => (currentUser.role === 'admin') },
   ];
 
@@ -190,8 +191,27 @@ window.HLM = window.HLM || {};
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  // ===== 项目页 =====
+  async function renderProjects() {
+    const content = $('#content');
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">项目管理</div><div class="page-desc">管理员管理项目 · 申请建项目走审批 · 任务可归属项目</div></div>
+        <div class="spacer"></div>
+        <button class="btn" onclick="window.HLM.UI.promptApplyProject()">申请建项目</button>
+        ${currentUser.role === 'admin' ? '<button class="btn primary" onclick="window.HLM.UI.promptCreateProject()">新建项目</button>' : ''}</div>
+      <div id="projectsBox"></div>`;
+    await loadProjects();
+  }
+
+  async function loadProjects() {
+    try {
+      const r = await API.get('/projects');
+      UI.renderProjects(r.data, $('#projectsBox'), currentUser.role === 'admin');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, projects: renderProjects, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');
@@ -248,7 +268,7 @@ window.HLM = window.HLM || {};
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, loadApprovals, refresh };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

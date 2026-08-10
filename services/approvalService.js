@@ -57,14 +57,14 @@ function makeNo() {
   return 'appr-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
-/** AI 发起审批请求 → pending */
-async function createApproval({ resource, amount, purpose, detail, requester, project_code, meta_tags }) {
+/** AI 发起审批请求 → pending（type: resource=资源申请 / project=项目创建申请） */
+async function createApproval({ type = 'resource', resource, amount, purpose, detail, requester, project_code, meta_tags }) {
   const db = getDb();
   const no = makeNo();
   const { lastId } = await db.run(
-    `INSERT INTO approvals (approval_no, resource, amount, purpose, detail, requester, project_code, meta_tags, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, 'pending')`,
-    [no, resource || '未指定资源', amount || null, purpose || null, detail || null,
+    `INSERT INTO approvals (approval_no, type, resource, amount, purpose, detail, requester, project_code, meta_tags, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, 'pending')`,
+    [no, type, resource || '未指定资源', amount || null, purpose || null, detail || null,
       requester || 'ai-agent', project_code || null,
       meta_tags ? JSON.stringify(meta_tags) : null]
   );

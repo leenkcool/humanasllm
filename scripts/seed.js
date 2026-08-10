@@ -12,21 +12,23 @@ async function seed() {
   const db = getDb();
 
   const accounts = [
-    { username: 'admin', password: 'admin123', role: 'admin', name: '管理员' },
-    { username: 'engineer1', password: 'admin123', role: 'engineer', name: '工程师-张' },
-    { username: 'engineer2', password: 'admin123', role: 'engineer', name: '工程师-李' },
+    { username: 'admin', password: 'admin123', role: 'admin', name: '管理员', email: 'admin@p390.local' },
+    { username: 'engineer1', password: 'admin123', role: 'engineer', name: '工程师-张', email: 'engineer1@p390.local' },
+    { username: 'engineer2', password: 'admin123', role: 'engineer', name: '工程师-李', email: 'engineer2@p390.local' },
   ];
 
   for (const acc of accounts) {
-    const exists = await db.exec('SELECT id FROM users WHERE username = ?', [acc.username]);
+    const exists = await db.exec('SELECT id, email FROM users WHERE username = ?', [acc.username]);
     if (exists.length > 0 && exists[0].values.length > 0) {
-      console.log(`[种子] 用户 ${acc.username} 已存在，跳过`);
+      // 已存在用户：补充邮箱（缺失时）
+      await db.run('UPDATE users SET email = COALESCE(email, ?) WHERE username = ?', [acc.email, acc.username]);
+      console.log(`[种子] 用户 ${acc.username} 已存在，补充邮箱`);
       continue;
     }
     const hash = bcryptjs.hashSync(acc.password, 10);
     await db.run(
-      'INSERT INTO users (username, password, role, name, is_active) VALUES (?, ?, ?, ?, true)',
-      [acc.username, hash, acc.role, acc.name]
+      'INSERT INTO users (username, email, password, role, name, is_active) VALUES (?, ?, ?, ?, ?, true)',
+      [acc.username, acc.email, hash, acc.role, acc.name]
     );
     console.log(`[种子] 已创建用户: ${acc.username} / ${acc.password} (${acc.role})`);
   }

@@ -20,7 +20,7 @@ window.HLM = window.HLM || {};
         <td class="nowrap"><span class="mono">#${t.id}</span></td>
         <td><span class="tag ${t.priority}">${esc(t.priority)}</span></td>
         <td><span class="tag ${t.status}">${STATUS_LABEL[t.status] || t.status}</span></td>
-        <td>${esc(t.project_code || '-')}</td>
+        <td>${esc(t.project_name || t.project_code || '-')}</td>
         <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(String(summary || '').slice(0, 60))}</td>
         <td class="nowrap">${esc(t.assignee_name || '-')}</td>
         <td class="nowrap" style="color:var(--muted);font-size:12px;">${fmt(t.created_at)}</td>
@@ -102,7 +102,8 @@ window.HLM = window.HLM || {};
           <span class="tag ${t.priority}">${esc(t.priority)}</span>
           ${t.stream ? '<span class="tag pending">stream</span>' : ''}
           <span class="chip">model: ${esc(t.model)}</span>
-          ${t.project_code ? `<span class="chip">项目: ${esc(t.project_code)}</span>` : ''}
+          ${t.project_code ? `<span class="chip">项目: ${esc(t.project_name || t.project_code)}</span>` : ''}
+          <span class="chip">归属: ${esc(t.project_name || t.project_code || '未归属')} <button class="btn sm" style="margin-left:4px;" onclick="window.HLM.UI.promptTaskProject(${t.id})">设置</button></span>
           <span class="chip">upstream: <span class="mono">${esc(t.upstream_request_id || '-')}</span></span>
         </div>
         <div class="ctx" style="display:flex;gap:8px;flex-wrap:wrap;">${metaHtml || '<span class="k">无元标签</span>'} ${params ? `<span style="color:var(--muted);font-size:12px;align-self:center;">${params}</span>` : ''}</div>
@@ -390,12 +391,115 @@ window.HLM = window.HLM || {};
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  // ===== 项目管理 =====
+  function projectFormHtml(p) {
+    return `
+      <div class="form-group"><label class="form-label">项目编码</label><input class="form-input" id="pjCode" value="${p ? esc(p.code) : ''}" ${p ? 'disabled' : ''} placeholder="如 internal-settlement"></div>
+      <div class="form-group"><label class="form-label">项目名称</label><input class="form-input" id="pjName" value="${p ? esc(p.name) : ''}"></div>
+      <div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="pjDesc" rows="3">${p ? esc(p.description || '') : ''}</textarea></div>`;
+  }
+  function promptCreateProject() {
+    openModal('新建项目', projectFormHtml(null), `
+      <button class="btn" onclick="window.HLM.UI.closeModal()">取消</button>
+      <button class="btn primary" onclick="window.HLM.UI.submitCreateProject()">创建</button>`, 'sm');
+  }
+  async function submitCreateProject() {
+    const code = $('#pjCode').value.trim();
+    const name = $('#pjName').value.trim();
+    if (!code || !name) { toast('编码和名称不能为空', 'warning'); return; }
+    try {
+      await API.post('/projects', { code, name, description: $('#pjDesc').value });
+      toast('项目已创建', 'success'); closeModal(); window.HLM.refresh && window.HLM.refresh();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  function promptApplyProject() {
+    openModal('申请建项目', projectFormHtml(null) + '<p style="color:var(--muted);font-size:12px;margin-top:8px;">提交后将由管理员审批，批准后自动创建项目。</p>', `
+      <button class="btn" onclick="window.HLM.UI.closeModal()">取消</button>
+      <button class="btn primary" onclick="window.HLM.UI.submitApplyProject()">提交申请</button>`, 'sm');
+  }
+  async function submitApplyProject() {
+    const code = $('#pjCode').value.trim();
+    const name = $('#pjName').value.trim();
+    if (!code || !name) { toast('编码和名称不能为空', 'warning'); return; }
+    try {
+      const r = await API.post('/projects/apply', { code, name, description: $('#pjDesc').value });
+      toast(r.message || '申请已提交，待管理员审批', 'success'); closeModal();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  async function promptEditProject(id) {
+    try {
+      const r = await API.get('/projects');
+      const p = (r.data || []).find(x => x.id === id);
+      if (!p) { toast('项目不存在', 'error'); return; }
+      openModal('编辑项目', projectFormHtml(p), `
+        <button class="btn" onclick="window.HLM.UI.closeModal()">取消</button>
+        <button class="btn primary" onclick="window.HLM.UI.submitEditProject(${id})">保存</button>`, 'sm');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  async function submitEditProject(id) {
+    try {
+      await API.put('/projects/' + id, { name: $('#pjName').value.trim(), description: $('#pjDesc').value });
+      toast('已保存', 'success'); closeModal(); window.HLM.refresh && window.HLM.refresh();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  async function doArchiveProject(id) {
+    try {
+      await API.post('/projects/' + id + '/archive', {});
+      toast('已更新', 'success'); window.HLM.refresh && window.HLM.refresh();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  async function renderProjects(list, box, isAdmin) {
+    box.innerHTML = `<div class="card"><div class="card-body-flush"><div class="tbl-wrap"><table class="data">
+      <thead><tr><th>编码</th><th>名称</th><th>描述</th><th>状态</th><th>创建时间</th>${isAdmin ? '<th>操作</th>' : ''}</tr></thead>
+      <tbody>${list.map(p => `
+        <tr>
+          <td><span class="mono">${esc(p.code)}</span></td>
+          <td><strong>${esc(p.name)}</strong></td>
+          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.description || '')}</td>
+          <td><span class="tag ${p.status === 'active' ? 'completed' : 'cancelled'}">${p.status === 'active' ? '进行中' : '已归档'}</span></td>
+          <td class="nowrap">${fmt(p.created_at)}</td>
+          ${isAdmin ? `<td class="nowrap">
+            <button class="btn sm" onclick="window.HLM.UI.promptEditProject(${p.id})">编辑</button>
+            <button class="btn sm danger" onclick="window.HLM.UI.doArchiveProject(${p.id})">${p.status === 'active' ? '归档' : '启用'}</button>
+          </td>` : ''}
+        </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无项目，可申请创建</td></tr>'}
+      </tbody></table></div></div></div>`;
+  }
+
+  // 任务归属项目
+  async function promptTaskProject(id) {
+    try {
+      const pr = await API.get('/projects');
+      const projects = (pr.data || []).filter(p => p.status === 'active');
+      openModal('设置任务归属项目', `
+        <div class="form-group">
+          <label class="form-label">归属项目</label>
+          <select class="form-select" id="taskProjectSelect">
+            <option value="">（不归属）</option>
+            ${projects.map(p => `<option value="${esc(p.code)}">${esc(p.code)} · ${esc(p.name)}</option>`).join('')}
+          </select>
+        </div>`,
+        `<button class="btn" onclick="window.HLM.UI.closeModal()">取消</button>
+         <button class="btn primary" onclick="window.HLM.UI.submitTaskProject(${id})">保存</button>`, 'sm');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  async function submitTaskProject(id) {
+    const code = $('#taskProjectSelect').value;
+    try {
+      await API.post('/tasks/' + id + '/project', { project_code: code });
+      toast('归属已更新', 'success'); closeModal(); window.HLM.refresh && window.HLM.refresh();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   window.HLM.UI = {
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
     promptReopen, submitReopen,
     renderUsers, showUserForm, saveUser, delUser, renderLogs,
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
+    renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,
+    promptEditProject, submitEditProject, doArchiveProject,
+    promptTaskProject, submitTaskProject,
     startCountdown,
     closeModal,
   };

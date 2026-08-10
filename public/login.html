@@ -27,7 +27,11 @@
         <button class="btn primary" type="submit" id="loginBtn">登 录</button>
         <p id="errMsg" style="color:var(--danger);font-size:13px;margin-top:12px;min-height:18px;"></p>
       </form>
-      <p style="color:var(--muted);font-size:12px;margin-top:16px;">测试账户：admin / engineer1 / engineer2，密码 admin123</p>
+      <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:13px;">
+        <a href="javascript:showRegister()" style="color:var(--primary);text-decoration:none;">没有账号？注册</a>
+        <a href="javascript:showForgot()" style="color:var(--muted);text-decoration:none;">忘记密码</a>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin-top:14px;">演示账户：admin / engineer1 / engineer2，密码 admin123</p>
     </div>
   </div>
   <script src="/js/utils.js"></script>
@@ -36,6 +40,8 @@
       var form = document.getElementById('loginForm');
       var err = document.getElementById('errMsg');
       var btn = document.getElementById('loginBtn');
+      var U = window.HLM.U;
+
       form.addEventListener('submit', async function (e) {
         e.preventDefault();
         var username = document.getElementById('username').value.trim();
@@ -59,6 +65,77 @@
           btn.disabled = false;
         }
       });
+
+      // ===== 注册 =====
+      function showRegister() {
+        U.openModal('注册账号', `
+          <div class="form-group"><label class="form-label">用户名</label><input class="form-input" id="regUsername" placeholder="登录名"></div>
+          <div class="form-group"><label class="form-label">邮箱</label><input class="form-input" id="regEmail" placeholder="用于找回密码"></div>
+          <div class="form-group"><label class="form-label">密码</label><input class="form-input" id="regPassword" type="password"></div>
+          <div class="form-group"><label class="form-label">姓名（可选）</label><input class="form-input" id="regName"></div>
+        `, `
+          <button class="btn" onclick="HLM.U.closeModal()">取消</button>
+          <button class="btn primary" onclick="doRegister()">注册</button>
+        `, 'sm');
+      }
+      async function doRegister() {
+        var username = document.getElementById('regUsername').value.trim();
+        var email = document.getElementById('regEmail').value.trim();
+        var password = document.getElementById('regPassword').value;
+        var name = document.getElementById('regName').value.trim();
+        if (!username || !email || !password) { alert('用户名、邮箱、密码不能为空'); return; }
+        try {
+          var res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify({ username: username, email: email, password: password, name: name })
+          });
+          var data = await res.json();
+          if (!data.success) throw new Error(data.message || '注册失败');
+          U.closeModal();
+          if (data.data && data.data.token) {
+            localStorage.setItem('hlm_token', data.data.token);
+            localStorage.setItem('hlm_user', JSON.stringify(data.data.user));
+            window.location.href = '/index.html';
+          } else {
+            err.textContent = (data.data && data.data.message) || '注册成功';
+          }
+        } catch (ex) { alert(ex.message); }
+      }
+
+      // ===== 忘记密码 =====
+      function showForgot() {
+        U.openModal('找回密码', `
+          <div class="form-group"><label class="form-label">注册邮箱</label><input class="form-input" id="forgotEmail" placeholder="输入注册时的邮箱"></div>
+          <p style="color:var(--muted);font-size:12px;">系统将重置密码并发到该邮箱（未配置 SMTP 时返回演示密码）</p>
+        `, `
+          <button class="btn" onclick="HLM.U.closeModal()">取消</button>
+          <button class="btn primary" onclick="doForgot()">发送</button>
+        `, 'sm');
+      }
+      async function doForgot() {
+        var email = document.getElementById('forgotEmail').value.trim();
+        if (!email) { alert('请输入邮箱'); return; }
+        try {
+          var res = await fetch('/api/auth/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify({ email: email })
+          });
+          var data = await res.json();
+          if (!data.success) throw new Error(data.message || '重置失败');
+          U.closeModal();
+          err.textContent = (data.data && data.data.demoPassword)
+            ? ('密码已重置，演示密码：' + data.data.demoPassword)
+            : data.message;
+          err.style.color = 'var(--success)';
+        } catch (ex) { alert(ex.message); }
+      }
+
+      window.showRegister = showRegister;
+      window.doRegister = doRegister;
+      window.showForgot = showForgot;
+      window.doForgot = doForgot;
     })();
   </script>
 </body>

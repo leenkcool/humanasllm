@@ -8,6 +8,70 @@ const { getDb } = require('../db');
 const { authenticate, signToken } = require('../middleware/auth');
 const { createLoginLimiter } = require('../middleware/security');
 const { rows } = require('../services/queueService');
+const { sendMail } = require('../services/mailer');
+
+// 注册（open 模式注册即用；audit 模式待管理员审核启用，.env 的 USER_REGISTER_MODE 控制）
+router.post('/register', async (req, res) => {
+  try {
+    const { username, email, password, name } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ success: false, message: '用户名、邮箱、密码不能为空' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, message: '邮箱格式不正确' });
+    }
+    const db = getDb();
+    const dup = rows(await db.exec('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]));
+    if (dup[0]) return res.status(400).json({ success: false, message: '用户名或邮箱已存在' });
+
+    const hash = await bcrypt.hash(password, 10);
+    const mode = process.env.USER_REGISTER_MODE || 'open';
+    const isActive = mode !== 'audit';
+    const { lastId } = await db.run(
+      'INSERT INTO users (username, email, password, role, name, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+      [username, email, hash, 'engineer', name || username, isActive]
+    );
+
+    if (!isActive) {
+      return res.json({ success: true, data: { id: lastId, active: false, message: '注册成功，待管理员审核启用' } });
+    }
+    const token = signToken({ id: lastId, username, role: 'engineer', name: name || username });
+    res.json({ success: true, data: { token, user: { id: lastId, username, email, role: 'engineer', name: name || username } } });
+  } catch (err) {
+    console.error('[注册失败]', err.message);
+    res.status(500).json({ success: false, message: '注册失败' });
+  }
+});
+
+// 忘记密码：向注册邮箱发送新密码
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: '请输入注册邮箱' });
+    const db = getDb();
+    const list = rows(await db.exec('SELECT id, username, email FROM users WHERE email = ?', [email]));
+    const user = list[0];
+    if (!user) return res.status(404).json({ success: false, message: '该邮箱未注册' });
+
+    const newPwd = 'pwd' + Math.random().toString(36).slice(2, 8) + 'A1';
+    const hash = await bcrypt.hash(newPwd, 10);
+    await db.run('UPDATE users SET password = ? WHERE id = ?', [hash, user.id]);
+
+    const mail = await sendMail({
+      to: email,
+      subject: 'p390 人工代理网关 - 密码重置',
+      text: `你的新密码：${newPwd}\n请登录后尽快在「个人资料」中修改密码。`,
+    });
+    res.json({
+      success: true,
+      message: mail.delivered ? '新密码已发送至你的邮箱' : '邮件服务未配置，密码已重置（见响应 demoPassword）',
+      data: { delivered: mail.delivered, ...(mail.delivered ? {} : { demoPassword: newPwd }) },
+    });
+  } catch (err) {
+    console.error('[重置密码失败]', err.message);
+    res.status(500).json({ success: false, message: '重置密码失败' });
+  }
+});
 
 // 登录
 router.post('/login', createLoginLimiter(), async (req, res) => {

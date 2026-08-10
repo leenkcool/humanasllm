@@ -7,6 +7,7 @@ const router = express.Router();
 const { getDb } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const queue = require('../services/queueService');
+const project = require('../services/projectService');
 
 const VALID_STATUS = ['pending', 'processing', 'completed', 'returned', 'paused', 'cancelled'];
 
@@ -27,8 +28,10 @@ router.get('/', authenticate, async (req, res) => {
     const count = await db.exec(`SELECT COUNT(*) as c FROM tasks t ${whereSql}`, params);
     const total = count[0].values[0][0];
     const list = queue.rows(await db.exec(
-      `SELECT t.*, u.name AS assignee_name
-         FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id
+      `SELECT t.*, u.name AS assignee_name, p.name AS project_name
+         FROM tasks t
+         LEFT JOIN users u ON t.assignee_id = u.id
+         LEFT JOIN projects p ON p.code = t.project_code
          ${whereSql} ORDER BY t.id DESC LIMIT ? OFFSET ?`,
       [...params, size, offset]
     ));
@@ -169,6 +172,25 @@ router.post('/:id/reopen', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[打回失败]', err.message);
     res.status(500).json({ success: false, message: '打回失败' });
+  }
+});
+
+// 设置任务归属项目（接单后把单子归到项目；project_code 为空则清除归属）
+router.post('/:id/project', authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const code = (req.body.project_code || '').toString().trim();
+    const task = await queue.getTask(id);
+    if (!task) return res.status(404).json({ success: false, message: '任务不存在' });
+    if (code) {
+      const p = await project.getProjectByCode(code);
+      if (!p) return res.status(400).json({ success: false, message: '项目不存在' });
+    }
+    await getDb().run('UPDATE tasks SET project_code = ? WHERE id = ?', [code || null, id]);
+    res.json({ success: true, data: await queue.getTask(id) });
+  } catch (err) {
+    console.error('[任务归属项目失败]', err.message);
+    res.status(500).json({ success: false, message: '设置归属项目失败' });
   }
 });
 

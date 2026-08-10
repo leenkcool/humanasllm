@@ -44,9 +44,12 @@ scripts/seed.js        # 种子账户
 
 ### 工作台（JWT 认证）
 - `POST /api/auth/login`（admin/engineer1/engineer2，密码 admin123）
+- `POST /api/auth/register`（用户名/邮箱/密码；`USER_REGISTER_MODE` 控制 open 注册即用 / audit 管理员审核启用）
+- `POST /api/auth/forgot-password`（用注册邮箱重置密码，向该邮箱发新密码；SMTP 可配置）
 - `/api/workbench/summary | queue | mine`
-- `/api/tasks` + `/api/tasks/:id/{claim|complete|reject|pause|resume|requeue|reopen|cancel}`
+- `/api/tasks` + `/api/tasks/:id/{claim|complete|reject|pause|resume|requeue|reopen|cancel|project}`
 - `/api/approvals` + `/api/approvals/:id/{approve|reject}`（审批列表/批准并提供资源/驳回）
+- `/api/projects` + `/api/projects/apply`（项目列表/管理员创建/申请建项目走审批）
 - `/api/logs/requests | tasks`、`/api/users`
 
 ## 任务状态机
@@ -60,7 +63,8 @@ scripts/seed.js        # 种子账户
 ## 环境变量（.env）
 `PORT=39000`、`DB_TYPE=pg`、`PG_DATABASE=p390`、`JWT_SECRET`、`HUMAN_LLM_MODEL=human-llm`、
 `TASK_PENDING_TIMEOUT_MIN`、`TASK_PROCESSING_TIMEOUT_MIN`、`UPSTREAM_API_KEY`(可选)、
-`AI_RELAY_ENABLED`、`AI_RELAY_BASE_URL`、`AI_RELAY_API_KEY`、`AI_RELAY_MODELS`
+`AI_RELAY_ENABLED`、`AI_RELAY_BASE_URL`、`AI_RELAY_API_KEY`、`AI_RELAY_MODELS`、
+`USER_REGISTER_MODE`(open/audit)、`SMTP_HOST/PORT/SECURE/USER/PASS/FROM`(邮件，可选)
 
 ## 命令
 - `npm install` → `npm run seed` → `npm start`（监听 `0.0.0.0:39000`）
