@@ -54,17 +54,13 @@ async function poll(fn, max = 20) {
   const w = await api('GET', '/api/workbench/summary', null, token);
   ok('workbench/summary', w.status === 200 && w.data.success);
 
-  // 3. 人工任务完整流程（/v1 挂起 → 工作台完成 → 返回 OpenAI 结构）
-  const chatPromise = api('POST', '/v1/chat/completions', {
+  // 3. 人工任务完整流程（/v1 异步受理 → 工作台完成 → 回查取结果）
+  const chat = await api('POST', '/v1/chat/completions', {
     model: 'human-llm', stream: false, priority: 'low', project_code: MARK,
     messages: [{ role: 'user', content: '冒烟测试任务' }],
   });
-  const taskId = await poll(async () => {
-    const l = await api('GET', '/api/tasks?status=pending&size=5', null, token);
-    const t = ((l.data.data && l.data.data.data) || []).find(x => x.project_code === MARK);
-    return t ? t.id : null;
-  });
-  ok('人工任务已创建(pending)', !!taskId, 'taskId=' + taskId);
+  ok('/v1 异步受理返回 task_id', chat.status === 200 && !!chat.data.task_id && chat.data.status === 'pending');
+  const taskId = chat.data.task_id;
 
   if (taskId) {
     const c = await api('POST', '/api/tasks/' + taskId + '/claim', {}, token);
@@ -72,15 +68,15 @@ async function poll(fn, max = 20) {
     const bad = await api('POST', '/api/tasks/' + taskId + '/complete', { content: '完成' }, token);
     ok('质量校验拦截占位(400)', bad.status === 400 && !bad.data.success);
     const comp = await api('POST', '/api/tasks/' + taskId + '/complete',
-      { content: '冒烟测试产出：核心链路正常（接单→提交→等待者唤醒→返回）' }, token);
+      { content: '冒烟测试产出：核心链路正常（异步受理→接单→提交→回查）' }, token);
     ok('提交真实产出 → completed', comp.status === 200 && comp.data.data.status === 'completed');
-    const chat = await chatPromise;
-    ok('/v1 返回 OpenAI 结构', chat.status === 200 &&
-      (chat.data.choices || [])[0]?.message?.content.includes('冒烟测试产出'));
+    const back = await api('GET', '/v1/tasks/' + taskId);
+    ok('/v1 回查取回产出', back.status === 200 && back.data.status === 'completed' &&
+      (back.data.content || '').includes('冒烟测试产出'));
     const bad2 = await api('POST', '/api/tasks/' + taskId + '/claim', {}, token);
     ok('非法流转拦截(completed→claim 400)', bad2.status === 400);
   } else {
-    ok('人工任务已创建(pending)', false, '未在超时窗口找到');
+    ok('/v1 异步受理返回 task_id', false, '未拿到 task_id');
   }
 
   // 4. 审批流程（/v1 挂起 → 工作台批准 → 返回 approved）

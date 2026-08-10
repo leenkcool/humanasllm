@@ -83,7 +83,7 @@
 | 功能 | 说明 |
 |---|---|
 | `GET /v1/models` | 返回 `human-llm` + AI 中继模型列表（如 `deepseek-v4-flash`） |
-| `POST /v1/chat/completions` | 支持一次性返回 + `stream` SSE 流式；模型名路由（human-llm→人工 / 命中 AI_RELAY_MODELS→AI 中继） |
+| `POST /v1/chat/completions` | **异步受理**：`human-llm` 创建任务后立即返回 `task_id`（人工小时级，不阻塞）；上游凭 `GET /v1/tasks/:id` 回查结果；命中 `AI_RELAY_MODELS` 仍同步中继 |
 | 上下文透传 | messages / 系统提示词 / 参数 / `project_code` / `priority` / `meta_tags` 全量落库并回显 |
 | 上游鉴权 | 可选 `UPSTREAM_API_KEY`（配置后 /v1 需 Bearer 头） |
 | 日志 | `request_logs`（in/out 请求）+ `task_logs`（状态审计留痕） |
@@ -91,7 +91,7 @@
 ### B. 任务工作台（Web UI）
 | 页面 | 能力 |
 |---|---|
-| 工作台 | 任务统计、待接单队列、**超时剩余时间倒计时** |
+| 工作台 | 任务统计（含**未完成聚合计数**）、**未完成任务列表**（防遗忘，人接单小时级）、待接单队列、**超时剩余时间倒计时** |
 | 任务队列 | 全量/筛选；接单/完成/驳回/暂停/重派/**打回重做**/取消；详情看完整上下文 |
 | 我的任务 | 我接单处理的 |
 | 审批 | AI 资源/项目申请 → 批准（提供资源）/驳回；**24h 超时提醒** |
@@ -131,7 +131,8 @@
 ### OpenAI 兼容（上游直连）
 ```
 GET  /v1/models
-POST /v1/chat/completions        # stream 支持；模型名路由；可选 category 标记任务场景（general/confidential/ops）
+POST /v1/chat/completions        # 异步受理：立即返回 task_id + status:pending；可选 category 标记场景（general/confidential/ops）
+GET  /v1/tasks/:id               # 回查：凭 task_id 取回人工产出/驳回原因/处理中
 POST /v1/approvals               # AI 提审批（资源/项目申请），挂起等待人类审批
 ```
 

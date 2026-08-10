@@ -97,7 +97,7 @@ window.HLM = window.HLM || {};
         <div class="spacer"></div><span class="chip">model: ${esc('human-llm')}</span>
         <button class="icon-btn" onclick="window.HLM.App.route()">${Icons.refresh}</button></div>
       <div class="stats" id="statsBox"></div>
-      <div class="card"><div class="card-head"><span class="t">${t('page.dashboard.queue')}</span>
+      <div class="card"><div class="card-head"><span class="t">${t('page.dashboard.unfinished')}</span>
         <button class="btn sm" onclick="window.HLM.App.route()">${t('common.refresh')}</button></div>
         <div class="card-body-flush"><div class="tbl-wrap"><table class="data">
           <thead><tr><th>${t('table.id')}</th><th>${t('table.priority')}</th><th>${t('table.status')}</th><th>${t('table.project')}</th><th>${t('table.summary')}</th><th>${t('table.assignee')}</th><th>${t('table.createdAt')}</th><th>${t('table.timeoutLeft')}</th><th>${t('table.action')}</th></tr></thead>
@@ -105,12 +105,12 @@ window.HLM = window.HLM || {};
     try {
       const s = await API.get('/workbench/summary');
       const st = s.data.stats;
-      const order = ['pending', 'processing', 'completed', 'returned', 'paused'];
+      const order = ['unfinished', 'pending', 'processing', 'completed', 'returned', 'paused'];
       $('#statsBox').innerHTML = order.map(k => `
         <div class="stat ${k}"><div class="num">${st[k] || 0}</div><div class="lbl">${t('stat.' + k)}</div></div>`).join('');
       window._pendingCount = st.pending || 0;
       updateBadges();
-      const q = await API.get('/workbench/queue');
+      const q = await API.get('/workbench/unfinished');
       UI.renderTasks(q.data, '#queueBody');
     } catch (e) { toast(e.message, 'error'); }
   }

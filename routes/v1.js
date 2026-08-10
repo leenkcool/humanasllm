@@ -79,13 +79,12 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
   }
   await queue.logRequest(taskId, 'in', req.body, parsed.model);
 
-  // 挂起等待人工结果（超时兜底）
-  const waitMs = parseInt(process.env.TASK_WAIT_MS) || 5 * 60 * 1000;
-  const result = await queue.waitForTask(taskId, waitMs);
-  const content = result.content || '';
+  // 异步受理：人工接单为小时级，/v1 不阻塞等待（分钟级挂起与人工节奏不匹配）
+  // 创建任务后立即返回 task_id，上游凭 GET /v1/tasks/:id 轮询取回人工处理结果
+  const content = `任务已受理，task_id=${taskId}，待人工处理；可通过 GET /v1/tasks/${taskId} 查询结果`;
 
   if (parsed.stream) {
-    // SSE 流式输出
+    // SSE 兼容：受理信息按流式块输出，上游按标准 SSE 解析正常结束
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -96,8 +95,35 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
     return;
   }
 
-  // 一次性返回：完成 / 驳回 / 超时统一按 OpenAI 结构返回，content 携带结果或说明
-  res.json(encoder.makeChatCompletion({ id: chatId, model: parsed.model, created, content }));
+  // 一次性返回：OpenAI 结构 + task_id（上游可轮询取结果）
+  const accepted = encoder.makeChatCompletion({ id: chatId, model: parsed.model, created, content });
+  accepted.task_id = taskId;
+  accepted.status = 'pending';
+  res.json(accepted);
+});
+
+// GET /v1/tasks/:id — 上游凭 task_id 查询人工任务处理结果（异步受理后回查）
+router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const task = await queue.getTask(id);
+    if (!task) return res.status(404).json(encoder.makeError(404, 'Task not found', 'invalid_request_error'));
+    let content = '任务处理中，请稍后查询';
+    if (task.status === 'completed') content = task.result_text || '';
+    else if (task.status === 'returned') content = `任务被驳回: ${task.reject_reason || '未填写原因'}`;
+    res.json({
+      task_id: task.id,
+      status: task.status,
+      content,
+      model: task.model,
+      category: task.category || 'general',
+      created_at: task.created_at,
+      completed_at: task.completed_at,
+    });
+  } catch (e) {
+    console.error('[任务回查失败]', e.message);
+    res.status(500).json(encoder.makeError(500, '查询失败', 'server_error'));
+  }
 });
 
 module.exports = router;

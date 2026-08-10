@@ -40,27 +40,33 @@
   "max_tokens": 1024, "temperature": 0.7,
   "project_code": "internal-settlement",   // 业务扩展：项目编码（关联 projects）
   "priority": "high",                       // 业务扩展：high|medium|low
+  "category": "confidential",               // 业务扩展：general|confidential|ops（涉密/运维类禁 AI 兜底）
   "meta_tags": { "source": "scheduler" }    // 业务扩展：元标签
 }
 ```
 
-**一次性返回**（`stream:false`，人工完成/中继后）：
+**异步受理（人工任务）**：`human-llm` 任务创建后**立即返回**，/v1 不阻塞等待（人工接单为小时级）。响应为 OpenAI 结构 + `task_id` + `status: pending`：
 ```json
-{ "id": "chatcmpl-xxx", "object": "chat.completion", "created": 1786…,
-  "model": "human-llm",
-  "choices": [{ "index": 0, "message": { "role": "assistant", "content": "<人工产出或 AI 内容>" }, "finish_reason": "stop" }],
-  "usage": { "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0 } }
+{ "id": "chatcmpl-xxx", "object": "chat.completion", "model": "human-llm",
+  "choices": [{ "index": 0, "message": { "role": "assistant",
+    "content": "任务已受理，task_id=12，待人工处理；可通过 GET /v1/tasks/12 查询结果" }, "finish_reason": "stop" }],
+  "usage": { "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0 },
+  "task_id": 12, "status": "pending" }
 ```
 
-**流式返回**（`stream:true`）：SSE `data:` 行：
-```
-data: {"id":"chatcmpl-…","choices":[{"delta":{"role":"assistant"}}]}
-data: {"id":"chatcmpl-…","choices":[{"delta":{"content":"…"}}]}
-data: {"id":"chatcmpl-…","choices":[{"delta":{},"finish_reason":"stop"}]}
-data: [DONE]
-```
+`stream:true` 同样立即返回受理信息（SSE `data:` 行 + `[DONE]`），不会等人工完成再流式输出。
 
-**超时/驳回**：仍返回 OpenAI 结构，`content` 携带说明（如「任务被驳回: …」或「请求等待超时，任务仍在处理中」）。
+**回查结果**：人工完成后，上游凭 `task_id` 取回产出（见下节）。AI 中继模型（命中 `AI_RELAY_MODELS`）不受影响，仍同步返回真实 LLM 内容。
+
+### GET /v1/tasks/:id
+上游凭 `task_id` 查询人工任务处理结果（异步受理后轮询取回）。
+```json
+{ "task_id": 12, "status": "completed", "content": "<人工产出>",
+  "model": "human-llm", "category": "general", "created_at": "…", "completed_at": "…" }
+```
+- `status: completed` → `content` 为人工产出
+- `status: returned` → `content` 为驳回原因说明（人工驳回/超时回落）
+- `status: pending|processing|paused` → `content` 为「任务处理中，请稍后查询」
 
 ### POST /v1/approvals
 AI 向人类提审批（资源/权限/项目申请），挂起等待人类批准/驳回。

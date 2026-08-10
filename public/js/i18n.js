@@ -51,6 +51,7 @@ window.HLM = window.HLM || {};
     'page.dashboard.title': '工作台',
     'page.dashboard.desc': '人工代理网关 · Human-as-LLM 任务监控',
     'page.dashboard.queue': '待接单队列',
+    'page.dashboard.unfinished': '未完成任务',
     'page.queue.title': '任务队列',
     'page.queue.desc': '全部人工任务',
     'page.mine.title': '我的任务',
@@ -70,6 +71,7 @@ window.HLM = window.HLM || {};
     'stat.completed': '已完成',
     'stat.returned': '驳回',
     'stat.paused': '暂停',
+    'stat.unfinished': '未完成',
 
     // 通用
     'common.all': '全部状态',
@@ -346,6 +348,7 @@ window.HLM = window.HLM || {};
     'page.dashboard.title': 'Dashboard',
     'page.dashboard.desc': 'Human-as-LLM Gateway · Task Monitor',
     'page.dashboard.queue': 'Queue Awaiting Claim',
+    'page.dashboard.unfinished': 'Unfinished Tasks',
     'page.queue.title': 'Task Queue',
     'page.queue.desc': 'All human tasks',
     'page.mine.title': 'My Tasks',
@@ -364,6 +367,7 @@ window.HLM = window.HLM || {};
     'stat.completed': 'Completed',
     'stat.returned': 'Returned',
     'stat.paused': 'Paused',
+    'stat.unfinished': 'Unfinished',
 
     'common.all': 'All statuses',
     'common.allPriority': 'All priorities',
