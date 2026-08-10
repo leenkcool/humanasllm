@@ -70,6 +70,7 @@ window.HLM = window.HLM || {};
     applyStatic();
     applyUserBadge();
     renderSidebar();
+    WS.refreshStatus();
     refresh();
   }
 

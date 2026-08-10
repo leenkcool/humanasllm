@@ -3,6 +3,7 @@ window.HLM = window.HLM || {};
 
 (function () {
   let socket = null;
+  let lastOk = null;
   const handlers = {};
 
   function init() {
@@ -26,6 +27,7 @@ window.HLM = window.HLM || {};
   }
 
   function setStatus(ok) {
+    lastOk = ok;
     const el = document.getElementById('wsStatus');
     if (el) {
       el.className = 'chip';
@@ -33,9 +35,12 @@ window.HLM = window.HLM || {};
     }
   }
 
+  // 侧栏重建后恢复实时状态文案（切换语言等场景）
+  function refreshStatus() { if (lastOk !== null) setStatus(lastOk); }
+
   function fire(evt, data) { (handlers[evt] || []).forEach(fn => { try { fn(data); } catch (e) { /* ignore */ } }); }
   function on(evt, fn) { (handlers[evt] = handlers[evt] || []).push(fn); }
   function disconnect() { if (socket) { socket.disconnect(); socket = null; } }
 
-  window.HLM.WS = { init, on, disconnect };
+  window.HLM.WS = { init, on, disconnect, refreshStatus };
 })();
