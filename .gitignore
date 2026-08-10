@@ -8,3 +8,6 @@ data/backups/
 data/human_task.json
 data/human_approval.json
 data/.job_result
+
+# CodeGraph index (local generated, not committed)
+.codegraph/
