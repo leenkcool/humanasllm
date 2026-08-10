@@ -15,21 +15,21 @@ window.HLM = window.HLM || {};
       box.innerHTML = `<tr><td colspan="9" class="empty">${t('task.empty')}</td></tr>`;
       return;
     }
-    box.innerHTML = list.map(t => {
-      const summary = t.request_payload?.messages?.find(m => m.role === 'user')?.content;
+    box.innerHTML = list.map(task => {
+      const summary = task.request_payload?.messages?.find(m => m.role === 'user')?.content;
       return `<tr>
-        <td class="nowrap"><span class="mono">#${t.id}</span></td>
-        <td><span class="tag ${t.priority}">${esc(t.priority)}</span></td>
-        <td><span class="tag ${t.status}">${STATUS_LABEL[t.status] || t.status}</span></td>
-        <td>${esc(t.project_name || t.project_code || '-')}</td>
+        <td class="nowrap"><span class="mono">#${task.id}</span></td>
+        <td><span class="tag ${task.priority}">${esc(task.priority)}</span></td>
+        <td><span class="tag ${task.status}">${STATUS_LABEL[task.status] || task.status}</span></td>
+        <td>${esc(task.project_name || task.project_code || '-')}</td>
         <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(String(summary || '').slice(0, 60))}</td>
-        <td class="nowrap">${esc(t.assignee_name || '-')}</td>
-        <td class="nowrap" style="color:var(--muted);font-size:12px;">${fmt(t.created_at)}</td>
-        <td class="nowrap" data-timeout="${t.timeout_at || ''}" data-status="${t.status}" style="font-size:12px;">${renderTimeoutCell(t.timeout_at, t.status)}</td>
+        <td class="nowrap">${esc(task.assignee_name || '-')}</td>
+        <td class="nowrap" style="color:var(--muted);font-size:12px;">${fmt(task.created_at)}</td>
+        <td class="nowrap" data-timeout="${task.timeout_at || ''}" data-status="${task.status}" style="font-size:12px;">${renderTimeoutCell(task.timeout_at, task.status)}</td>
         <td class="nowrap">
           <div style="display:flex;gap:6px;">
-            <button class="btn sm" onclick="window.HLM.UI.openDetail(${t.id})">${t('common.view')}</button>
-            ${t.status === 'pending' ? `<button class="btn sm primary" onclick="window.HLM.UI.doAction('claim',${t.id})">${t('task.claim')}</button>` : ''}
+            <button class="btn sm" onclick="window.HLM.UI.openDetail(${task.id})">${t('common.view')}</button>
+            ${task.status === 'pending' ? `<button class="btn sm primary" onclick="window.HLM.UI.doAction('claim',${task.id})">${t('task.claim')}</button>` : ''}
           </div>
         </td>
       </tr>`;
@@ -73,11 +73,11 @@ window.HLM = window.HLM || {};
   async function openDetail(id) {
     try {
       const r = await API.get('/tasks/' + id);
-      const t = r.data;
-      const p = t.request_payload || {};
+      const task = r.data;
+      const p = task.request_payload || {};
       const messages = Array.isArray(p.messages) ? p.messages : [];
 
-      const metaHtml = Object.entries(t.meta_tags || {}).map(([k, v]) => `<span class="tag medium" style="margin-right:6px;">${esc(k)}: ${esc(v)}</span>`).join('');
+      const metaHtml = Object.entries(task.meta_tags || {}).map(([k, v]) => `<span class="tag medium" style="margin-right:6px;">${esc(k)}: ${esc(v)}</span>`).join('');
       const msgsHtml = messages.map(m => `
         <div class="msg-row ${esc(m.role)}">
           <div class="role">${esc(m.role)}</div>
@@ -88,56 +88,56 @@ window.HLM = window.HLM || {};
         .filter(k => p[k] != null).map(k => `${esc(k)}=${esc(String(p[k]))}`).join(' &nbsp; ');
 
       let resultHtml = '';
-      if (t.status === 'completed' && t.result_text) {
-        resultHtml = `<div class="ctx"><div class="k">${t('task.result')}</div><pre>${esc(nl(t.result_text))}</pre></div>`;
+      if (task.status === 'completed' && task.result_text) {
+        resultHtml = `<div class="ctx"><div class="k">${t('task.result')}</div><pre>${esc(nl(task.result_text))}</pre></div>`;
       }
-      if (t.reject_reason) {
-        resultHtml += `<div class="ctx" style="border-left:3px solid var(--danger);"><div class="k">${t('task.rejectReason')}</div><pre>${esc(nl(t.reject_reason))}</pre></div>`;
+      if (task.reject_reason) {
+        resultHtml += `<div class="ctx" style="border-left:3px solid var(--danger);"><div class="k">${t('task.rejectReason')}</div><pre>${esc(nl(task.reject_reason))}</pre></div>`;
       }
 
       const body = `
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-          <span class="tag ${t.status}">${STATUS_LABEL[t.status] || t.status}</span>
-          <span class="tag ${t.priority}">${esc(t.priority)}</span>
-          ${t.stream ? '<span class="tag pending">stream</span>' : ''}
-          <span class="chip">model: ${esc(t.model)}</span>
-          ${t.project_code ? `<span class="chip">${t('task.project')} ${esc(t.project_name || t.project_code)}</span>` : ''}
-          <span class="chip">${t('task.owner')} ${esc(t.project_name || t.project_code || t('task.unassigned'))} <button class="btn sm" style="margin-left:4px;" onclick="window.HLM.UI.promptTaskProject(${t.id})">${t('task.set')}</button></span>
-          <span class="chip">upstream: <span class="mono">${esc(t.upstream_request_id || '-')}</span></span>
+          <span class="tag ${task.status}">${STATUS_LABEL[task.status] || task.status}</span>
+          <span class="tag ${task.priority}">${esc(task.priority)}</span>
+          ${task.stream ? '<span class="tag pending">stream</span>' : ''}
+          <span class="chip">model: ${esc(task.model)}</span>
+          ${task.project_code ? `<span class="chip">${t('task.project')} ${esc(task.project_name || task.project_code)}</span>` : ''}
+          <span class="chip">${t('task.owner')} ${esc(task.project_name || task.project_code || t('task.unassigned'))} <button class="btn sm" style="margin-left:4px;" onclick="window.HLM.UI.promptTaskProject(${task.id})">${t('task.set')}</button></span>
+          <span class="chip">upstream: <span class="mono">${esc(task.upstream_request_id || '-')}</span></span>
         </div>
         <div class="ctx" style="display:flex;gap:8px;flex-wrap:wrap;">${metaHtml || `<span class="k">${t('task.noTags')}</span>`} ${params ? `<span style="color:var(--muted);font-size:12px;align-self:center;">${params}</span>` : ''}</div>
         <div class="ctx"><div class="k">${t('task.context', { n: messages.length })}</div>${msgsHtml}</div>
         ${resultHtml}
-        <div class="ctx"><div class="k">${t('task.audit')}</div><pre style="font-size:11px;">${(t.logs || []).map(l => `[${fmt(l.created_at)}] ${esc(l.action)} — ${esc(l.actor_name || t('task.system'))}${l.remark ? ' · ' + esc(l.remark) : ''}`).join('\n') || t('task.none')}</pre></div>
+        <div class="ctx"><div class="k">${t('task.audit')}</div><pre style="font-size:11px;">${(task.logs || []).map(l => `[${fmt(l.created_at)}] ${esc(l.action)} — ${esc(l.actor_name || t('task.system'))}${l.remark ? ' · ' + esc(l.remark) : ''}`).join('\n') || t('task.none')}</pre></div>
       `;
 
-      const foot = actionButtons(t);
-      openModal(t('task.detailTitle', { id: t.id }), body, foot, 'lg');
+      const foot = actionButtons(task);
+      openModal(t('task.detailTitle', { id: task.id }), body, foot, 'lg');
     } catch (e) {
       toast(e.message, 'error');
     }
   }
 
-  function actionButtons(t) {
-    const id = t.id;
+  function actionButtons(task) {
+    const id = task.id;
     const user = window.HLM.currentUser || {};
-    const isOwner = t.assignee_id === user.id || user.role === 'admin';
+    const isOwner = task.assignee_id === user.id || user.role === 'admin';
     let btns = `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`;
 
-    if (t.status === 'pending') btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('claim', ${id})">${t('task.claim')}</button>`;
-    if (t.status === 'processing' && isOwner) {
+    if (task.status === 'pending') btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('claim', ${id})">${t('task.claim')}</button>`;
+    if (task.status === 'processing' && isOwner) {
       btns += `<button class="btn success" onclick="window.HLM.UI.promptComplete(${id})">${t('task.submitResult')}</button>`;
       btns += `<button class="btn danger" onclick="window.HLM.UI.promptReject(${id})">${t('task.reject')}</button>`;
       btns += `<button class="btn" onclick="window.HLM.UI.doAction('pause', ${id})">${t('task.pause')}</button>`;
     }
-    if (t.status === 'paused' && isOwner) {
+    if (task.status === 'paused' && isOwner) {
       btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('resume', ${id})">${t('task.resume')}</button>`;
       btns += `<button class="btn danger" onclick="window.HLM.UI.promptReject(${id})">${t('task.reject')}</button>`;
     }
-    if (t.status === 'returned') btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('claim', ${id})">${t('task.claimAgain')}</button>`;
-    if (t.status === 'returned' || t.status === 'paused') btns += `<button class="btn" onclick="window.HLM.UI.promptRequeue(${id})">${t('task.requeue')}</button>`;
-    if (t.status === 'completed' && isOwner) btns += `<button class="btn danger" onclick="window.HLM.UI.promptReopen(${id})">${t('task.reopen')}</button>`;
-    if (!['completed', 'cancelled'].includes(t.status)) btns += `<button class="btn danger" onclick="window.HLM.UI.promptCancel(${id})">${t('task.cancel')}</button>`;
+    if (task.status === 'returned') btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('claim', ${id})">${t('task.claimAgain')}</button>`;
+    if (task.status === 'returned' || task.status === 'paused') btns += `<button class="btn" onclick="window.HLM.UI.promptRequeue(${id})">${t('task.requeue')}</button>`;
+    if (task.status === 'completed' && isOwner) btns += `<button class="btn danger" onclick="window.HLM.UI.promptReopen(${id})">${t('task.reopen')}</button>`;
+    if (!['completed', 'cancelled'].includes(task.status)) btns += `<button class="btn danger" onclick="window.HLM.UI.promptCancel(${id})">${t('task.cancel')}</button>`;
     return btns;
   }
 
