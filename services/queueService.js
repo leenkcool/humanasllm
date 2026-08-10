@@ -9,6 +9,8 @@ require('dotenv').config();
 const { getDb } = require('../db');
 const ws = require('./websocket');
 const aiRelay = require('./aiRelay');
+const { TASK_TRANSITIONS } = require('./stateMachine');
+const { createWaiterStore } = require('./waiters');
 
 const STATUS = {
   PENDING: 'pending',
@@ -19,20 +21,11 @@ const STATUS = {
   CANCELLED: 'cancelled',
 };
 
-// 状态机合法转换表
-// pending → completed 用于「待接单超时 · AI 降级代答」直达终态（无人接单由 AI 兜底完成）
-// completed → returned 用于「产出不合格 · 打回重做」（人工乱答/占位可打回重新派发）
-const TRANSITIONS = {
-  pending: ['processing', 'returned', 'cancelled', 'completed'],
-  processing: ['completed', 'returned', 'paused'],
-  returned: ['pending', 'processing', 'cancelled'],
-  paused: ['processing', 'returned', 'cancelled'],
-  completed: ['returned'],
-  cancelled: [],
-};
+// 状态机合法转换表（独立单例，见 services/stateMachine.js）
+const TRANSITIONS = TASK_TRANSITIONS;
 
-// 等待者：taskId → { resolve, timer }
-const waiters = new Map();
+// 等待者：taskId → { resolve, timer }（通用 store，见 services/waiters.js）
+const waiters = createWaiterStore();
 
 const PENDING_MIN = () => parseInt(process.env.TASK_PENDING_TIMEOUT_MIN) || 60;
 const PROCESSING_MIN = () => parseInt(process.env.TASK_PROCESSING_TIMEOUT_MIN) || 120;
@@ -238,22 +231,13 @@ async function reopenTask(taskId, reason, actor) {
 
 /** /v1 接口挂起等待（Promise，超时兜底） */
 function waitForTask(taskId, timeoutMs) {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      waiters.delete(taskId);
-      resolve({ timedOut: true, content: '请求等待超时，任务仍在处理中，可稍后查询', task: null });
-    }, timeoutMs);
-    waiters.set(taskId, { resolve, timer });
-  });
+  return waiters.wait(taskId, timeoutMs, () => ({
+    timedOut: true, content: '请求等待超时，任务仍在处理中，可稍后查询', task: null,
+  }));
 }
 
 function resolveWaiter(taskId, result) {
-  const w = waiters.get(taskId);
-  if (w) {
-    clearTimeout(w.timer);
-    waiters.delete(taskId);
-    w.resolve(result);
-  }
+  waiters.resolve(taskId, result);
 }
 
 /** 超时处理：待接单超时优先 AI 降级代答，失败回落 returned；处理中超时 → returned */

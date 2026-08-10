@@ -7,17 +7,16 @@
 require('dotenv').config();
 const { getDb } = require('../db');
 const ws = require('./websocket');
+const { APPROVAL_TRANSITIONS } = require('./stateMachine');
+const { createWaiterStore } = require('./waiters');
 
 const STATUS = { PENDING: 'pending', APPROVED: 'approved', REJECTED: 'rejected' };
 
-const TRANSITIONS = {
-  pending: ['approved', 'rejected'],
-  approved: [],
-  rejected: [],
-};
+// 状态机合法转换表（独立单例，见 services/stateMachine.js）
+const TRANSITIONS = APPROVAL_TRANSITIONS;
 
-// 等待者：approvalId → { resolve, timer }
-const waiters = new Map();
+// 等待者：approvalId → { resolve, timer }（通用 store，见 services/waiters.js）
+const waiters = createWaiterStore();
 
 function rows(result) {
   if (!result || !result.length) return [];
@@ -108,22 +107,13 @@ async function reject(id, reason, actor) {
 
 /** /v1/approvals 挂起等待 */
 function waitForApproval(id, timeoutMs) {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      waiters.delete(id);
-      resolve({ timedOut: true, message: '审批等待超时，审批单仍在处理中，可稍后查询', approval: null });
-    }, timeoutMs);
-    waiters.set(id, { resolve, timer });
-  });
+  return waiters.wait(id, timeoutMs, () => ({
+    timedOut: true, message: '审批等待超时，审批单仍在处理中，可稍后查询', approval: null,
+  }));
 }
 
 function resolveWaiter(id, result) {
-  const w = waiters.get(id);
-  if (w) {
-    clearTimeout(w.timer);
-    waiters.delete(id);
-    w.resolve(result);
-  }
+  waiters.resolve(id, result);
 }
 
 /** 待审批超时提醒（每 60 秒扫描一次，超过 24h 未处理的标红提醒） */
