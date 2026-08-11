@@ -54,6 +54,43 @@ description: 派人工工程师处理（P390 人工路由）
 按 AGENTS.md 的人工路由规则，把当前任务提交到 P390 网关（<baseUrl>），登记 task_id 并回查取回人工产出。
 `;
 
+// Cursor 规则（需 frontmatter）；Windsurf / Gemini / Aider 内容同通用规则
+const CURSOR_TPL = `---
+description: P390 人工路由（Human-as-LLM）：涉密/需人工任务走人工工程师
+globs: **/*.{js,ts,py,md,json}
+---
+${AGENTS_TPL}`;
+const GEMINI_TPL = AGENTS_TPL;
+const WINDSURF_TPL = AGENTS_TPL;
+const AIDER_TPL = AGENTS_TPL;
+
+// 通用构建指南：任意 AI Agent 工具（含未来的）如何把规则构建成本地 skill/agent
+const BUILD_TPL = `# 构建本地 SKILL / AGENT（任意 AI Agent 工具通用方法）
+
+P390 人工路由能力 = 一段规则 + OpenAI 兼容接口说明。任何 AI Agent 工具（含未来的）都能构建成本地 skill / agent。
+
+## 一、规则全文（复制到你的 skill / agent / 规则文件）
+
+${AGENTS_TPL}
+
+## 二、按工具放置
+
+| 工具 | 放置位置 |
+|---|---|
+| Claude Code | .claude/skills/dispatch-human/SKILL.md（+ .claude/agents/humanllm.md） |
+| Codex / OpenCode / Gemini / Continue 等 | AGENTS.md（或 GEMINI.md） |
+| Cursor | .cursor/rules/p390.mdc |
+| Windsurf | .windsurf/rules/p390.md |
+| Aider | CONVENTIONS.md |
+| 其他 / 未来工具 | 该工具的 rules / skill / instructions 目录 |
+
+## 三、构建步骤
+1. 取上方规则全文（网关 <baseUrl> 已内嵌）。
+2. 写入工具对应的规则文件。
+3. 若工具支持 skill/agent 命名（如 Claude Code 的 SKILL.md），把规则做成 dispatch-human skill。
+4. 验证：让 Agent 处理一个涉密/需人工任务，确认它走 P390 人工路由并回查交付。
+`;
+
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; }
 }
@@ -71,35 +108,45 @@ function renderTemplate(tpl, cfg) {
     .replace(/https?:\/\/localhost:39000/g, base);
 }
 
-// 免认证安装接口：目标项目粘贴安装提示词后，Agent 拉取本接口写入项目
-// ?tool=claude → .claude SKILL+AGENT；tool=codex|gemini|agents → AGENTS.md；tool=opencode → AGENTS.md + .opencode command
-router.get('/install', (req, res) => {
-  try {
-    const cfg = readJson(CONFIG_FILE, DEFAULT_CONFIG);
-    const tool = req.query.tool || 'claude';
-    const base = String(cfg.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/+$/, '');
-    if (tool === 'opencode') {
-      return res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: [
-        { path: 'AGENTS.md', content: renderTemplate(AGENTS_TPL, cfg) },
-        { path: '.opencode/command/dispatch-human.md', content: renderTemplate(OPENCODE_CMD_TPL, cfg) },
-      ] } });
-    }
-    if (tool === 'claude') {
+/** 按工具生成安装文件列表 */
+function toolFiles(tool, cfg) {
+  const a = (p, c) => ({ path: p, content: c });
+  const agents = renderTemplate(AGENTS_TPL, cfg);
+  switch (tool) {
+    case 'claude': {
       const skill = fs.existsSync(SKILL_OUT)
         ? fs.readFileSync(SKILL_OUT, 'utf8')
         : renderTemplate(fs.readFileSync(SKILL_TPL, 'utf8'), cfg);
       const agent = fs.existsSync(AGENT_OUT)
         ? fs.readFileSync(AGENT_OUT, 'utf8')
         : renderTemplate(fs.readFileSync(AGENT_TPL, 'utf8'), cfg);
-      return res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: [
-        { path: '.claude/skills/dispatch-human/SKILL.md', content: skill },
-        { path: '.claude/agents/humanllm.md', content: agent },
-      ] } });
+      return [
+        a('.claude/skills/dispatch-human/SKILL.md', skill),
+        a('.claude/agents/humanllm.md', agent),
+      ];
     }
-    // codex / gemini / 通用 → AGENTS.md
-    res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: [
-      { path: 'AGENTS.md', content: renderTemplate(AGENTS_TPL, cfg) },
-    ] } });
+    case 'opencode':
+      return [
+        a('AGENTS.md', agents),
+        a('.opencode/command/dispatch-human.md', renderTemplate(OPENCODE_CMD_TPL, cfg)),
+      ];
+    case 'gemini': return [a('GEMINI.md', renderTemplate(GEMINI_TPL, cfg))];
+    case 'cursor': return [a('.cursor/rules/p390.mdc', renderTemplate(CURSOR_TPL, cfg))];
+    case 'windsurf': return [a('.windsurf/rules/p390.md', renderTemplate(WINDSURF_TPL, cfg))];
+    case 'aider': return [a('CONVENTIONS.md', renderTemplate(AIDER_TPL, cfg))];
+    case 'build': return [a('构建指南.md', renderTemplate(BUILD_TPL, cfg))];
+    default: return [a('AGENTS.md', agents)]; // codex / agents / 其他 → AGENTS.md
+  }
+}
+
+// 免认证安装接口：目标项目粘贴安装提示词后，Agent 拉取本接口写入项目
+// tool 支持：claude / codex / agents / opencode / gemini / cursor / windsurf / aider / build（通用构建方法）
+router.get('/install', (req, res) => {
+  try {
+    const cfg = readJson(CONFIG_FILE, DEFAULT_CONFIG);
+    const tool = req.query.tool || 'claude';
+    const base = String(cfg.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/+$/, '');
+    res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: toolFiles(tool, cfg) } });
   } catch (e) {
     console.error('[安装包生成失败]', e.message);
     res.status(500).json({ success: false, message: '生成安装包失败' });

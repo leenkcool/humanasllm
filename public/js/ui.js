@@ -238,19 +238,53 @@ window.HLM = window.HLM || {};
           ${isAdmin ? `<button class="btn primary sm" onclick="window.HLM.UI.showUserForm()">${Icons.plus} ${t('user.add')}</button>` : ''}
         </div>
         <div class="card-body-flush"><div class="tbl-wrap"><table class="data">
-          <thead><tr><th>${t('table.id')}</th><th>${t('user.username')}</th><th>${t('user.name')}</th><th>${t('user.skills')}</th><th>${t('user.role')}</th><th>${t('table.status')}</th><th>${t('table.createdAt')}</th>${isAdmin ? `<th>${t('table.action')}</th>` : ''}</tr></thead>
+          <thead><tr><th>${t('table.id')}</th><th>${t('user.username')}</th><th>${t('user.name')}</th><th>${t('user.email')}</th><th>${t('user.skills')}</th><th>${t('user.tenant')}</th><th>${t('user.rate')}</th><th>${t('table.status')}</th><th>${t('table.action')}</th></tr></thead>
           <tbody>${users.map(u => `
             <tr>
               <td>${u.id}</td><td><strong>${esc(u.username)}</strong></td><td>${esc(u.name || '-')}</td>
+              <td>${esc(u.email || '-')}</td>
               <td>${u.skills ? `<span class="tag low">${esc(u.skills)}</span>` : '-'}</td>
-              <td><span class="tag ${u.role === 'admin' ? 'high' : 'medium'}">${u.role === 'admin' ? t('role.admin') : t('role.engineer')}</span></td>
+              <td>${esc(u.tenant_name || '-')}</td>
+              <td>${rateCell(u)}</td>
               <td>${u.is_active ? `<span class="tag completed">${t('user.active')}</span>` : `<span class="tag cancelled">${t('user.disabled')}</span>`}</td>
-              <td class="nowrap">${fmt(u.created_at)}</td>
-              ${isAdmin ? `<td class="nowrap"><button class="btn sm" onclick="window.HLM.UI.showUserForm(${u.id})">${t('common.edit')}</button> <button class="btn sm danger" onclick="window.HLM.UI.delUser(${u.id})">${t('common.delete')}</button></td>` : ''}
-            </tr>`).join('') || `<tr><td colspan="8" class="empty">${t('user.empty')}</td></tr>`}
+              <td class="nowrap">
+                <button class="btn sm" onclick="window.HLM.UI.showUserDetail(${u.id})">${t('user.viewDetail')}</button>
+                ${isAdmin ? `<button class="btn sm" onclick="window.HLM.UI.showUserForm(${u.id})">${t('common.edit')}</button> <button class="btn sm danger" onclick="window.HLM.UI.delUser(${u.id})">${t('common.delete')}</button>` : ''}
+              </td>
+            </tr>`).join('') || `<tr><td colspan="9" class="empty">${t('user.empty')}</td></tr>`}
           </tbody>
         </table></div></div></div>`;
     } catch (e) { box.innerHTML = `<div class="empty" style="padding:40px;">${esc(e.message)}</div>`; }
+  }
+
+  // 一次通过率单元格
+  function rateCell(u) {
+    const c = u.completed || 0;
+    const r = u.reopened || 0;
+    if (!c) return '-';
+    return `<span style="color:var(--success);font-weight:600;">${Math.max(0, Math.round((1 - r / c) * 1000) / 10)}%</span>`;
+  }
+
+  // 用户详情弹窗（丰富信息：基本 + 租户 + 统计）
+  async function showUserDetail(id) {
+    try {
+      const r = await API.get('/users');
+      const u = (r.data || []).find(x => x.id === id);
+      if (!u) return toast(t('user.notFound'), 'error');
+      const c = u.completed || 0, rr = u.reopened || 0;
+      const rate = c > 0 ? Math.max(0, Math.round((1 - rr / c) * 1000) / 10) + '%' : '-';
+      const html = `
+        <div class="ctx"><div class="k">${t('user.username')}</div><div><strong>${esc(u.username)}</strong></div></div>
+        <div class="ctx"><div class="k">${t('user.name')}</div><div>${esc(u.name || '-')}</div></div>
+        <div class="ctx"><div class="k">${t('user.email')}</div><div>${esc(u.email || '-')}</div></div>
+        <div class="ctx"><div class="k">${t('user.role')}</div><div>${u.role === 'admin' ? t('role.admin') : t('role.engineer')}</div></div>
+        <div class="ctx"><div class="k">${t('user.tenant')}</div><div>${esc(u.tenant_name || '-')}</div></div>
+        <div class="ctx"><div class="k">${t('user.skills')}</div><div>${esc(u.skills || '-')}</div></div>
+        <div class="ctx"><div class="k">${t('user.stats')}</div><div>${t('gov.claimed')} ${c} · ${t('gov.reopened')} ${rr} · ${t('gov.passRate')} ${rate}</div></div>
+        <div class="ctx"><div class="k">${t('table.status')}</div><div>${u.is_active ? t('user.active') : t('user.disabled')}</div></div>
+        <div class="ctx"><div class="k">${t('table.createdAt')}</div><div>${fmt(u.created_at)}</div></div>`;
+      openModal(t('user.detailTitle'), html, `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`);
+    } catch (e) { toast(e.message, 'error'); }
   }
 
   async function showUserForm(id) {
@@ -641,7 +675,7 @@ window.HLM = window.HLM || {};
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
     promptReopen, submitReopen, showAuditReport, downloadDataset, showRules, ruleForm, saveRule, toggleRule, delRule,
-    renderUsers, showUserForm, saveUser, delUser, renderLogs,
+    renderUsers, showUserForm, saveUser, delUser, showUserDetail, renderLogs,
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
     renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,
     promptEditProject, submitEditProject, doArchiveProject,

@@ -272,7 +272,12 @@ window.HLM = window.HLM || {};
               <option value="claude">Claude Code</option>
               <option value="codex">Codex (OpenAI)</option>
               <option value="opencode">OpenCode</option>
+              <option value="gemini">Gemini CLI</option>
+              <option value="cursor">Cursor</option>
+              <option value="windsurf">Windsurf</option>
+              <option value="aider">Aider</option>
               <option value="agents">通用 Agent (AGENTS.md)</option>
+              <option value="build">构建方法（任意工具）</option>
             </select></div>
           <div style="display:flex;gap:8px;">
             <button class="btn primary" onclick="window.HLM.App.generateGateway()">${t('gateway.generate')}</button>

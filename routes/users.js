@@ -9,15 +9,20 @@ const { getDb } = require('../db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { rows } = require('../services/queueService');
 
-// 列表（可筛选角色）
+// 列表（可筛选角色；含租户名 + 个人统计：完成/打回/一次通过率）
 router.get('/', authenticate, async (req, res) => {
   try {
     const db = getDb();
     const role = req.query.role;
-    const sql = role
-      ? 'SELECT id, username, email, role, name, skills, is_active, created_at FROM users WHERE role = ? ORDER BY id'
-      : 'SELECT id, username, email, role, name, skills, is_active, created_at FROM users ORDER BY id';
-    const list = rows(await db.exec(sql, role ? [role] : []));
+    const where = role ? 'WHERE u.role = ?' : '';
+    const params = role ? [role] : [];
+    const list = rows(await db.exec(
+      `SELECT u.id, u.username, u.email, u.role, u.name, u.skills, u.is_active, u.tenant_id,
+              t.name AS tenant_name, u.created_at,
+              (SELECT COUNT(*) FROM tasks x WHERE x.assignee_id = u.id AND x.status = 'completed') AS completed,
+              (SELECT COUNT(*) FROM task_logs l WHERE l.action = 'reopen' AND l.task_id IN (SELECT id FROM tasks WHERE assignee_id = u.id)) AS reopened
+         FROM users u LEFT JOIN tenants t ON u.tenant_id = t.id ${where} ORDER BY u.id`,
+      params));
     res.json({ success: true, data: list });
   } catch (err) {
     console.error('[用户列表失败]', err.message);
