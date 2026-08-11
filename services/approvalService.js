@@ -45,11 +45,12 @@ async function getApprovalByNo(no) {
   return list[0] || null;
 }
 
-async function listApprovals({ status, page = 1, size = 20 }) {
+async function listApprovals({ status, page = 1, size = 20, tenantId }) {
   const db = getDb();
   const where = [];
   const params = [];
   if (status && STATUS[status.toUpperCase()]) { where.push('status = ?'); params.push(status); }
+  if (tenantId) { where.push('tenant_id = ?'); params.push(tenantId); }
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const count = await db.exec(`SELECT COUNT(*) AS c FROM approvals ${whereSql}`, params);
   const total = count[0].values[0][0];
@@ -65,15 +66,15 @@ function makeNo() {
 }
 
 /** AI 发起审批请求 → pending（type: resource=资源申请 / project=项目创建申请） */
-async function createApproval({ type = 'resource', resource, amount, purpose, detail, requester, project_code, meta_tags }) {
+async function createApproval({ type = 'resource', resource, amount, purpose, detail, requester, project_code, meta_tags, tenant_id }) {
   const db = getDb();
   const no = makeNo();
   const { lastId } = await db.run(
-    `INSERT INTO approvals (approval_no, type, resource, amount, purpose, detail, requester, project_code, meta_tags, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, 'pending')`,
+    `INSERT INTO approvals (approval_no, type, resource, amount, purpose, detail, requester, project_code, meta_tags, status, tenant_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, 'pending', ?)`,
     [no, type, resource || '未指定资源', amount || null, purpose || null, detail || null,
       requester || 'ai-agent', project_code || null,
-      meta_tags ? JSON.stringify(meta_tags) : null]
+      meta_tags ? JSON.stringify(meta_tags) : null, tenant_id || null]
   );
   ws.broadcast('approval:new', { id: lastId, approval_no: no });
   notifier.send({

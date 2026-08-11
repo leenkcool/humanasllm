@@ -5,6 +5,7 @@
  */
 const express = require('express');
 const router = express.Router();
+const { getDb } = require('../db');
 const approval = require('../services/approvalService');
 const project = require('../services/projectService');
 const { authenticate } = require('../middleware/auth');
@@ -51,8 +52,11 @@ router.post('/approvals', requireUpstreamKey, async (req, res) => {
     const { resource, amount, purpose, detail, requester, project_code, meta_tags } = req.body || {};
     if (!resource) return res.status(400).json(encoder.makeError(400, 'resource 不能为空'));
 
+    // 上游 /v1 无 JWT：审批归默认租户（租户路由在 v2 上游 key 路由）
+    const defTenant = (await getDb().exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0];
+    const tenantId = defTenant && defTenant.values[0] ? defTenant.values[0][0] : null;
     const created = await approval.createApproval({
-      resource, amount, purpose, detail, requester, project_code, meta_tags,
+      resource, amount, purpose, detail, requester, project_code, meta_tags, tenant_id: tenantId,
     });
     const a = await approval.getApproval(created.id);
     // 异步受理：AI 提审批立即返回 approval_no，人类批准/驳回后凭 GET /v1/approvals/:id 回查
@@ -84,7 +88,7 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const size = Math.min(100, Math.max(1, parseInt(req.query.size) || 20));
-    const r = await approval.listApprovals({ status: req.query.status, page, size });
+    const r = await approval.listApprovals({ status: req.query.status, page, size, tenantId: req.tenant_id });
     res.json({ success: true, data: r });
   } catch (e) {
     console.error('[审批列表失败]', e.message);
@@ -99,6 +103,7 @@ async function getApprovalHandler(req, res) {
     let a = /^\d+$/.test(idStr) ? await approval.getApproval(parseInt(idStr)) : null;
     if (!a) a = await approval.getApprovalByNo(idStr);
     if (!a) return res.status(404).json({ success: false, message: '审批单不存在' });
+    if (req.tenant_id && a.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '审批单不存在' });
     res.json({ success: true, data: a });
   } catch (e) {
     console.error('[审批详情失败]', e.message);
@@ -115,6 +120,8 @@ router.get('/approvals/:id', authAny, getApprovalHandler);
 router.post('/:id/approve', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const a0 = await approval.getApproval(id);
+    if (!a0 || a0.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '审批单不存在' });
     const provided = (req.body.provided || '').toString();
     const r = await approval.approve(id, provided, { id: req.user.id, name: req.user.name || req.user.username });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
@@ -139,6 +146,8 @@ router.post('/:id/approve', authenticate, async (req, res) => {
 router.post('/:id/reject', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const a0 = await approval.getApproval(id);
+    if (!a0 || a0.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '审批单不存在' });
     const reason = (req.body.reason || '').toString().trim();
     if (!reason) return res.status(400).json({ success: false, message: '请填写驳回原因' });
     const r = await approval.reject(id, reason, { id: req.user.id, name: req.user.name || req.user.username });

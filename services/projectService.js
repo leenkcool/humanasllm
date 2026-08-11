@@ -14,12 +14,14 @@ function rows(result) {
   });
 }
 
-async function listProjects({ status } = {}) {
+async function listProjects({ status, tenantId } = {}) {
   const db = getDb();
-  const sql = status
-    ? 'SELECT * FROM projects WHERE status = ? ORDER BY id'
-    : 'SELECT * FROM projects ORDER BY id';
-  return rows(await db.exec(sql, status ? [status] : []));
+  const where = [];
+  const params = [];
+  if (status) { where.push('status = ?'); params.push(status); }
+  if (tenantId) { where.push('tenant_id = ?'); params.push(tenantId); }
+  const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  return rows(await db.exec(`SELECT * FROM projects ${whereSql} ORDER BY id`, params));
 }
 
 async function getProject(id) {
@@ -32,14 +34,14 @@ async function getProjectByCode(code) {
   return list[0] || null;
 }
 
-async function createProject({ code, name, description, createdBy }) {
+async function createProject({ code, name, description, createdBy, tenantId }) {
   const db = getDb();
   if (!code || !name) throw Object.assign(new Error('项目编码和名称不能为空'), { status: 400 });
   const exists = rows(await db.exec('SELECT id FROM projects WHERE code = ?', [code]));
   if (exists[0]) throw Object.assign(new Error('项目编码已存在'), { status: 400 });
   const { lastId } = await db.run(
-    'INSERT INTO projects (code, name, description, created_by) VALUES (?, ?, ?, ?)',
-    [code, name, description || null, createdBy || null]
+    'INSERT INTO projects (code, name, description, created_by, tenant_id) VALUES (?, ?, ?, ?, ?)',
+    [code, name, description || null, createdBy || null, tenantId || null]
   );
   return { id: lastId, code, name };
 }
@@ -78,6 +80,7 @@ async function createFromApproval(approval) {
     name: detail.name || approval.resource || code,
     description: detail.desc || approval.purpose || null,
     createdBy: approval.provider_id || null,
+    tenantId: approval.tenant_id,
   });
 }
 

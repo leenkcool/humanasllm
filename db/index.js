@@ -154,6 +154,8 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS skills TEXT`);
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
+  await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
+  await db.exec(`ALTER TABLE projects ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
   await seedTenants();
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'general'`);
@@ -176,6 +178,8 @@ async function seedTenants() {
   const defaultId = d[0].values[0][0];
   await db.run('UPDATE users SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
   await db.run('UPDATE tasks SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
+  await db.run('UPDATE approvals SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
+  await db.run('UPDATE projects SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
 }
 
 /** 播种分级策略种子规则（白名单锁死：confidential/ops 命中即定级，不可被上游声明降级） */
