@@ -37,6 +37,13 @@ async function getApproval(id) {
   return list[0] || null;
 }
 
+/** 按 approval_no 查（上游 /v1 回查用） */
+async function getApprovalByNo(no) {
+  const r = await getDb().exec('SELECT * FROM approvals WHERE approval_no = ?', [no]);
+  const list = rows(r);
+  return list[0] || null;
+}
+
 async function listApprovals({ status, page = 1, size = 20 }) {
   const db = getDb();
   const where = [];
@@ -133,6 +140,6 @@ function startApprovalScanner() {
 }
 
 module.exports = {
-  STATUS, TRANSITIONS, getApproval, listApprovals,
+  STATUS, TRANSITIONS, getApproval, getApprovalByNo, listApprovals,
   createApproval, approve, reject, waitForApproval, startApprovalScanner,
 };

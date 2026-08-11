@@ -69,7 +69,7 @@
 - `status: pending|processing|paused` → `content` 为「任务处理中，请稍后查询」
 
 ### POST /v1/approvals
-AI 向人类提审批（资源/权限/项目申请），挂起等待人类批准/驳回。
+AI 向人类提审批（资源/权限/项目申请），**异步受理**：创建后立即返回 `approval_no`，不阻塞等待（人类审批是小时级），凭它回查结果。
 
 **请求体**：
 ```json
@@ -78,14 +78,24 @@ AI 向人类提审批（资源/权限/项目申请），挂起等待人类批准
   "project_code": "p390" }
 ```
 
-**返回**（批准/驳回后）：
+**返回**（异步受理确认）：
 ```json
 { "id": "appr-xxx", "object": "approval", "resource": "…", "amount": "…",
-  "status": "approved", "provided": "已批准：192.168.168.60…",
-  "reject_reason": null, "decided_at": "…" }
+  "status": "pending", "provided": null, "reject_reason": null, "decided_at": null,
+  "message": "审批已受理，可通过 GET /v1/approvals/appr-xxx 查询结果" }
 ```
-- `status`: `pending`(超时) / `approved` / `rejected`
-- `provided`：人类批准时提供的资源/说明；`reject_reason`：驳回原因
+- `id` = `approval_no`，凭它回查结果（见下）
+
+### GET /v1/approvals/:id
+上游凭 `approval_no`（或工作台凭 db id）查询审批结果。
+```json
+{ "success": true, "data": { "id": …, "approval_no": "appr-xxx", "status": "approved",
+  "provided": "已批准：192.168.168.60…", "reject_reason": null, "decided_at": "…" } }
+```
+- `status: approved` → `provided` 为人类提供的资源/说明
+- `status: rejected` → `reject_reason` 为驳回原因
+- `status: pending` → 仍待审批，继续轮候
+- 认证：上游带 `UPSTREAM_API_KEY` 或工作台带 JWT（双认证）
 
 ---
 

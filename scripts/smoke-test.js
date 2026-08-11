@@ -79,10 +79,14 @@ async function poll(fn, max = 20) {
     ok('/v1 异步受理返回 task_id', false, '未拿到 task_id');
   }
 
-  // 4. 审批流程（/v1 挂起 → 工作台批准 → 返回 approved）
-  const apprPromise = api('POST', '/v1/approvals', {
+  // 4. 审批流程（/v1 异步受理 → 回查 pending → 工作台批准 → 回查 approved）
+  const appr = await api('POST', '/v1/approvals', {
     resource: '冒烟审批', amount: '1', purpose: '冒烟测试', requester: MARK,
   });
+  ok('/v1 审批异步受理返回 approval_no', appr.status === 200 && !!appr.data.id && appr.data.status === 'pending');
+  const approvalNo = appr.data.id;
+  let back = await api('GET', '/v1/approvals/' + approvalNo, null, token);
+  ok('/v1 审批回查1 pending', back.status === 200 && back.data.data.status === 'pending');
   const apprId = await poll(async () => {
     const l = await api('GET', '/api/approvals?status=pending&size=5', null, token);
     const a = ((l.data.data && l.data.data.data) || []).find(x => x.requester === MARK);
@@ -91,8 +95,8 @@ async function poll(fn, max = 20) {
   ok('审批已创建(pending)', !!apprId, 'apprId=' + apprId);
   if (apprId) {
     await api('POST', '/api/approvals/' + apprId + '/approve', { provided: '已提供' }, token);
-    const appr = await apprPromise;
-    ok('/v1 审批返回 approved', appr.status === 200 && appr.data.status === 'approved');
+    back = await api('GET', '/v1/approvals/' + approvalNo, null, token);
+    ok('/v1 审批回查2 approved+provided', back.status === 200 && back.data.data.status === 'approved' && back.data.data.provided === '已提供');
   }
 
   // 5. 项目

@@ -21,6 +21,14 @@ function requireUpstreamKey(req, res, next) {
   next();
 }
 
+/** 双认证：上游 API-Key 或工作台 JWT（/v1/approvals/:id 回查 + /api/approvals/:id 详情） */
+function authAny(req, res, next) {
+  const key = process.env.UPSTREAM_API_KEY;
+  const auth = req.headers.authorization || '';
+  if (key && (auth.startsWith('Bearer ') && auth.slice(7) === key || req.query.api_key === key)) return next();
+  authenticate(req, res, next);
+}
+
 /** 审批单 → 返回给 AI 的结果结构 */
 function toResult(a) {
   return {
@@ -37,7 +45,7 @@ function toResult(a) {
   };
 }
 
-// ===== OpenAI 兼容：AI 发起审批请求（挂起等待人类审批） =====
+// ===== OpenAI 兼容：AI 发起审批请求（异步受理 → 凭 approval_no 回查） =====
 router.post('/approvals', requireUpstreamKey, async (req, res) => {
   try {
     const { resource, amount, purpose, detail, requester, project_code, meta_tags } = req.body || {};
@@ -46,15 +54,9 @@ router.post('/approvals', requireUpstreamKey, async (req, res) => {
     const created = await approval.createApproval({
       resource, amount, purpose, detail, requester, project_code, meta_tags,
     });
-
-    const waitMs = parseInt(process.env.TASK_WAIT_MS) || 5 * 60 * 1000;
-    const result = await approval.waitForApproval(created.id, waitMs);
-
-    if (result.timedOut || !result.approval) {
-      const a = await approval.getApproval(created.id);
-      return res.json({ ...toResult(a), status: a.status, message: result.message || '审批等待超时' });
-    }
-    res.json(toResult(result.approval));
+    const a = await approval.getApproval(created.id);
+    // 异步受理：AI 提审批立即返回 approval_no，人类批准/驳回后凭 GET /v1/approvals/:id 回查
+    res.json({ ...toResult(a), message: '审批已受理，可通过 GET /v1/approvals/' + a.approval_no + ' 查询结果' });
   } catch (e) {
     console.error('[审批发起失败]', e.message);
     res.status(500).json(encoder.makeError(500, '审批发起失败: ' + e.message, 'server_error'));
@@ -90,17 +92,24 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// 审批详情
-router.get('/:id', authenticate, async (req, res) => {
+/** 按 db id 或 approval_no 查审批单 */
+async function getApprovalHandler(req, res) {
   try {
-    const a = await approval.getApproval(parseInt(req.params.id));
+    const idStr = req.params.id;
+    let a = /^\d+$/.test(idStr) ? await approval.getApproval(parseInt(idStr)) : null;
+    if (!a) a = await approval.getApprovalByNo(idStr);
     if (!a) return res.status(404).json({ success: false, message: '审批单不存在' });
     res.json({ success: true, data: a });
   } catch (e) {
     console.error('[审批详情失败]', e.message);
     res.status(500).json({ success: false, message: '获取审批详情失败' });
   }
-});
+}
+
+// 工作台详情：GET /api/approvals/:id（JWT）
+router.get('/:id', authenticate, getApprovalHandler);
+// 上游回查：GET /v1/approvals/:id（双认证，凭 approval_no 或 db id）
+router.get('/approvals/:id', authAny, getApprovalHandler);
 
 // 批准 + 提供资源
 router.post('/:id/approve', authenticate, async (req, res) => {

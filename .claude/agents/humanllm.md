@@ -32,17 +32,17 @@ model: haiku
   "project_code": "humanllm-subagent"
 }
 ```
-2) Bash 提交并等待人类审批（最长约 9 分钟，审批仍是同步挂起）：
+2) Bash 提交（**短超时**：/v1 异步受理，立即返回 `approval_no`，不阻塞等审批）：
 ```bash
 curl.exe -s -X POST http://192.168.168.3:39000/v1/approvals \
   -H "Content-Type: application/json; charset=utf-8" \
   --data-binary "@G:\dev\p390\data\human_approval.json" \
-  --max-time 550
+  --max-time 30
 ```
 3) 按返回处理：
-   - `status: "approved"` → 把 `provided`（人类提供的资源/准备说明）**附进第 1 步任务包的【环境约定/参考上下文】**（如"资源已就绪：&lt;provided&gt;"），再派单。
-   - `status: "rejected"` → **不派单**，直接向调用者如实转达驳回原因，建议调整资源申请后重试。
-   - 超时无结果 → 说明"审批待处理，可稍后再次调用查询"，不派单。
+   - 返回 `approval_no` + `status: "pending"` → 把 approval_no **登记到** `data/human_followup.json` 的 `approvals` 部分（见第 3 步回查），并如实告知调用者「已提审批 approval_no=…，人类批准后再次调用我即可获取资源并派单」。**不派单、不阻塞等待**。
+   - 若返回已 `approved`（人工即时批准）→ 把 `provided` 附进第 1 步任务包的【环境约定/参考上下文】（如"资源已就绪：&lt;provided&gt;"），再派单。
+   - 若返回 `rejected` → **不派单**，向调用者如实转达驳回原因，建议调整资源申请后重试。
 
 > 审批请求体（`human_approval.json`）与任务包（`human_task.json`）分文件存放，互不覆盖。
 
@@ -139,6 +139,7 @@ curl.exe -s -X POST http://192.168.168.3:39000/v1/chat/completions \
 }
 ```
 - 若该文件已有其他 pending 任务，保留它们并把新 task_id 加入同一个 `pending` 对象。
+- 资源审批登记：审批用同一文件的 `approvals` 字段（`{ "<approval_no>": { "resource": "...", "submitted_at": "...", "status": "pending" } }`），与 `pending` 并存、互不覆盖。
 
 ### 第 3 步：回查未完成任务（每次被调用时，先查再做）
 
@@ -153,6 +154,10 @@ curl.exe -s http://192.168.168.3:39000/v1/tasks/42 --max-time 15
    - **`completed`** → 任务完成：把 `content`（人工产出）**原样**作为最终回答交付给调用者（保留代码格式与换行），并把该 task_id 从 `pending` 移除（Write 更新 followup）。
    - **`returned`** → 任务被驳回/超时回落：向调用者如实转达 `content` 中的驳回原因，建议补充上下文后重新派单，并把该 task_id 从 `pending` 移除（或保留并标注 rejected 由调用者决定）。
    - **`pending` / `processing` / `paused`** → 仍在人工处理中：如实反馈「任务 #42 仍在处理中（状态：<status>），人工为小时级，可稍后再次调用查询」，**保留**在 `pending` 中**继续轮候**，`checks` 加 1。
+4) 同时回查 `approvals` 部分的未决审批：`GET /v1/approvals/{approval_no}`
+   - **`approved`** → 把返回的 `provided`（人类提供的资源/准备说明）附进对应待派任务包，再走第 0/1/2 步派单；从 `approvals` 移除。
+   - **`rejected`** → 向调用者转达 `reject_reason`，建议调整后重试；从 `approvals` 移除。
+   - **`pending`** → 仍待人类审批，保留继续轮候，如实反馈「审批中」。
 
 > 若某 task_id 回查 404（不存在/已清理），从 `pending` 移除并说明。
 
