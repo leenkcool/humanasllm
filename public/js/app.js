@@ -100,6 +100,8 @@ window.HLM = window.HLM || {};
         <button class="icon-btn" onclick="window.HLM.App.route()">${Icons.refresh}</button></div>
       <div class="stats" id="statsBox"></div>
       <div class="stats" id="govBox" style="margin-bottom:18px;"></div>
+      <div class="card"><div class="card-head"><span class="t">${t('gov.engineers')}</span></div>
+        <div class="card-body" id="engBox"></div></div>
       <div class="card"><div class="card-head"><span class="t">${t('page.dashboard.unfinished')}</span>
         <button class="btn sm" onclick="window.HLM.App.route()">${t('common.refresh')}</button></div>
         <div class="card-body-flush"><div class="tbl-wrap"><table class="data">
@@ -121,6 +123,13 @@ window.HLM = window.HLM || {};
         <div class="stat"><div class="num">${gd.approval.avg_min != null ? gd.approval.avg_min + t('gov.min') : '-'}</div><div class="lbl">${t('gov.approvalAvg')}</div></div>
         <div class="stat"><div class="num">${gd.timeout.rate}%</div><div class="lbl">${t('gov.timeoutRate')}</div></div>
         <div class="stat"><div class="num" style="font-size:14px;line-height:1.5;white-space:normal;">${catLabel}</div><div class="lbl">${t('gov.categories')}</div></div>`;
+      $('#engBox').innerHTML = (gd.engineers && gd.engineers.length)
+        ? gd.engineers.map(e => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);">
+            <div><strong>${esc(e.name)}</strong>${e.skills ? ` <span class="tag low" style="margin-left:6px;">${esc(e.skills)}</span>` : ''}</div>
+            <div style="font-size:13px;color:var(--muted);">${t('gov.claimed')} ${e.completed} · ${t('gov.reopened')} ${e.reopened} · <b style="color:var(--success);">${e.rate != null ? e.rate + '%' : '-'}</b></div>
+          </div>`).join('')
+        : `<div class="empty" style="padding:16px;">${t('gov.noData')}</div>`;
       const q = await API.get('/workbench/unfinished');
       UI.renderTasks(q.data, '#queueBody');
     } catch (e) { toast(e.message, 'error'); }

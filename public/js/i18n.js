@@ -80,6 +80,9 @@ window.HLM = window.HLM || {};
     'gov.categories': '分级分布',
     'gov.min': ' 分钟',
     'gov.noData': '暂无数据',
+    'gov.engineers': '工程师评级',
+    'gov.claimed': '完成',
+    'gov.reopened': '打回',
 
     // 合规报告
     'page.audit.report': '合规报告',
@@ -206,6 +209,8 @@ window.HLM = window.HLM || {};
     'user.cardTitle': '工程师账户',
     'user.add': '新增',
     'user.username': '用户名',
+    'user.skills': '技能',
+    'user.skillsPh': '逗号分隔，如 运维,数据库,安全',
     'user.name': '姓名',
     'user.role': '角色',
     'user.password': '密码',
@@ -419,6 +424,9 @@ window.HLM = window.HLM || {};
     'gov.categories': 'Category mix',
     'gov.min': ' min',
     'gov.noData': 'No data',
+    'gov.engineers': 'Engineer ratings',
+    'gov.claimed': 'Completed',
+    'gov.reopened': 'Reopened',
 
     // Compliance report
     'page.audit.report': 'Compliance Report',
@@ -540,6 +548,8 @@ window.HLM = window.HLM || {};
     'user.cardTitle': 'Engineer Accounts',
     'user.add': 'Add',
     'user.username': 'Username',
+    'user.skills': 'Skills',
+    'user.skillsPh': 'comma-separated, e.g. ops,database,security',
     'user.name': 'Name',
     'user.role': 'Role',
     'user.password': 'Password',

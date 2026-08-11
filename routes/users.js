@@ -15,8 +15,8 @@ router.get('/', authenticate, async (req, res) => {
     const db = getDb();
     const role = req.query.role;
     const sql = role
-      ? 'SELECT id, username, email, role, name, is_active, created_at FROM users WHERE role = ? ORDER BY id'
-      : 'SELECT id, username, email, role, name, is_active, created_at FROM users ORDER BY id';
+      ? 'SELECT id, username, email, role, name, skills, is_active, created_at FROM users WHERE role = ? ORDER BY id'
+      : 'SELECT id, username, email, role, name, skills, is_active, created_at FROM users ORDER BY id';
     const list = rows(await db.exec(sql, role ? [role] : []));
     res.json({ success: true, data: list });
   } catch (err) {
@@ -56,7 +56,7 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     const list = rows(await db.exec('SELECT id FROM users WHERE id = ?', [id]));
     if (!list[0]) return res.status(404).json({ success: false, message: '用户不存在' });
 
-    const { role, name, is_active, password } = req.body;
+    const { role, name, is_active, password, skills } = req.body;
     const sets = [];
     const params = [];
     if (role !== undefined) {
@@ -64,6 +64,7 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
       sets.push('role = ?'); params.push(role);
     }
     if (name !== undefined) { sets.push('name = ?'); params.push(name); }
+    if (skills !== undefined) { sets.push('skills = ?'); params.push(String(skills)); }
     if (is_active !== undefined) { sets.push('is_active = ?'); params.push(is_active ? true : false); }
     if (password) { sets.push('password = ?'); params.push(await bcrypt.hash(password, 10)); }
     if (sets.length === 0) return res.status(400).json({ success: false, message: '没有可更新的字段' });

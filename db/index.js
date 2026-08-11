@@ -144,6 +144,7 @@ async function initDatabase() {
   await db.exec(SCHEMA);
   // ===== 兼容迁移（对已存在的表补列） =====
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(128)`);
+  await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS skills TEXT`);
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'general'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS rule_id INTEGER`);

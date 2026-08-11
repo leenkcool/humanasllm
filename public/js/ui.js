@@ -238,27 +238,33 @@ window.HLM = window.HLM || {};
           ${isAdmin ? `<button class="btn primary sm" onclick="window.HLM.UI.showUserForm()">${Icons.plus} ${t('user.add')}</button>` : ''}
         </div>
         <div class="card-body-flush"><div class="tbl-wrap"><table class="data">
-          <thead><tr><th>${t('table.id')}</th><th>${t('user.username')}</th><th>${t('user.name')}</th><th>${t('user.role')}</th><th>${t('table.status')}</th><th>${t('table.createdAt')}</th>${isAdmin ? `<th>${t('table.action')}</th>` : ''}</tr></thead>
+          <thead><tr><th>${t('table.id')}</th><th>${t('user.username')}</th><th>${t('user.name')}</th><th>${t('user.skills')}</th><th>${t('user.role')}</th><th>${t('table.status')}</th><th>${t('table.createdAt')}</th>${isAdmin ? `<th>${t('table.action')}</th>` : ''}</tr></thead>
           <tbody>${users.map(u => `
             <tr>
               <td>${u.id}</td><td><strong>${esc(u.username)}</strong></td><td>${esc(u.name || '-')}</td>
+              <td>${u.skills ? `<span class="tag low">${esc(u.skills)}</span>` : '-'}</td>
               <td><span class="tag ${u.role === 'admin' ? 'high' : 'medium'}">${u.role === 'admin' ? t('role.admin') : t('role.engineer')}</span></td>
               <td>${u.is_active ? `<span class="tag completed">${t('user.active')}</span>` : `<span class="tag cancelled">${t('user.disabled')}</span>`}</td>
               <td class="nowrap">${fmt(u.created_at)}</td>
               ${isAdmin ? `<td class="nowrap"><button class="btn sm" onclick="window.HLM.UI.showUserForm(${u.id})">${t('common.edit')}</button> <button class="btn sm danger" onclick="window.HLM.UI.delUser(${u.id})">${t('common.delete')}</button></td>` : ''}
-            </tr>`).join('') || `<tr><td colspan="7" class="empty">${t('user.empty')}</td></tr>`}
+            </tr>`).join('') || `<tr><td colspan="8" class="empty">${t('user.empty')}</td></tr>`}
           </tbody>
         </table></div></div></div>`;
     } catch (e) { box.innerHTML = `<div class="empty" style="padding:40px;">${esc(e.message)}</div>`; }
   }
 
-  function showUserForm(id) {
+  async function showUserForm(id) {
     const isEdit = !!id;
+    let u = {};
+    if (isEdit) {
+      try { const r = await API.get('/users'); u = (r.data || []).find(x => x.id === id) || {}; } catch (e) { /* ignore */ }
+    }
     openModal(isEdit ? t('user.editTitle') : t('user.addTitle'), `
-      <div class="form-group"><label class="form-label">${t('user.username')}</label><input class="form-input" id="uName" ${isEdit ? 'disabled' : ''}></div>
-      <div class="form-group"><label class="form-label">${t('user.name')}</label><input class="form-input" id="uNick"></div>
+      <div class="form-group"><label class="form-label">${t('user.username')}</label><input class="form-input" id="uName" value="${esc(u.username || '')}" ${isEdit ? 'disabled' : ''}></div>
+      <div class="form-group"><label class="form-label">${t('user.name')}</label><input class="form-input" id="uNick" value="${esc(u.name || '')}"></div>
+      <div class="form-group"><label class="form-label">${t('user.skills')}</label><input class="form-input" id="uSkills" value="${esc(u.skills || '')}" placeholder="${t('user.skillsPh')}"></div>
       ${!isEdit ? `<div class="form-group"><label class="form-label">${t('user.password')}</label><input class="form-input" id="uPass" type="password"></div>` : ''}
-      <div class="form-group"><label class="form-label">${t('user.role')}</label><select class="form-select" id="uRole"><option value="engineer">${t('role.engineer')}</option><option value="admin">${t('role.admin')}</option></select></div>
+      <div class="form-group"><label class="form-label">${t('user.role')}</label><select class="form-select" id="uRole"><option value="engineer" ${u.role !== 'admin' ? 'selected' : ''}>${t('role.engineer')}</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>${t('role.admin')}</option></select></div>
     `, `
       <button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.cancel')}</button>
       <button class="btn primary" onclick="window.HLM.UI.saveUser(${id || 'null'})">${t('common.save')}</button>`);
@@ -267,13 +273,14 @@ window.HLM = window.HLM || {};
   async function saveUser(id) {
     const username = $('#uName').value.trim();
     const name = $('#uNick').value.trim();
+    const skills = $('#uSkills').value.trim();
     const role = $('#uRole').value;
     const password = id ? undefined : $('#uPass').value;
     if (!username) { toast(t('user.requiredUsername'), 'warning'); return; }
     if (!id && !password) { toast(t('user.requiredPassword'), 'warning'); return; }
     try {
-      if (id) { await API.put('/users/' + id, { name, role }); }
-      else { await API.post('/users', { username, password, role, name }); }
+      if (id) { await API.put('/users/' + id, { name, role, skills }); }
+      else { await API.post('/users', { username, password, role, name, skills }); }
       toast(t('user.saved'), 'success');
       closeModal();
       window.HLM.refresh && window.HLM.refresh();

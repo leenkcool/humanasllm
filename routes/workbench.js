@@ -66,12 +66,33 @@ router.get('/governance', authenticate, async (req, res) => {
     ))[0] || {};
     const total = parseInt(tz.total) || 0;
     const timeoutCount = parseInt(tz.timeout) || 0;
+    // 工程师治理：per-engineer 一次通过率 + 技能标签
+    const engineers = queue.rows(await db.exec(
+      `SELECT u.id, u.username, u.name, u.skills,
+              COUNT(DISTINCT t.id) AS total,
+              COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'completed') AS completed,
+              COUNT(DISTINCT t.id) FILTER (WHERE EXISTS (SELECT 1 FROM task_logs l WHERE l.task_id = t.id AND l.action = 'reopen')) AS reopened
+         FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id
+        WHERE u.role = 'engineer'
+        GROUP BY u.id, u.username, u.name, u.skills
+        ORDER BY completed DESC`
+    ));
+    const engineerStats = (engineers || []).map(e => {
+      const c = parseInt(e.completed) || 0;
+      const r = parseInt(e.reopened) || 0;
+      return {
+        id: e.id, name: e.name || e.username, username: e.username, skills: e.skills || null,
+        total: parseInt(e.total) || 0, completed: c, reopened: r,
+        rate: c > 0 ? Math.max(0, Math.round((1 - r / c) * 1000) / 10) : null,
+      };
+    });
     res.json({ success: true, data: {
       categories,
       qa: { completed, reopened, rate: completed > 0 ? Math.max(0, Math.round((1 - reopened / completed) * 1000) / 10) : null },
       approval: { total: parseInt(appr.total) || 0, decided: parseInt(appr.decided) || 0, avg_min: appr.avg_min != null ? Math.round(parseFloat(appr.avg_min) * 10) / 10 : null },
       timeout: { count: timeoutCount, rate: total > 0 ? Math.round((timeoutCount / total) * 1000) / 10 : 0 },
       total_tasks: total,
+      engineers: engineerStats,
     } });
   } catch (err) {
     console.error('[治理概览失败]', err.message);
