@@ -72,4 +72,4 @@ async function classify({ messages, body = {}, tenantId }) {
   return { category: DEFAULT, rule_id: null, rule_name: null, source: 'default' };
 }
 
-module.exports = { CATEGORIES, DEFAULT, classify, matchKeywords };
+module.exports = { CATEGORIES, DEFAULT, classify, matchKeywords, explicitCategory };
