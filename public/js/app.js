@@ -276,6 +276,10 @@ window.HLM = window.HLM || {};
               <option value="cursor">Cursor</option>
               <option value="windsurf">Windsurf</option>
               <option value="aider">Aider</option>
+              <option value="workbuddy">WorkBuddy</option>
+              <option value="openclaw">OpenClaw</option>
+              <option value="hermes">Hermes</option>
+              <option value="pi">Pi Agent</option>
               <option value="agents">通用 Agent (AGENTS.md)</option>
               <option value="build">构建方法（任意工具）</option>
             </select></div>

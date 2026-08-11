@@ -82,6 +82,7 @@ ${AGENTS_TPL}
 | Cursor | .cursor/rules/p390.mdc |
 | Windsurf | .windsurf/rules/p390.md |
 | Aider | CONVENTIONS.md |
+| workbuddy / openclaw / hermes / pi | AGENTS.md（若支持）；否则按「三、构建步骤」 |
 | 其他 / 未来工具 | 该工具的 rules / skill / instructions 目录 |
 
 ## 三、构建步骤
@@ -135,6 +136,15 @@ function toolFiles(tool, cfg) {
     case 'windsurf': return [a('.windsurf/rules/p390.md', renderTemplate(WINDSURF_TPL, cfg))];
     case 'aider': return [a('CONVENTIONS.md', renderTemplate(AIDER_TPL, cfg))];
     case 'build': return [a('构建指南.md', renderTemplate(BUILD_TPL, cfg))];
+    // workbuddy / openclaw / hermes / pi：按 AGENTS.md 标准（多数 agent 兼容）+ 附构建指南兜底
+    case 'workbuddy':
+    case 'openclaw':
+    case 'hermes':
+    case 'pi':
+      return [
+        a('AGENTS.md', agents),
+        a('构建指南.md', renderTemplate(BUILD_TPL, cfg)),
+      ];
     default: return [a('AGENTS.md', agents)]; // codex / agents / 其他 → AGENTS.md
   }
 }
