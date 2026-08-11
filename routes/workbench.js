@@ -13,19 +13,21 @@ router.get('/summary', authenticate, async (req, res) => {
   try {
     const db = getDb();
     const stats = { pending: 0, processing: 0, completed: 0, returned: 0, paused: 0, cancelled: 0 };
-    const rows = queue.rows(await db.exec('SELECT status, COUNT(*) AS c FROM tasks GROUP BY status'));
+    const rows = queue.rows(await db.exec('SELECT status, COUNT(*) AS c FROM tasks WHERE tenant_id = ? GROUP BY status', [req.tenant_id]));
     for (const r of rows) {
       if (stats[r.status] !== undefined) stats[r.status] = parseInt(r.c) || 0;
     }
     const engineers = queue.rows(await db.exec(
-      "SELECT id, username, name FROM users WHERE role = 'engineer' AND is_active = true ORDER BY id"
+      "SELECT id, username, name FROM users WHERE role = 'engineer' AND is_active = true AND tenant_id = ? ORDER BY id",
+      [req.tenant_id]
     ));
     // 未完成聚合：所有尚未结束的人肉任务（防遗忘，人工为小时级节奏）
     stats.unfinished = (stats.pending || 0) + (stats.processing || 0) + (stats.returned || 0) + (stats.paused || 0);
     // 一次通过率（质量治理）：completed 中未被 reopen 打回的比例
     const qa = queue.rows(await db.exec(
-      `SELECT (SELECT COUNT(*) FROM tasks WHERE status = 'completed') AS completed,
-              (SELECT COUNT(*) FROM task_logs WHERE action = 'reopen') AS reopened`
+      `SELECT (SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND tenant_id = ?) AS completed,
+              (SELECT COUNT(*) FROM task_logs l JOIN tasks t ON l.task_id = t.id WHERE l.action = 'reopen' AND t.tenant_id = ?) AS reopened`,
+      [req.tenant_id, req.tenant_id]
     ));
     const q = qa[0] || {};
     const completed = parseInt(q.completed) || 0;
@@ -46,11 +48,12 @@ router.get('/summary', authenticate, async (req, res) => {
 router.get('/governance', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const cats = queue.rows(await db.exec('SELECT category, COUNT(*) AS c FROM tasks GROUP BY category', []));
+    const cats = queue.rows(await db.exec('SELECT category, COUNT(*) AS c FROM tasks WHERE tenant_id = ? GROUP BY category', [req.tenant_id]));
     const categories = (cats || []).map(r => ({ category: r.category, count: parseInt(r.c) || 0 }));
     const qa = queue.rows(await db.exec(
-      `SELECT (SELECT COUNT(*) FROM tasks WHERE status = 'completed') AS completed,
-              (SELECT COUNT(*) FROM task_logs WHERE action = 'reopen') AS reopened`
+      `SELECT (SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND tenant_id = ?) AS completed,
+              (SELECT COUNT(*) FROM task_logs l JOIN tasks t ON l.task_id = t.id WHERE l.action = 'reopen' AND t.tenant_id = ?) AS reopened`,
+      [req.tenant_id, req.tenant_id]
     ))[0] || {};
     const completed = parseInt(qa.completed) || 0;
     const reopened = parseInt(qa.reopened) || 0;
@@ -61,8 +64,9 @@ router.get('/governance', authenticate, async (req, res) => {
          FROM approvals`
     ))[0] || {};
     const tz = queue.rows(await db.exec(
-      `SELECT (SELECT COUNT(*) FROM tasks) AS total,
-              (SELECT COUNT(*) FROM task_logs WHERE remark LIKE '%超时%') AS timeout`
+      `SELECT (SELECT COUNT(*) FROM tasks WHERE tenant_id = ?) AS total,
+              (SELECT COUNT(*) FROM task_logs l JOIN tasks t ON l.task_id = t.id WHERE l.remark LIKE '%超时%' AND t.tenant_id = ?) AS timeout`,
+      [req.tenant_id, req.tenant_id]
     ))[0] || {};
     const total = parseInt(tz.total) || 0;
     const timeoutCount = parseInt(tz.timeout) || 0;
@@ -73,9 +77,10 @@ router.get('/governance', authenticate, async (req, res) => {
               COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'completed') AS completed,
               COUNT(DISTINCT t.id) FILTER (WHERE EXISTS (SELECT 1 FROM task_logs l WHERE l.task_id = t.id AND l.action = 'reopen')) AS reopened
          FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id
-        WHERE u.role = 'engineer'
+        WHERE u.role = 'engineer' AND u.tenant_id = ? AND (t.tenant_id IS NULL OR t.tenant_id = ?)
         GROUP BY u.id, u.username, u.name, u.skills
-        ORDER BY completed DESC`
+        ORDER BY completed DESC`,
+      [req.tenant_id, req.tenant_id]
     ));
     const engineerStats = (engineers || []).map(e => {
       const c = parseInt(e.completed) || 0;
@@ -108,10 +113,11 @@ router.get('/unfinished', authenticate, async (req, res) => {
       `SELECT t.*, u.name AS assignee_name, p.name AS project_name
          FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id
          LEFT JOIN projects p ON p.code = t.project_code
-        WHERE t.status IN ('pending','processing','returned','paused')
+        WHERE t.status IN ('pending','processing','returned','paused') AND t.tenant_id = ?
         ORDER BY CASE t.status WHEN 'pending' THEN 0 WHEN 'processing' THEN 1 WHEN 'returned' THEN 2 ELSE 3 END,
                  CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, t.created_at
-        LIMIT 100`
+        LIMIT 100`,
+      [req.tenant_id]
     ));
     res.json({ success: true, data: list });
   } catch (err) {
@@ -128,8 +134,8 @@ router.get('/mine', authenticate, async (req, res) => {
       `SELECT t.*, u.name AS assignee_name, p.name AS project_name
          FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id
          LEFT JOIN projects p ON p.code = t.project_code
-        WHERE t.assignee_id = ? ORDER BY t.id DESC LIMIT 100`,
-      [req.user.id]
+        WHERE t.assignee_id = ? AND t.tenant_id = ? ORDER BY t.id DESC LIMIT 100`,
+      [req.user.id, req.tenant_id]
     ));
     res.json({ success: true, data: list });
   } catch (err) {
@@ -146,9 +152,10 @@ router.get('/queue', authenticate, async (req, res) => {
       `SELECT t.*, u.name AS assignee_name, p.name AS project_name
          FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id
          LEFT JOIN projects p ON p.code = t.project_code
-        WHERE t.status = 'pending'
+        WHERE t.status = 'pending' AND t.tenant_id = ?
         ORDER BY CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, t.created_at
-        LIMIT 100`
+        LIMIT 100`,
+      [req.tenant_id]
     ));
     res.json({ success: true, data: list });
   } catch (err) {

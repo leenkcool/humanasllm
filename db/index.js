@@ -121,6 +121,13 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+
+CREATE TABLE IF NOT EXISTS tenants (
+  id SERIAL PRIMARY KEY,
+  code VARCHAR(64) UNIQUE NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
 `;
 
 function createAdapter() {
@@ -145,6 +152,9 @@ async function initDatabase() {
   // ===== 兼容迁移（对已存在的表补列） =====
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(128)`);
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS skills TEXT`);
+  await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
+  await seedTenants();
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'general'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS rule_id INTEGER`);
@@ -153,6 +163,19 @@ async function initDatabase() {
   // ===== 分级策略引擎种子规则（幂等：task_rules 为空时播种） =====
   await seedRules();
   return db;
+}
+
+/** 播种默认租户并把存量用户归位（多租户 v1：现有单租户数据归 default） */
+async function seedTenants() {
+  const db = getDb();
+  const tr = await db.exec('SELECT id FROM tenants WHERE code = ?', ['default']);
+  if (!tr[0] || !tr[0].values.length) {
+    await db.run('INSERT INTO tenants (code, name) VALUES (?, ?)', ['default', '默认租户']);
+  }
+  const d = await db.exec('SELECT id FROM tenants WHERE code = ?', ['default']);
+  const defaultId = d[0].values[0][0];
+  await db.run('UPDATE users SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
+  await db.run('UPDATE tasks SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
 }
 
 /** 播种分级策略种子规则（白名单锁死：confidential/ops 命中即定级，不可被上游声明降级） */

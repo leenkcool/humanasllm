@@ -28,18 +28,21 @@ router.get('/', authenticate, async (req, res) => {
 // 新增
 router.post('/', authenticate, requireRole('admin'), async (req, res) => {
   try {
-    const { username, password, role, name } = req.body;
+    const { username, password, role, name, skills, tenant_id } = req.body;
     if (!username || !password) return res.status(400).json({ success: false, message: '用户名和密码不能为空' });
     const r = role || 'engineer';
     if (!['engineer', 'admin'].includes(r)) return res.status(400).json({ success: false, message: '非法角色' });
     const db = getDb();
     const exists = rows(await db.exec('SELECT id FROM users WHERE username = ?', [username]));
     if (exists[0]) return res.status(400).json({ success: false, message: '用户名已存在' });
+    // 租户归属：显式指定或默认租户
+    let tid = tenant_id;
+    if (!tid) { const d = rows(await db.exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0]; tid = d ? d.id : null; }
 
     const hash = await bcrypt.hash(password, 10);
     const { lastId } = await db.run(
-      'INSERT INTO users (username, password, role, name, is_active) VALUES (?, ?, ?, ?, true)',
-      [username, hash, r, name || username]
+      'INSERT INTO users (username, password, role, name, skills, is_active, tenant_id) VALUES (?, ?, ?, ?, ?, true, ?)',
+      [username, hash, r, name || username, skills || null, tid]
     );
     res.json({ success: true, data: { id: lastId } });
   } catch (err) {
@@ -56,7 +59,7 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     const list = rows(await db.exec('SELECT id FROM users WHERE id = ?', [id]));
     if (!list[0]) return res.status(404).json({ success: false, message: '用户不存在' });
 
-    const { role, name, is_active, password, skills } = req.body;
+    const { role, name, is_active, password, skills, tenant_id } = req.body;
     const sets = [];
     const params = [];
     if (role !== undefined) {
@@ -65,6 +68,7 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     }
     if (name !== undefined) { sets.push('name = ?'); params.push(name); }
     if (skills !== undefined) { sets.push('skills = ?'); params.push(String(skills)); }
+    if (tenant_id !== undefined) { sets.push('tenant_id = ?'); params.push(tenant_id || null); }
     if (is_active !== undefined) { sets.push('is_active = ?'); params.push(is_active ? true : false); }
     if (password) { sets.push('password = ?'); params.push(await bcrypt.hash(password, 10)); }
     if (sets.length === 0) return res.status(400).json({ success: false, message: '没有可更新的字段' });

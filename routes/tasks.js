@@ -19,7 +19,9 @@ router.get('/export', authenticate, async (req, res) => {
     const list = queue.rows(await db.exec(
       `SELECT t.id, t.upstream_request_id, t.model, t.priority, t.category, t.project_code, t.status,
               u.name AS assignee_name, t.result_text, t.reject_reason, t.created_at, t.completed_at
-         FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id ORDER BY t.id`
+         FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id
+        WHERE t.tenant_id = ? ORDER BY t.id`,
+      [req.tenant_id]
     ));
     const cols = ['id', 'upstream_request_id', 'model', 'priority', 'category', 'project_code', 'status', 'assignee_name', 'result_text', 'reject_reason', 'created_at', 'completed_at'];
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -43,6 +45,7 @@ router.get('/', authenticate, async (req, res) => {
     if (VALID_STATUS.includes(req.query.status)) { where.push('t.status = ?'); params.push(req.query.status); }
     if (['high', 'medium', 'low'].includes(req.query.priority)) { where.push('t.priority = ?'); params.push(req.query.priority); }
     if (req.query.assignee) { where.push('t.assignee_id = ?'); params.push(parseInt(req.query.assignee)); }
+    where.push('t.tenant_id = ?'); params.push(req.tenant_id);
     const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
     const count = await db.exec(`SELECT COUNT(*) as c FROM tasks t ${whereSql}`, params);
@@ -68,6 +71,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const id = parseInt(req.params.id);
     const task = await queue.getTask(id);
     if (!task) return res.status(404).json({ success: false, message: '任务不存在' });
+    if (task.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '任务不存在' });
     const db = getDb();
     const logs = queue.rows(await db.exec(
       'SELECT * FROM task_logs WHERE task_id = ? ORDER BY id', [id]

@@ -130,15 +130,18 @@ async function createTaskFromRequest({ parsed, chatId, created }) {
   const projectCode = parsed.extra.project_code || null;
   const metaTags = parsed.extra.meta_tags || parsed.extra.meta || null;
   const payload = { ...parsed, created };
+  // 多租户：上游 /v1 无 JWT，任务归默认租户（租户路由见工作台）
+  const defTenant = rows(await getDb().exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0];
+  const tenantId = defTenant ? defTenant.id : null;
 
   const { lastId } = await db.run(
     `INSERT INTO tasks
-       (upstream_request_id, model, stream, priority, category, rule_id, project_code, meta_tags, request_payload, status, timeout_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?)`,
+       (upstream_request_id, model, stream, priority, category, rule_id, project_code, meta_tags, request_payload, status, timeout_at, tenant_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?)`,
     [chatId, parsed.model, parsed.stream, priority, category, ruleId, projectCode,
       metaTags ? JSON.stringify(metaTags) : null,
       JSON.stringify(payload),
-      timeoutMinutes('pending', priority)]
+      timeoutMinutes('pending', priority), tenantId]
   );
   await addLog(lastId, 'create', null, { status: 'pending' }, null, '上游请求接入');
   ws.broadcast('task:new', { id: lastId });

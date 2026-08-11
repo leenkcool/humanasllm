@@ -27,16 +27,19 @@ router.post('/register', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const mode = process.env.USER_REGISTER_MODE || 'open';
     const isActive = mode !== 'audit';
+    // 注册归默认租户（多租户 v1；企业版租户归属由管理员分配）
+    const defTenant = rows(await db.exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0];
+    const tenantId = defTenant ? defTenant.id : null;
     const { lastId } = await db.run(
-      'INSERT INTO users (username, email, password, role, name, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-      [username, email, hash, 'engineer', name || username, isActive]
+      'INSERT INTO users (username, email, password, role, name, is_active, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [username, email, hash, 'engineer', name || username, isActive, tenantId]
     );
 
     if (!isActive) {
       return res.json({ success: true, data: { id: lastId, active: false, message: '注册成功，待管理员审核启用' } });
     }
-    const token = signToken({ id: lastId, username, role: 'engineer', name: name || username });
-    res.json({ success: true, data: { token, user: { id: lastId, username, email, role: 'engineer', name: name || username } } });
+    const token = signToken({ id: lastId, username, role: 'engineer', name: name || username, tenant_id: tenantId });
+    res.json({ success: true, data: { token, user: { id: lastId, username, email, role: 'engineer', name: name || username, tenant_id: tenantId } } });
   } catch (err) {
     console.error('[注册失败]', err.message);
     res.status(500).json({ success: false, message: '注册失败' });
@@ -89,12 +92,18 @@ router.post('/login', createLoginLimiter(), async (req, res) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ success: false, message: '用户名或密码错误' });
 
-    const token = signToken({ id: user.id, username: user.username, role: user.role, name: user.name });
+    const tenant = user.tenant_id
+      ? rows(await db.exec('SELECT name FROM tenants WHERE id = ?', [user.tenant_id]))[0]
+      : null;
+    const token = signToken({ id: user.id, username: user.username, role: user.role, name: user.name, tenant_id: user.tenant_id });
     res.json({
       success: true,
       data: {
         token,
-        user: { id: user.id, username: user.username, role: user.role, name: user.name },
+        user: {
+          id: user.id, username: user.username, role: user.role, name: user.name,
+          tenant_id: user.tenant_id, tenant_name: tenant ? tenant.name : null,
+        },
       },
     });
   } catch (err) {

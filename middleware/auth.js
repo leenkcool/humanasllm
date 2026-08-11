@@ -16,6 +16,7 @@ function authenticate(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
+    req.tenant_id = decoded.tenant_id || null; // 多租户：请求所属租户
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

@@ -76,7 +76,8 @@ window.HLM = window.HLM || {};
 
   function applyUserBadge() {
     $('#userName').textContent = currentUser.name || currentUser.username || '';
-    $('#userRole').textContent = currentUser.role === 'admin' ? t('role.admin') : t('role.engineer');
+    const tenant = currentUser.tenant_name ? currentUser.tenant_name + ' · ' : '';
+    $('#userRole').textContent = tenant + (currentUser.role === 'admin' ? t('role.admin') : t('role.engineer'));
   }
 
   function setTheme(id) {
