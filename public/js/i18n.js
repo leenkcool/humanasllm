@@ -73,6 +73,28 @@ window.HLM = window.HLM || {};
     'stat.paused': '暂停',
     'stat.unfinished': '未完成',
 
+    // 治理概览
+    'gov.passRate': '一次通过率',
+    'gov.approvalAvg': '审批平均时效',
+    'gov.timeoutRate': '超时率',
+    'gov.categories': '分级分布',
+    'gov.min': ' 分钟',
+    'gov.noData': '暂无数据',
+
+    // 合规报告
+    'page.audit.report': '合规报告',
+    'audit.totalTasks': '任务总数',
+    'audit.protected': '分级保护',
+    'audit.aiFallback': 'AI 兜底次数',
+    'audit.compliance': '合规结论',
+    'audit.auditChain': '审计链健康',
+    'audit.valid': '有效',
+    'audit.invalid': '异常',
+    'audit.approvals': '审批统计',
+    'audit.approved': '批准',
+    'audit.rejected': '驳回',
+    'audit.generatedAt': '生成时间',
+
     // 通用
     'common.all': '全部状态',
     'common.allPriority': '全部优先级',
@@ -370,6 +392,28 @@ window.HLM = window.HLM || {};
     'stat.returned': 'Returned',
     'stat.paused': 'Paused',
     'stat.unfinished': 'Unfinished',
+
+    // Governance
+    'gov.passRate': 'Pass rate',
+    'gov.approvalAvg': 'Avg approval',
+    'gov.timeoutRate': 'Timeout rate',
+    'gov.categories': 'Category mix',
+    'gov.min': ' min',
+    'gov.noData': 'No data',
+
+    // Compliance report
+    'page.audit.report': 'Compliance Report',
+    'audit.totalTasks': 'Total tasks',
+    'audit.protected': 'Protected',
+    'audit.aiFallback': 'AI fallback used',
+    'audit.compliance': 'Compliance',
+    'audit.auditChain': 'Audit chain',
+    'audit.valid': 'valid',
+    'audit.invalid': 'broken',
+    'audit.approvals': 'Approvals',
+    'audit.approved': 'approved',
+    'audit.rejected': 'rejected',
+    'audit.generatedAt': 'Generated at',
 
     'common.all': 'All statuses',
     'common.allPriority': 'All priorities',

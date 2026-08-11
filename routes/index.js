@@ -11,6 +11,7 @@ const logRoutes = require('./logs');
 const v1Routes = require('./v1');
 const approvalRoutes = require('./approvals');
 const projectRoutes = require('./projects');
+const auditRoutes = require('./audit');
 
 module.exports = function (app) {
   // 工作台 REST
@@ -29,6 +30,9 @@ module.exports = function (app) {
 
   // 项目管理
   app.use('/api/projects', projectRoutes);
+
+  // 审计 / 合规报告
+  app.use('/api/audit', auditRoutes);
 
   // 健康检查
   const health = (req, res) => res.json({ status: 'ok', service: 'p390-human-llm', timestamp: new Date().toISOString() });

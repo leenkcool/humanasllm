@@ -42,6 +42,43 @@ router.get('/summary', authenticate, async (req, res) => {
   }
 });
 
+// 治理概览（阶段二：可度量——分级分布 / 一次通过率 / 审批时效 / 超时率）
+router.get('/governance', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const cats = queue.rows(await db.exec('SELECT category, COUNT(*) AS c FROM tasks GROUP BY category', []));
+    const categories = (cats || []).map(r => ({ category: r.category, count: parseInt(r.c) || 0 }));
+    const qa = queue.rows(await db.exec(
+      `SELECT (SELECT COUNT(*) FROM tasks WHERE status = 'completed') AS completed,
+              (SELECT COUNT(*) FROM task_logs WHERE action = 'reopen') AS reopened`
+    ))[0] || {};
+    const completed = parseInt(qa.completed) || 0;
+    const reopened = parseInt(qa.reopened) || 0;
+    const appr = queue.rows(await db.exec(
+      `SELECT COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE decided_at IS NOT NULL) AS decided,
+              AVG(EXTRACT(EPOCH FROM (decided_at - created_at)) / 60) AS avg_min
+         FROM approvals`
+    ))[0] || {};
+    const tz = queue.rows(await db.exec(
+      `SELECT (SELECT COUNT(*) FROM tasks) AS total,
+              (SELECT COUNT(*) FROM task_logs WHERE remark LIKE '%超时%') AS timeout`
+    ))[0] || {};
+    const total = parseInt(tz.total) || 0;
+    const timeoutCount = parseInt(tz.timeout) || 0;
+    res.json({ success: true, data: {
+      categories,
+      qa: { completed, reopened, rate: completed > 0 ? Math.max(0, Math.round((1 - reopened / completed) * 1000) / 10) : null },
+      approval: { total: parseInt(appr.total) || 0, decided: parseInt(appr.decided) || 0, avg_min: appr.avg_min != null ? Math.round(parseFloat(appr.avg_min) * 10) / 10 : null },
+      timeout: { count: timeoutCount, rate: total > 0 ? Math.round((timeoutCount / total) * 1000) / 10 : 0 },
+      total_tasks: total,
+    } });
+  } catch (err) {
+    console.error('[治理概览失败]', err.message);
+    res.status(500).json({ success: false, message: '获取治理概览失败' });
+  }
+});
+
 // 未完成任务聚合（待接单/处理中/驳回可重派/暂停 → 长期可见，防遗忘）
 router.get('/unfinished', authenticate, async (req, res) => {
   try {

@@ -95,8 +95,10 @@ window.HLM = window.HLM || {};
     content.innerHTML = `
       <div class="topbar"><div><div class="page-title">${t('page.dashboard.title')}</div><div class="page-desc">${t('page.dashboard.desc')}</div></div>
         <div class="spacer"></div><span class="chip">model: ${esc('human-llm')}</span>
+        <button class="btn" onclick="window.HLM.UI.showAuditReport()">${t('page.audit.report')}</button>
         <button class="icon-btn" onclick="window.HLM.App.route()">${Icons.refresh}</button></div>
       <div class="stats" id="statsBox"></div>
+      <div class="stats" id="govBox" style="margin-bottom:18px;"></div>
       <div class="card"><div class="card-head"><span class="t">${t('page.dashboard.unfinished')}</span>
         <button class="btn sm" onclick="window.HLM.App.route()">${t('common.refresh')}</button></div>
         <div class="card-body-flush"><div class="tbl-wrap"><table class="data">
@@ -110,6 +112,14 @@ window.HLM = window.HLM || {};
         <div class="stat ${k}"><div class="num">${st[k] || 0}</div><div class="lbl">${t('stat.' + k)}</div></div>`).join('');
       window._pendingCount = st.pending || 0;
       updateBadges();
+      const g = await API.get('/workbench/governance');
+      const gd = g.data;
+      const catLabel = gd.categories.map(c => `${t('category.' + c.category) || c.category}:${c.count}`).join(' · ') || t('gov.noData');
+      $('#govBox').innerHTML = `
+        <div class="stat"><div class="num">${gd.qa.rate != null ? gd.qa.rate + '%' : '-'}</div><div class="lbl">${t('gov.passRate')}</div></div>
+        <div class="stat"><div class="num">${gd.approval.avg_min != null ? gd.approval.avg_min + t('gov.min') : '-'}</div><div class="lbl">${t('gov.approvalAvg')}</div></div>
+        <div class="stat"><div class="num">${gd.timeout.rate}%</div><div class="lbl">${t('gov.timeoutRate')}</div></div>
+        <div class="stat"><div class="num" style="font-size:14px;line-height:1.5;white-space:normal;">${catLabel}</div><div class="lbl">${t('gov.categories')}</div></div>`;
       const q = await API.get('/workbench/unfinished');
       UI.renderTasks(q.data, '#queueBody');
     } catch (e) { toast(e.message, 'error'); }

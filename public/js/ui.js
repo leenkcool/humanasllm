@@ -516,10 +516,29 @@ window.HLM = window.HLM || {};
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  // 合规报告（数据不出网关证明）
+  async function showAuditReport() {
+    try {
+      const r = await API.get('/audit/report');
+      const d = r.data;
+      const rows = [
+        [t('audit.totalTasks'), d.total_tasks],
+        [t('audit.protected'), `${d.protected.confidential} ${t('category.confidential')} + ${d.protected.ops} ${t('category.ops')}`],
+        [t('audit.aiFallback'), d.ai_fallback_used],
+        [t('audit.compliance'), d.compliance],
+        [t('audit.auditChain'), `${d.audit_chains.valid} ${t('audit.valid')} / ${d.audit_chains.invalid} ${t('audit.invalid')}`],
+        [t('audit.approvals'), `${d.approvals.total} (${t('audit.approved')} ${d.approvals.approved} / ${t('audit.rejected')} ${d.approvals.rejected})`],
+        [t('audit.generatedAt'), d.generated_at],
+      ];
+      const html = rows.map(([k, v]) => `<div class="ctx"><div class="k">${esc(k)}</div><div>${esc(String(v))}</div></div>`).join('');
+      openModal(t('page.audit.report'), html, `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   window.HLM.UI = {
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
-    promptReopen, submitReopen,
+    promptReopen, submitReopen, showAuditReport,
     renderUsers, showUserForm, saveUser, delUser, renderLogs,
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
     renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,
