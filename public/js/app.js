@@ -271,6 +271,12 @@ window.HLM = window.HLM || {};
             <button class="btn" onclick="window.HLM.App.saveGateway()">${t('gateway.save')}</button>
           </div>
         </div></div>
+      <div class="card"><div class="card-head"><span class="t">${t('gateway.installTitle')}</span>
+        <span class="chip">${t('gateway.installDesc')}</span></div>
+        <div class="card-body">
+          <textarea class="form-textarea" id="gwPrompt" rows="8" readonly style="font-family:monospace;font-size:12px;"></textarea>
+          <div style="margin-top:8px;"><button class="btn" onclick="window.HLM.App.copyPrompt()">${t('gateway.copy')}</button></div>
+        </div></div>
       <div class="card"><div class="card-head"><span class="t">${t('gateway.files')}</span>
         <span class="chip">${t('gateway.editable')}</span></div>
         <div class="card-body">
@@ -296,6 +302,7 @@ window.HLM = window.HLM || {};
       const f = await API.get('/gateway/files');
       _gwFiles = f.data;
       renderGwFile(_gwType);
+      updatePrompt();
     } catch (e) { toast(e.message, 'error'); }
   }
 
@@ -303,6 +310,30 @@ window.HLM = window.HLM || {};
     _gwType = type;
     const box = $('#gwFile');
     if (box) box.value = _gwFiles[type] || '';
+  }
+
+  // 生成「安装提示词」：在目标项目的 Claude Code 里粘贴即自动安装
+  function buildInstallPrompt(baseUrl, model) {
+    return `请从 P390 人工代理网关安装「人工路由」能力到本项目的 .claude/ 目录：
+
+1. 调用 GET ${baseUrl}/api/gateway/install 获取安装包（返回 data.skill / data.agent）
+2. 把 data.skill 写入 .claude/skills/dispatch-human/SKILL.md
+3. 把 data.agent 写入 .claude/agents/humanllm.md
+4. 确认安装完成，并说明网关地址为 ${baseUrl}、模型为 ${model}`;
+  }
+
+  function updatePrompt() {
+    const base = $('#gwUrl').value.trim();
+    const model = $('#gwModel').value.trim() || 'human-llm';
+    const box = $('#gwPrompt');
+    if (box && base) box.value = buildInstallPrompt(base, model);
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText($('#gwPrompt').value);
+      toast(t('gateway.copied'), 'success');
+    } catch (e) { toast(t('gateway.copyFail'), 'error'); }
   }
 
   async function generateGateway() {
@@ -317,6 +348,7 @@ window.HLM = window.HLM || {};
       const r = await API.post('/gateway/generate', cfg);
       _gwFiles = r.data;
       renderGwFile(_gwType);
+      updatePrompt();
       toast(t('gateway.generated'), 'success');
     } catch (e) { toast(e.message, 'error'); }
   }
@@ -329,6 +361,7 @@ window.HLM = window.HLM || {};
         apiKey: $('#gwKey').value.trim(),
         note: $('#gwNote').value.trim(),
       });
+      updatePrompt();
       toast(t('gateway.saved'), 'success');
     } catch (e) { toast(e.message, 'error'); }
   }
@@ -425,7 +458,7 @@ window.HLM = window.HLM || {};
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

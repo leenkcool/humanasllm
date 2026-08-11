@@ -85,6 +85,11 @@ window.HLM = window.HLM || {};
     'gateway.saved': '已保存',
     'gateway.generated': '已生成',
     'gateway.baseUrlReq': '请填写网关地址',
+    'gateway.installTitle': '安装提示词',
+    'gateway.installDesc': '复制到目标项目的 Claude Code，粘贴即自动安装',
+    'gateway.copy': '复制安装提示词',
+    'gateway.copied': '已复制',
+    'gateway.copyFail': '复制失败，请手动选择复制',
 
     // 统计
     'stat.pending': '待接单',
@@ -454,6 +459,11 @@ window.HLM = window.HLM || {};
     'gateway.saved': 'Saved',
     'gateway.generated': 'Generated',
     'gateway.baseUrlReq': 'Gateway URL required',
+    'gateway.installTitle': 'Install prompt',
+    'gateway.installDesc': 'Paste into target project\'s Claude Code to auto-install',
+    'gateway.copy': 'Copy install prompt',
+    'gateway.copied': 'Copied',
+    'gateway.copyFail': 'Copy failed, please select and copy manually',
 
     'stat.pending': 'Awaiting',
     'stat.processing': 'Processing',

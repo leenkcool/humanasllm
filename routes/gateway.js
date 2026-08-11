@@ -34,6 +34,24 @@ function renderTemplate(tpl, cfg) {
     .replace(/https?:\/\/localhost:39000/g, base);
 }
 
+// 免认证安装接口：目标项目粘贴安装提示词后，Claude Code 拉取本接口写入 .claude/
+// 返回当前配置渲染的 SKILL/AGENT + 网关地址（不含密钥）
+router.get('/install', (req, res) => {
+  try {
+    const cfg = readJson(CONFIG_FILE, DEFAULT_CONFIG);
+    const skill = fs.existsSync(SKILL_OUT)
+      ? fs.readFileSync(SKILL_OUT, 'utf8')
+      : renderTemplate(fs.readFileSync(SKILL_TPL, 'utf8'), cfg);
+    const agent = fs.existsSync(AGENT_OUT)
+      ? fs.readFileSync(AGENT_OUT, 'utf8')
+      : renderTemplate(fs.readFileSync(AGENT_TPL, 'utf8'), cfg);
+    res.json({ success: true, data: { gateway: cfg.baseUrl, model: cfg.model, skill, agent } });
+  } catch (e) {
+    console.error('[安装包生成失败]', e.message);
+    res.status(500).json({ success: false, message: '生成安装包失败' });
+  }
+});
+
 // 读取当前配置
 router.get('/config', authenticate, (req, res) => {
   res.json({ success: true, data: readJson(CONFIG_FILE, DEFAULT_CONFIG) });
