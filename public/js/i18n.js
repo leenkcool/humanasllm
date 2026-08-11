@@ -99,6 +99,8 @@ window.HLM = window.HLM || {};
     'gateway.installPkg': '安装包预览',
     'gateway.installFiles': '生成的文件（按工具）',
     'gateway.copyInstall': '复制安装包',
+    'gateway.allNoEdit': '本机全装脚本无需微调，直接复制运行',
+    'gateway.noFile': '请先选择要编辑的文件',
 
     // 统计
     'stat.pending': '待接单',
@@ -498,6 +500,8 @@ window.HLM = window.HLM || {};
     'gateway.installPkg': 'Install package preview',
     'gateway.installFiles': 'Generated files (per tool)',
     'gateway.copyInstall': 'Copy install package',
+    'gateway.allNoEdit': 'Full-install script is not editable; copy and run directly',
+    'gateway.noFile': 'Select a file to edit first',
 
     'stat.pending': 'Awaiting',
     'stat.processing': 'Processing',

@@ -13,6 +13,7 @@ const { authenticate } = require('../middleware/auth');
 
 const DATA_DIR = path.join(__dirname, '../data');
 const CONFIG_FILE = path.join(DATA_DIR, 'gateway_config.json');
+const FILES_FILE = path.join(DATA_DIR, 'gateway_files.json');
 const SKILL_TPL = path.join(__dirname, '../.claude/skills/dispatch-human/SKILL.md');
 const AGENT_TPL = path.join(__dirname, '../.claude/agents/humanllm.md');
 const SKILL_OUT = path.join(DATA_DIR, 'gateway_skill.md');
@@ -97,6 +98,10 @@ function readJson(file, fallback) {
 }
 function writeText(file, content) { fs.writeFileSync(file, content, 'utf8'); }
 
+// 多工具微调存储：{ tool: { path: content } }
+function readFilesJson() { return readJson(FILES_FILE, {}); }
+function writeFilesJson(obj) { writeText(FILES_FILE, JSON.stringify(obj, null, 2)); }
+
 /** 用配置渲染模板：替换网关地址 + <baseUrl>/<model> 占位 */
 function renderTemplate(tpl, cfg) {
   const base = String(cfg.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/+$/, '');
@@ -149,14 +154,52 @@ function toolFiles(tool, cfg) {
   }
 }
 
+/** 该工具的生成文件（微调后优先，否则按模板渲染） */
+function getToolFiles(tool, cfg) {
+  const saved = readFilesJson()[tool];
+  if (saved && Object.keys(saved).length) {
+    return Object.entries(saved).map(([p, c]) => ({ path: p, content: c }));
+  }
+  return toolFiles(tool, cfg);
+}
+
+/** 本机全装 node 脚本：一次写入所有工具的 skill/agent/规则（Claude 安装后可同步其他本机 agent） */
+function installAllScript(cfg) {
+  const tools = ['claude', 'codex', 'agents', 'opencode', 'gemini', 'cursor', 'windsurf', 'aider', 'workbuddy', 'openclaw', 'hermes', 'pi'];
+  const files = {};
+  for (const t of tools) files[t] = getToolFiles(t, cfg);
+  const payload = JSON.stringify(files).replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+  const base = String(cfg.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/+$/, '');
+  const model = cfg.model || 'human-llm';
+  return `#!/usr/bin/env node
+/* P390 本机全装：写入所有支持的 AI Agent 工具的 skill/agent/规则 */
+const fs = require('fs'), path = require('path');
+const FILES = ${payload};
+let n = 0;
+for (const [tool, list] of Object.entries(FILES)) {
+  for (const f of list) {
+    const p = path.join(process.cwd(), f.path);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, f.content, 'utf8');
+    console.log('[' + tool + '] ' + f.path);
+    n++;
+  }
+}
+console.log('P390 本机安装完成：' + n + ' 个文件。网关 ' + '${base}' + '，模型 ' + '${model}' + '。');
+`;
+}
+
 // 免认证安装接口：目标项目粘贴安装提示词后，Agent 拉取本接口写入项目
-// tool 支持：claude / codex / agents / opencode / gemini / cursor / windsurf / aider / build（通用构建方法）
+// tool 支持：claude / codex / agents / opencode / gemini / cursor / windsurf / aider / workbuddy / openclaw / hermes / pi / build / all（本机全装脚本）
 router.get('/install', (req, res) => {
   try {
     const cfg = readJson(CONFIG_FILE, DEFAULT_CONFIG);
     const tool = req.query.tool || 'claude';
     const base = String(cfg.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/+$/, '');
-    res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: toolFiles(tool, cfg) } });
+    if (tool === 'all') {
+      return res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: [{ path: 'p390-install.js', content: installAllScript(cfg) }] } });
+    }
+    res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: getToolFiles(tool, cfg) } });
   } catch (e) {
     console.error('[安装包生成失败]', e.message);
     res.status(500).json({ success: false, message: '生成安装包失败' });
@@ -198,29 +241,26 @@ router.post('/generate', authenticate, (req, res) => {
   }
 });
 
-// 读取生成/微调后的文件（未生成时按当前配置渲染模板）
+// 读取某工具生成/微调后的文件（微调后优先，否则模板渲染）
 router.get('/files', authenticate, (req, res) => {
   try {
     const cfg = readJson(CONFIG_FILE, DEFAULT_CONFIG);
-    const skill = fs.existsSync(SKILL_OUT)
-      ? fs.readFileSync(SKILL_OUT, 'utf8')
-      : renderTemplate(fs.readFileSync(SKILL_TPL, 'utf8'), cfg);
-    const agent = fs.existsSync(AGENT_OUT)
-      ? fs.readFileSync(AGENT_OUT, 'utf8')
-      : renderTemplate(fs.readFileSync(AGENT_TPL, 'utf8'), cfg);
-    res.json({ success: true, data: { skill, agent } });
+    const tool = req.query.tool || 'claude';
+    res.json({ success: true, data: { tool, files: getToolFiles(tool, cfg) } });
   } catch (e) {
     console.error('[读取失败]', e.message);
     res.status(500).json({ success: false, message: '读取失败' });
   }
 });
 
-// 保存微调后的文件
-router.put('/files/:type', authenticate, (req, res) => {
-  const content = (req.body && req.body.content) != null ? String(req.body.content) : '';
-  if (req.params.type === 'skill') writeText(SKILL_OUT, content);
-  else if (req.params.type === 'agent') writeText(AGENT_OUT, content);
-  else return res.status(400).json({ success: false, message: 'type 非法' });
+// 保存某工具某文件的微调
+router.put('/files', authenticate, (req, res) => {
+  const { tool, path: fpath, content } = req.body || {};
+  if (!tool || !fpath) return res.status(400).json({ success: false, message: 'tool 与 path 必填' });
+  const all = readFilesJson();
+  all[tool] = all[tool] || {};
+  all[tool][fpath] = String(content != null ? content : '');
+  writeFilesJson(all);
   res.json({ success: true });
 });
 

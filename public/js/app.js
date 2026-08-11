@@ -250,9 +250,9 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 接入配置（生成 SKILL/AGENT + 在线微调） =====
-  let _gwType = 'skill';
-  let _gwFiles = { skill: '', agent: '' };
   let _gwTool = 'claude';
+  let _gwFiles = [];       // 当前工具文件列表 [{path, content}]
+  let _gwPath = '';        // 当前编辑的文件
 
   async function renderGateway() {
     const content = $('#content');
@@ -282,6 +282,7 @@ window.HLM = window.HLM || {};
               <option value="pi">Pi Agent</option>
               <option value="agents">通用 Agent (AGENTS.md)</option>
               <option value="build">构建方法（任意工具）</option>
+              <option value="all">本机全装（node 脚本）</option>
             </select></div>
           <div style="display:flex;gap:8px;">
             <button class="btn primary" onclick="window.HLM.App.generateGateway()">${t('gateway.generate')}</button>
@@ -303,15 +304,10 @@ window.HLM = window.HLM || {};
       <div class="card"><div class="card-head"><span class="t">${t('gateway.files')}</span>
         <span class="chip">${t('gateway.editable')}</span></div>
         <div class="card-body">
-          <div style="display:flex;gap:6px;margin-bottom:8px;">
-            <button class="btn sm" data-gwtab="skill">SKILL.md</button>
-            <button class="btn sm" data-gwtab="agent">AGENT.md</button>
-          </div>
-          <textarea class="form-textarea" id="gwFile" rows="18" style="font-family:monospace;font-size:12px;"></textarea>
+          <select class="form-select" id="gwFilePath" style="max-width:100%;margin-bottom:8px;font-family:monospace;font-size:12px;"></select>
+          <textarea class="form-textarea" id="gwFile" rows="16" style="font-family:monospace;font-size:12px;"></textarea>
           <div style="margin-top:8px;"><button class="btn" onclick="window.HLM.App.saveFile()">${t('gateway.saveFile')}</button></div>
         </div></div>`;
-    content.querySelector('[data-gwtab="skill"]').onclick = () => renderGwFile('skill');
-    content.querySelector('[data-gwtab="agent"]').onclick = () => renderGwFile('agent');
     await loadGateway();
   }
 
@@ -322,22 +318,44 @@ window.HLM = window.HLM || {};
       $('#gwModel').value = c.data.model || 'human-llm';
       $('#gwKey').value = c.data.apiKey || '';
       $('#gwNote').value = c.data.note || '';
-      const f = await API.get('/gateway/files');
-      _gwFiles = f.data;
-      renderGwFile(_gwType);
       updatePrompt();
       loadInstall();
+      renderGwFiles(_gwTool);
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  function renderGwFile(type) {
-    _gwType = type;
+  // 加载当前工具的生成文件（微调后优先），供在线编辑
+  async function renderGwFiles(tool) {
     const box = $('#gwFile');
-    if (box) box.value = _gwFiles[type] || '';
+    const sel = $('#gwFilePath');
+    if (!box || !sel) return;
+    try {
+      const r = await API.get('/gateway/install?tool=' + tool);
+      _gwFiles = r.data.files || [];
+      _gwPath = _gwFiles[0] ? _gwFiles[0].path : '';
+      sel.innerHTML = _gwFiles.map(f => `<option value="${esc(f.path)}">${esc(f.path)}</option>`).join('');
+      sel.onchange = () => { _gwPath = sel.value; renderGwFileText(); };
+      renderGwFileText();
+    } catch (e) { /* 预览失败不阻塞 */ }
+  }
+
+  function renderGwFileText() {
+    const box = $('#gwFile');
+    if (!box) return;
+    const f = _gwFiles.find(x => x.path === _gwPath);
+    box.value = f ? f.content : '';
   }
 
   // 生成「安装提示词」：在目标项目粘贴即自动安装（按工具）
   function buildInstallPrompt(baseUrl, model, tool) {
+    if (tool === 'all') {
+      return `请从 P390 人工代理网关「本机全装」到本项目：
+
+1. 调用 GET ${baseUrl}/api/gateway/install?tool=all 获取 p390-install.js
+2. 写入项目根目录并运行：node p390-install.js
+3. 脚本自动写入所有 AI Agent 工具的 skill/agent/规则（.claude/ .opencode/ AGENTS.md GEMINI.md 等）
+4. 确认安装完成（网关 ${baseUrl}，模型 ${model}）`;
+    }
     return `请从 P390 人工代理网关安装「人工路由」能力到本项目（工具：${tool}）：
 
 1. 调用 GET ${baseUrl}/api/gateway/install?tool=${tool} 获取安装包（返回 data.files 数组）
@@ -363,6 +381,7 @@ window.HLM = window.HLM || {};
     _gwTool = $('#gwTool').value;
     updatePrompt();
     loadInstall();
+    renderGwFiles(_gwTool);
   }
 
   // 拉取当前工具的安装包预览（只读，可复制）
@@ -415,10 +434,10 @@ window.HLM = window.HLM || {};
   }
 
   async function saveFile() {
+    if (_gwTool === 'all') { toast(t('gateway.allNoEdit'), 'info'); return; }
+    if (!_gwPath) { toast(t('gateway.noFile'), 'warning'); return; }
     try {
-      const content = $('#gwFile').value;
-      await API.put('/gateway/files/' + _gwType, { content });
-      _gwFiles[_gwType] = content;
+      await API.put('/gateway/files', { tool: _gwTool, path: _gwPath, content: $('#gwFile').value });
       toast(t('gateway.saved'), 'success');
     } catch (e) { toast(e.message, 'error'); }
   }
