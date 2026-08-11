@@ -39,18 +39,19 @@ function rowToObj(cols, row) {
 }
 
 /**
- * 计算任务分类
- * @param {Object} opts { messages, body }  body 含 project_code / meta_tags / category
+ * 计算任务分类（多租户：租户专属规则优先，全局规则兜底）
+ * @param {Object} opts { messages, body, tenantId }  body 含 project_code / meta_tags / category
  * @returns {Promise<{category, rule_id, rule_name, source}>}
  *   source: 'rule'（规则命中，白名单锁死）| 'explicit'（上游声明）| 'default'
  */
-async function classify({ messages, body = {} }) {
+async function classify({ messages, body = {}, tenantId }) {
   const db = getDb();
   const text = buildText(messages, body);
 
-  // 1) 规则匹配（enabled + priority 升序，命中即锁死）
+  // 1) 规则匹配（租户专属优先，enabled + priority 升序，命中即锁死）
   const rules = await db.exec(
-    'SELECT * FROM task_rules WHERE enabled = true ORDER BY priority ASC, id ASC', []);
+    'SELECT * FROM task_rules WHERE enabled = true AND (tenant_id IS NULL OR tenant_id = ?) ORDER BY (tenant_id = ?) DESC, priority ASC, id ASC',
+    [tenantId || null, tenantId || null]);
   for (const row of (rules[0] ? rules[0].values : [])) {
     const r = rowToObj(rules[0].columns, row);
     const target = r.match_field === 'project'

@@ -10,6 +10,7 @@ const router = express.Router();
 const encoder = require('../services/openaiEncoder');
 const queue = require('../services/queueService');
 const aiRelay = require('../services/aiRelay');
+const { getTenantByUpstreamKey } = require('../middleware/auth');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
 function requireUpstreamKey(req, res, next) {
@@ -68,10 +69,13 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
   const chatId = encoder.makeId();
   const created = Math.floor(Date.now() / 1000);
 
-  // 接入 → 创建人工任务（pending）→ 推送工作台
+  // 接入 → 创建人工任务（pending）→ 推送工作台（上游 API key 路由租户）
   let taskId;
   try {
-    const createdRes = await queue.createTaskFromRequest({ parsed, chatId, created });
+    const auth = req.headers.authorization || '';
+    const upKey = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.api_key || '');
+    const upstreamTenant = await getTenantByUpstreamKey(upKey);
+    const createdRes = await queue.createTaskFromRequest({ parsed, chatId, created, tenantId: upstreamTenant });
     taskId = createdRes.taskId;
   } catch (e) {
     console.error('[创建任务失败]', e.message);

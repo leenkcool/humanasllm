@@ -1,6 +1,17 @@
 const jwt = require('jsonwebtoken');
 
 /**
+ * 按上游 API key 解析租户（多租户：tenants.upstream_key 映射）
+ * 无匹配返回 null（调用方回退默认租户）
+ */
+async function getTenantByUpstreamKey(key) {
+  if (!key) return null;
+  const { getDb } = require('../db');
+  const r = await getDb().exec('SELECT id FROM tenants WHERE upstream_key = ?', [key]);
+  return r[0] && r[0].values[0] ? r[0].values[0][0] : null;
+}
+
+/**
  * JWT 认证中间件
  * 从 Authorization header 读取 Bearer token 并验证
  */
@@ -49,4 +60,4 @@ function requireRole(role) {
   };
 }
 
-module.exports = { authenticate, signToken, requireRole };
+module.exports = { authenticate, signToken, requireRole, getTenantByUpstreamKey };

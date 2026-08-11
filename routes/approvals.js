@@ -9,6 +9,7 @@ const { getDb } = require('../db');
 const approval = require('../services/approvalService');
 const project = require('../services/projectService');
 const { authenticate } = require('../middleware/auth');
+const { getTenantByUpstreamKey } = require('../middleware/auth');
 const encoder = require('../services/openaiEncoder');
 const { toCSV } = require('../services/csv');
 
@@ -52,9 +53,14 @@ router.post('/approvals', requireUpstreamKey, async (req, res) => {
     const { resource, amount, purpose, detail, requester, project_code, meta_tags } = req.body || {};
     if (!resource) return res.status(400).json(encoder.makeError(400, 'resource 不能为空'));
 
-    // 上游 /v1 无 JWT：审批归默认租户（租户路由在 v2 上游 key 路由）
-    const defTenant = (await getDb().exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0];
-    const tenantId = defTenant && defTenant.values[0] ? defTenant.values[0][0] : null;
+    // 上游 /v1 无 JWT：API key 路由租户，无则默认租户
+    const auth = req.headers.authorization || '';
+    const upKey = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.api_key || '');
+    let tenantId = await getTenantByUpstreamKey(upKey);
+    if (!tenantId) {
+      const defTenant = (await getDb().exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0];
+      tenantId = defTenant && defTenant.values[0] ? defTenant.values[0][0] : null;
+    }
     const created = await approval.createApproval({
       resource, amount, purpose, detail, requester, project_code, meta_tags, tenant_id: tenantId,
     });

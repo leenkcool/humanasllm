@@ -119,20 +119,19 @@ async function logRequest(taskId, direction, payload, model) {
   );
 }
 
-/** 上游请求接入 → 创建 pending 任务 */
-async function createTaskFromRequest({ parsed, chatId, created }) {
+/** 上游请求接入 → 创建 pending 任务（多租户：上游 API key 路由租户，无则默认租户） */
+async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenantIdParam }) {
   const db = getDb();
   const priority = parsed.extra.priority || 'medium';
+  let tenantId = tenantIdParam;
+  if (!tenantId) { const def = rows(await db.exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0]; tenantId = def ? def.id : null; }
   // 分级策略引擎定级（规则白名单锁死 > 上游显式 > 默认 general），rule_id 留痕分级理由
-  const cat = await classify({ messages: parsed.messages, body: parsed.extra });
+  const cat = await classify({ messages: parsed.messages, body: parsed.extra, tenantId });
   const category = cat.category;
   const ruleId = cat.rule_id;
   const projectCode = parsed.extra.project_code || null;
   const metaTags = parsed.extra.meta_tags || parsed.extra.meta || null;
   const payload = { ...parsed, created };
-  // 多租户：上游 /v1 无 JWT，任务归默认租户（租户路由见工作台）
-  const defTenant = rows(await getDb().exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0];
-  const tenantId = defTenant ? defTenant.id : null;
 
   const { lastId } = await db.run(
     `INSERT INTO tasks

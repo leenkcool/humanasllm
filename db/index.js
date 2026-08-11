@@ -156,6 +156,8 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
   await db.exec(`ALTER TABLE projects ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
+  await db.exec(`ALTER TABLE task_rules ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
+  await db.exec(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS upstream_key VARCHAR(64)`);
   await seedTenants();
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'general'`);
