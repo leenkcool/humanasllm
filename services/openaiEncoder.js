@@ -20,7 +20,7 @@ function parseChatRequest(body = {}) {
     throw Object.assign(new Error('Invalid \'messages\': must be a non-empty array.'), { status: 400 });
   }
   const extra = pickExtra(body);
-  if (!CATEGORIES.includes(extra.category)) extra.category = 'general';
+  // category 最终定级交给分级策略引擎（categoryEngine.classify：规则白名单锁死 > 显式 > default）
   return {
     model: body.model || MODEL,
     stream: !!body.stream,

@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   stream BOOLEAN NOT NULL DEFAULT false,
   priority VARCHAR(10) NOT NULL DEFAULT 'medium',
   category VARCHAR(20) NOT NULL DEFAULT 'general',
+  rule_id INTEGER,
   project_code TEXT,
   meta_tags JSONB,
   request_payload JSONB NOT NULL DEFAULT '{}',
@@ -48,6 +49,19 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_at);
+
+CREATE TABLE IF NOT EXISTS task_rules (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(64) NOT NULL,
+  category VARCHAR(20) NOT NULL DEFAULT 'general',
+  match_field VARCHAR(20) NOT NULL DEFAULT 'content',
+  keywords TEXT NOT NULL,
+  priority INT NOT NULL DEFAULT 100,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_rules_enabled ON task_rules(enabled);
 
 CREATE TABLE IF NOT EXISTS task_logs (
   id SERIAL PRIMARY KEY,
@@ -132,7 +146,33 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(128)`);
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'general'`);
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS rule_id INTEGER`);
+  // ===== 分级策略引擎种子规则（幂等：task_rules 为空时播种） =====
+  await seedRules();
   return db;
+}
+
+/** 播种分级策略种子规则（白名单锁死：confidential/ops 命中即定级，不可被上游声明降级） */
+async function seedRules() {
+  const db = getDb();
+  const r = await db.exec('SELECT COUNT(*) AS c FROM task_rules', []);
+  if (r[0] && r[0].values[0][0] > 0) return;
+  const rules = [
+    // 涉密 / 合规 / 安全（confidential，最高优先）
+    ['合规备案安全', 'confidential', 'content', '备案,等保,通保,渗透,漏洞,溯源,入侵排查,应急响应,日志审计,SSL证书,域名续费,大模型备案,算法备案,数据安全,隐私合规,安全巡检', 10],
+    ['涉密敏感', 'confidential', 'content', '涉密,私有数据,敏感数据,不能外传,不出网关,机密,脱敏', 20],
+    ['密钥权限', 'confidential', 'content', 'SSH密钥,API密钥,管理员密码,令牌,权限管控,后台权限,密钥保管', 30],
+    // 运维 / 基础设施（ops）
+    ['数据库运维', 'ops', 'content', '数据库迁移,DDL,备份恢复,死锁,慢查询,数据备份,异地备份', 40],
+    ['基础设施', 'ops', 'content', '机房,电力,防火墙,负载均衡,K8s,Kubernetes,DNS,带宽,磁盘阵列,SSH远程,公网IP,端口管理,内网', 50],
+    ['部署发布', 'ops', 'content', '灰度发布,回滚,CI/CD,部署,定时任务,定时脚本,定时重启,版本更新,环境搭建', 60],
+    ['监控故障', 'ops', 'content', '宕机,接口报错,502,401,容器异常,SERVFAIL,告警,慢请求,内存报错,程序崩溃', 70],
+  ];
+  for (const [name, category, field, keywords, priority] of rules) {
+    await db.run(
+      'INSERT INTO task_rules (name, category, match_field, keywords, priority) VALUES (?, ?, ?, ?, ?)',
+      [name, category, field, keywords, priority]);
+  }
 }
 
 function getDb() {

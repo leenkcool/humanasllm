@@ -117,6 +117,7 @@ router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
       content,
       model: task.model,
       category: task.category || 'general',
+      rule_id: task.rule_id || null,
       created_at: task.created_at,
       completed_at: task.completed_at,
     });

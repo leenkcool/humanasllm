@@ -11,6 +11,7 @@ const ws = require('./websocket');
 const aiRelay = require('./aiRelay');
 const { TASK_TRANSITIONS } = require('./stateMachine');
 const { createWaiterStore } = require('./waiters');
+const { classify } = require('./categoryEngine');
 
 const STATUS = {
   PENDING: 'pending',
@@ -87,16 +88,19 @@ async function logRequest(taskId, direction, payload, model) {
 async function createTaskFromRequest({ parsed, chatId, created }) {
   const db = getDb();
   const priority = parsed.extra.priority || 'medium';
-  const category = parsed.extra.category || 'general';
+  // 分级策略引擎定级（规则白名单锁死 > 上游显式 > 默认 general），rule_id 留痕分级理由
+  const cat = await classify({ messages: parsed.messages, body: parsed.extra });
+  const category = cat.category;
+  const ruleId = cat.rule_id;
   const projectCode = parsed.extra.project_code || null;
   const metaTags = parsed.extra.meta_tags || parsed.extra.meta || null;
   const payload = { ...parsed, created };
 
   const { lastId } = await db.run(
     `INSERT INTO tasks
-       (upstream_request_id, model, stream, priority, category, project_code, meta_tags, request_payload, status, timeout_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?)`,
-    [chatId, parsed.model, parsed.stream, priority, category, projectCode,
+       (upstream_request_id, model, stream, priority, category, rule_id, project_code, meta_tags, request_payload, status, timeout_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?)`,
+    [chatId, parsed.model, parsed.stream, priority, category, ruleId, projectCode,
       metaTags ? JSON.stringify(metaTags) : null,
       JSON.stringify(payload),
       PENDING_MIN()]
