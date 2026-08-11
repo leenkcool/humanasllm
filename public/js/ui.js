@@ -524,7 +524,7 @@ window.HLM = window.HLM || {};
       const rows = [
         [t('audit.totalTasks'), d.total_tasks],
         [t('audit.protected'), `${d.protected.confidential} ${t('category.confidential')} + ${d.protected.ops} ${t('category.ops')}`],
-        [t('audit.aiFallback'), d.ai_fallback_used],
+        [t('audit.aiFallback'), `${d.ai_fallback.total} (${t('category.general')} ${d.ai_fallback.general} / ${t('audit.protectedAi')} ${d.ai_fallback.protected})`],
         [t('audit.compliance'), d.compliance],
         [t('audit.auditChain'), `${d.audit_chains.valid} ${t('audit.valid')} / ${d.audit_chains.invalid} ${t('audit.invalid')}`],
         [t('audit.approvals'), `${d.approvals.total} (${t('audit.approved')} ${d.approvals.approved} / ${t('audit.rejected')} ${d.approvals.rejected})`],

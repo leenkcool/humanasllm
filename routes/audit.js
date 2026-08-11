@@ -16,10 +16,13 @@ router.get('/report', authenticate, async (req, res) => {
       'SELECT id, category, rule_id, status, result_payload, created_at, completed_at FROM tasks', []));
     const protectedConf = tasks.filter(t => t.category === 'confidential').length;
     const protectedOps = tasks.filter(t => t.category === 'ops').length;
-    const aiFallback = tasks.filter(t => {
+    // AI 兜底核查：general 类兜底是设计允许（降级），受保护任务（confidential/ops）被兜底才是违规
+    const aiRelayTasks = tasks.filter(t => {
       const rp = t.result_payload;
       return !!(rp && rp.source === 'ai-relay');
-    }).length;
+    });
+    const aiFallback = aiRelayTasks.length;
+    const protectedAi = aiRelayTasks.filter(t => t.category !== 'general').length;
 
     // 审计链健康（哈希链完整性）
     let validChains = 0, invalidChains = 0;
@@ -39,10 +42,10 @@ router.get('/report', authenticate, async (req, res) => {
       generated_at: new Date().toISOString(),
       total_tasks: tasks.length,
       protected: { confidential: protectedConf, ops: protectedOps, total: protectedConf + protectedOps },
-      ai_fallback_used: aiFallback,
-      compliance: aiFallback === 0
-        ? 'PASS：无任务被 AI 兜底，涉密/运维数据未出网关'
-        : `FAIL：${aiFallback} 个任务走 AI 兜底，需核查是否含涉密/运维内容`,
+      ai_fallback: { total: aiFallback, general: aiFallback - protectedAi, protected: protectedAi },
+      compliance: protectedAi === 0
+        ? 'PASS：受保护任务（涉密/运维）无 AI 兜底，数据未出网关'
+        : `FAIL：${protectedAi} 个受保护任务被 AI 兜底，涉密/运维数据可能出网关，需核查`,
       audit_chains: { valid: validChains, invalid: invalidChains },
       approvals: {
         total: parseInt(appr.total) || 0,
