@@ -129,13 +129,36 @@ async function poll(fn, max = 20) {
   const u0 = users.data.data[0];
   ok('用户列表含租户+统计', 'tenant_name' in u0 && 'completed' in u0);
 
-  // 8. 清理本次创建的测试数据
+  // 8. 权限边界 / 多工具安装 / 服务器端安装越界 / 租户隔离
+  const engLogin = await api('POST', '/api/auth/login', { username: 'engineer1', password: 'admin123' });
+  const engToken = engLogin.data.data.token;
+  const forbidden = await api('GET', '/api/rules', null, engToken);
+  ok('工程师无权访问规则(403)', forbidden.status === 403);
+
+  const instOpen = await api('GET', '/api/gateway/install?tool=opencode');
+  ok('多工具安装(opencode→AGENTS+command)', instOpen.status === 200 && instOpen.data.data.files.length === 2 && instOpen.data.data.files[1].path.includes('.opencode'));
+  const instGemini = await api('GET', '/api/gateway/install?tool=gemini');
+  ok('多工具安装(gemini→GEMINI.md)', instGemini.status === 200 && instGemini.data.data.files[0].path === 'GEMINI.md');
+
+  const serverBad = await api('POST', '/api/gateway/install-server', { tool: 'codex', target: '../escape' }, token);
+  ok('服务器端安装越界拒绝', serverBad.status === 400 || (serverBad.data.message || '').includes('越界'));
+
+  const tn = await api('POST', '/api/tenants', { code: 'smoke-iso', name: '冒烟租户' }, token);
+  ok('建租户(隔离测试)', tn.status === 200 && tn.data.success);
+  await api('POST', '/api/users', { username: 'smokeiso', password: 'admin123', role: 'engineer', name: '冒烟租户工程师', tenant_id: tn.data.data.id }, token);
+  const isoLogin = await api('POST', '/api/auth/login', { username: 'smokeiso', password: 'admin123' });
+  const isoTasks = await api('GET', '/api/tasks?size=5', null, isoLogin.data.data.token);
+  ok('租户隔离(新租户任务空)', isoTasks.status === 200 && isoTasks.data.data.data.length === 0);
+
+  // 9. 清理本次创建的测试数据
   const db = getDb();
   await db.run(`DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM request_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM tasks WHERE project_code = $1`, [MARK]);
   await db.run(`DELETE FROM approvals WHERE requester = $1`, [MARK]);
   await db.run(`DELETE FROM projects WHERE code LIKE 'smoke-%'`, []);
+  await db.run(`DELETE FROM users WHERE username = 'smokeiso'`, []);
+  await db.run(`DELETE FROM tenants WHERE code = 'smoke-iso'`, []);
   console.log('  （已清理冒烟测试数据）');
 
   console.log(`\n=== 结果: ${pass} 通过 / ${fail} 失败 ===`);
