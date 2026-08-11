@@ -7,6 +7,7 @@
 require('dotenv').config();
 const { getDb } = require('../db');
 const ws = require('./websocket');
+const notifier = require('./notifier');
 const { APPROVAL_TRANSITIONS } = require('./stateMachine');
 const { createWaiterStore } = require('./waiters');
 
@@ -75,6 +76,10 @@ async function createApproval({ type = 'resource', resource, amount, purpose, de
       meta_tags ? JSON.stringify(meta_tags) : null]
   );
   ws.broadcast('approval:new', { id: lastId, approval_no: no });
+  notifier.send({
+    event: 'approval:new', title: `新审批待办 ${no}`,
+    text: `${resource}${amount ? ' / ' + amount : ''}${purpose ? '\n' + purpose : ''}`,
+  });
   return { id: lastId, approval_no: no };
 }
 
@@ -132,6 +137,7 @@ function startApprovalScanner() {
       );
       for (const row of (r[0] ? r[0].values : [])) {
         ws.broadcast('approval:overdue', { id: row[0] });
+        notifier.send({ event: 'approval:overdue', title: `审批超时 #${row[0]}`, text: '已超 24h 未处理，请及时审批' });
       }
     } catch (e) {
       console.error('[审批超时扫描失败]', e.message);

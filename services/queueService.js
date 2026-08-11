@@ -6,12 +6,14 @@
  * 内存等待者 Map：/v1/chat/completions 挂起等待，工程师完成后唤醒返回
  */
 require('dotenv').config();
+const crypto = require('crypto');
 const { getDb } = require('../db');
 const ws = require('./websocket');
 const aiRelay = require('./aiRelay');
 const { TASK_TRANSITIONS } = require('./stateMachine');
 const { createWaiterStore } = require('./waiters');
 const { classify } = require('./categoryEngine');
+const notifier = require('./notifier');
 
 const STATUS = {
   PENDING: 'pending',
@@ -68,14 +70,37 @@ async function getTask(id) {
   return list[0] || null;
 }
 
+/** 确定性序列化：对象键排序，保证哈希与 DB jsonb 存储顺序无关（pg jsonb 存储时按键排序） */
+function stableJson(v) {
+  if (Array.isArray(v)) return '[' + v.map(stableJson).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableJson(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
+
+/** 确定性序列化（INSERT 传对象 / SELECT jsonb 字符串 → 统一对象再序列化，保证哈希一致） */
+function norm(v) {
+  if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return v; } }
+  return v;
+}
+const hashPayload = (p) => crypto.createHash('sha256').update(stableJson(p)).digest('hex');
+
+/** 审计留痕（哈希链防篡改：每条 log 含 prev_hash + hash，可验证完整性） */
 async function addLog(taskId, action, oldValue, newValue, actor, remark) {
-  await getDb().run(
-    `INSERT INTO task_logs (task_id, action, old_value, new_value, actor_id, actor_name, remark)
-     VALUES (?, ?, ?::jsonb, ?::jsonb, ?, ?, ?)`,
+  const db = getDb();
+  const actorName = actor ? actor.name || actor.username : '系统';
+  const rem = remark || null;
+  const last = rows(await db.exec('SELECT hash FROM task_logs WHERE task_id = ? ORDER BY id DESC LIMIT 1', [taskId]));
+  const prevHash = last[0] ? last[0].hash : null;
+  const hash = hashPayload({ prevHash, action, oldValue: norm(oldValue), newValue: norm(newValue), actor: actorName, remark: rem });
+  await db.run(
+    `INSERT INTO task_logs (task_id, action, old_value, new_value, actor_id, actor_name, remark, prev_hash, hash)
+     VALUES (?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?)`,
     [taskId, action,
       oldValue ? JSON.stringify(oldValue) : null,
       newValue ? JSON.stringify(newValue) : null,
-      actor ? actor.id : null, actor ? actor.name || actor.username : '系统', remark || null]
+      actor ? actor.id : null, actorName, rem, prevHash, hash]
   );
 }
 
@@ -107,8 +132,14 @@ async function createTaskFromRequest({ parsed, chatId, created }) {
       JSON.stringify(payload),
       PENDING_MIN()]
   );
-  await addLog(lastId, 'create', null, { status: 'pending' }, null, '系统', '上游请求接入');
+  await addLog(lastId, 'create', null, { status: 'pending' }, null, '上游请求接入');
   ws.broadcast('task:new', { id: lastId });
+  const firstUser = parsed.messages.find(m => m.role === 'user');
+  const summary = firstUser && typeof firstUser.content === 'string' ? firstUser.content.slice(0, 60) : '';
+  notifier.send({
+    event: 'task:new', title: `新人工任务 #${lastId}`,
+    text: `优先级 ${priority} / 类别 ${category}${summary ? '\n' + summary : ''}`, taskId: lastId,
+  });
   return { taskId: lastId };
 }
 
@@ -298,6 +329,13 @@ async function timeoutTask(taskId, phase) {
   if (t.ok) {
     ws.broadcast('task:timeout', { id: taskId, phase });
     resolveWaiter(taskId, { completed: false, status: STATUS.RETURNED, content: `任务${label}超时`, task: t.task });
+    // 通知：涉密/运维类不 AI 代答，需人工重派；general 类 AI 兜底失败也通知
+    const cat = (t.task && t.task.category) || 'general';
+    notifier.send({
+      event: 'task:timeout', title: `任务 #${taskId} ${label}超时`,
+      text: `类别 ${cat}${cat === 'general' ? '（AI 兜底失败，需人工重派）' : '（涉密/运维类不 AI 代答，需人工改上下文重派）'}`,
+      taskId,
+    });
   }
 }
 
@@ -316,9 +354,25 @@ function startTimeoutScanner() {
   }, 30000);
 }
 
+/** 校验任务审计哈希链完整性（治理层「留痕是人的证据」，可证明未被篡改） */
+async function verifyAuditChain(taskId) {
+  const logs = rows(await getDb().exec('SELECT * FROM task_logs WHERE task_id = ? ORDER BY id', [taskId]));
+  let prevHash = null, valid = true, brokenAt = null;
+  for (const l of logs) {
+    const h = hashPayload({
+      prevHash: l.prev_hash, action: l.action,
+      oldValue: norm(l.old_value), newValue: norm(l.new_value),
+      actor: l.actor_name || '系统', remark: l.remark || null,
+    });
+    if (h !== l.hash) { valid = false; brokenAt = l.id; break; }
+    prevHash = l.hash;
+  }
+  return { valid, broken_at: brokenAt, count: logs.length };
+}
+
 module.exports = {
   STATUS, TRANSITIONS, getTask, rows, addLog, logRequest,
   createTaskFromRequest, transition, claimTask, completeTask,
   rejectTask, pauseTask, resumeTask, requeueTask, cancelTask, reopenTask,
-  qualityCheck, waitForTask, startTimeoutScanner, timeoutTask,
+  qualityCheck, waitForTask, startTimeoutScanner, timeoutTask, verifyAuditChain,
 };

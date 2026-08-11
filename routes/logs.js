@@ -62,4 +62,26 @@ router.get('/tasks', authenticate, async (req, res) => {
   }
 });
 
+// 审计哈希链验证 + 治理链路（分级/rule_id/完整性）
+router.get('/tasks/:id/audit', authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const db = getDb();
+    const task = await queue.getTask(id);
+    if (!task) return res.status(404).json({ success: false, message: '任务不存在' });
+    const chain = await queue.verifyAuditChain(id);
+    res.json({ success: true, data: {
+      valid: chain.valid,
+      broken_at: chain.broken_at,
+      log_count: chain.count,
+      category: task.category || 'general',
+      rule_id: task.rule_id || null,
+      task: { id: task.id, status: task.status, created_at: task.created_at, completed_at: task.completed_at },
+    } });
+  } catch (err) {
+    console.error('[审计验证失败]', err.message);
+    res.status(500).json({ success: false, message: '审计验证失败' });
+  }
+});
+
 module.exports = router;
