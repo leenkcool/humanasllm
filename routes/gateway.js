@@ -316,3 +316,6 @@ router.put('/files', authenticate, (req, res) => {
 });
 
 module.exports = router;
+// 纯函数导出（单元测试 / 复用）
+module.exports.renderTemplate = renderTemplate;
+module.exports.safeTarget = safeTarget;
