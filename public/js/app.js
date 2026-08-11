@@ -291,6 +291,11 @@ window.HLM = window.HLM || {};
   }
 
   // 窄窗(769-1024)/竖屏大窗(≥1025)自动折叠为图标侧栏；可手动展开，展开后主内容宽度由 CSS 扣除
+  function syncExpandTitle() {
+    const sb = $('#sidebar');
+    const eb = $('#expandBtn');
+    if (sb && eb) eb.title = sb.classList.contains('collapsed') ? t('app.expand') : t('app.collapse');
+  }
   function applyResponsive() {
     const sb = $('#sidebar');
     if (!sb) return;
@@ -298,12 +303,13 @@ window.HLM = window.HLM || {};
     const portrait = window.matchMedia('(orientation: portrait)').matches;
     const mini = (w >= 769 && w <= 1024) || (w >= 1025 && portrait);
     sb.classList.toggle('collapsed', mini);
+    syncExpandTitle();
   }
 
   // ===== 侧栏交互 =====
   function initSidebar() {
     const sb = $('#sidebar');
-    $('#expandBtn').onclick = () => sb.classList.toggle('collapsed');
+    $('#expandBtn').onclick = () => { sb.classList.toggle('collapsed'); syncExpandTitle(); };
     $('#menuBtn').onclick = () => sb.classList.toggle('open');
     document.querySelector('.main').addEventListener('click', () => sb.classList.remove('open'));
     applyResponsive();
