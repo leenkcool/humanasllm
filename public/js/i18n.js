@@ -6,10 +6,10 @@ window.HLM = window.HLM || {};
 
   // ===== 字典 =====
   const zh = {
-    'meta.title.index': '人工代理网关 · 工程师工作台',
-    'meta.title.login': '登录 · 人工代理网关',
-    'app.name': '人工代理网关',
-    'app.sub': 'Human-as-LLM 工作台',
+    'meta.title.index': 'Human as Agent · 工程师工作台',
+    'meta.title.login': '登录 · Human as Agent',
+    'app.name': 'Human as Agent',
+    'app.sub': 'Human as Agent 工作台',
     'app.menu': '菜单',
     'app.collapse': '折叠侧栏',
     'app.expand': '展开侧栏',
@@ -377,8 +377,8 @@ window.HLM = window.HLM || {};
     'api.requestFail': '请求失败',
 
     // 登录页
-    'login.heading': '人工代理网关',
-    'login.sub': 'Human-as-LLM 工程师工作台',
+    'login.heading': 'Human as Agent',
+    'login.sub': 'Human as Agent 工程师工作台',
     'login.username': '用户名',
     'login.usernamePlaceholder': 'admin / engineer1 / engineer2',
     'login.password': '密码',
@@ -411,10 +411,10 @@ window.HLM = window.HLM || {};
   };
 
   const en = {
-    'meta.title.index': 'Human-as-LLM Gateway · Engineer Workbench',
-    'meta.title.login': 'Login · Human-as-LLM Gateway',
-    'app.name': 'Human-as-LLM Gateway',
-    'app.sub': 'Human-as-LLM Workbench',
+    'meta.title.index': 'Human as Agent · Engineer Workbench',
+    'meta.title.login': 'Login · Human as Agent',
+    'app.name': 'Human as Agent',
+    'app.sub': 'Human as Agent Workbench',
     'app.menu': 'Menu',
     'app.collapse': 'Collapse sidebar',
     'app.expand': 'Expand sidebar',
@@ -763,8 +763,8 @@ window.HLM = window.HLM || {};
     'api.expired': 'Session expired',
     'api.requestFail': 'Request failed',
 
-    'login.heading': 'Human-as-LLM Gateway',
-    'login.sub': 'Human-as-LLM Engineer Workbench',
+    'login.heading': 'Human as Agent',
+    'login.sub': 'Human as Agent Engineer Workbench',
     'login.username': 'Username',
     'login.usernamePlaceholder': 'admin / engineer1 / engineer2',
     'login.password': 'Password',

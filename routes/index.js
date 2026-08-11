@@ -47,7 +47,7 @@ module.exports = function (app) {
   app.use('/api/gateway', gatewayRoutes);
 
   // 健康检查
-  const health = (req, res) => res.json({ status: 'ok', service: 'p390-human-llm', timestamp: new Date().toISOString() });
+  const health = (req, res) => res.json({ status: 'ok', service: 'p390-human-as-agent', timestamp: new Date().toISOString() });
   app.get('/api/health', health);
   app.get('/v1/health', health);
 };

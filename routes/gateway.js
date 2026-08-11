@@ -172,11 +172,21 @@ function installAllScript(cfg) {
   const base = String(cfg.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/+$/, '');
   const model = cfg.model || 'human-llm';
   return `#!/usr/bin/env node
-/* P390 本机全装：写入所有支持的 AI Agent 工具的 skill/agent/规则 */
-const fs = require('fs'), path = require('path');
+/* P390 本机全装：扫描本机已装 AI Agent 工具，写入对应 skill/agent/规则 */
+const fs = require('fs'), path = require('path'), { execSync } = require('child_process');
+function has(cmd) { try { execSync((process.platform === 'win32' ? 'where ' : 'which ') + cmd, { stdio: 'ignore' }); return true; } catch (e) { return false; } }
+const CLI = { codex: 'codex', opencode: 'opencode', gemini: 'gemini', cursor: 'cursor', aider: 'aider' };
+const DETECT = {};
+for (const [t, c] of Object.entries(CLI)) DETECT[t] = has(c);
 const FILES = ${payload};
-let n = 0;
+let n = 0; const skipped = [];
 for (const [tool, list] of Object.entries(FILES)) {
+  const always = tool === 'agents' || tool === 'claude';          // AGENTS.md 与 Claude Code 总是装
+  const noCli = tool === 'workbuddy' || tool === 'openclaw' || tool === 'hermes' || tool === 'pi';
+  if (!always) {
+    if (noCli) { skipped.push(tool + '(无标准CLI)'); continue; }
+    if (!DETECT[tool]) { skipped.push(tool); console.log('跳过 [' + tool + ']：未检测到本机 ' + CLI[tool] + ' 命令'); continue; }
+  }
   for (const f of list) {
     const p = path.join(process.cwd(), f.path);
     fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -186,6 +196,7 @@ for (const [tool, list] of Object.entries(FILES)) {
   }
 }
 console.log('P390 本机安装完成：' + n + ' 个文件。网关 ' + '${base}' + '，模型 ' + '${model}' + '。');
+if (skipped.length) console.log('未检测到/未安装：' + skipped.join(', ') + '（可按构建指南手动安装）');
 `;
 }
 
