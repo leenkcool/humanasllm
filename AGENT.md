@@ -29,3 +29,11 @@
 - Node.js 20+ / PostgreSQL（库 `p390`）。
 - 测试：`npm test`（单元+集成）/ `npm run test:smoke`（API 回归）/ `npm run test:coverage`（覆盖率）。
 - 部署：见 `docs/DEPLOY.md`（Windows/Linux）。
+
+
+---
+
+## 💬 支持与交流
+
+本项目支持微信 / QQ 交流群：**6181193**。二次开发、问题反馈、需求讨论欢迎加入。
+

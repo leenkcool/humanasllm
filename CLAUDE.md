@@ -81,3 +81,11 @@ scripts/seed.js        # 种子账户
 - API 地址用 `window.location.origin`；SVG 图标；4 套主题（浅/暖/莫兰迪/深）默认浅色
 - 模块 IIFE + `window.HLM.*`；加载顺序 utils → api → ws → ui → app
 - 响应式：PC 横/竖、平板、手机（≤768 侧栏抽屉）
+
+
+---
+
+## 💬 支持与交流
+
+本项目支持微信 / QQ 交流群：**6181193**。二次开发、问题反馈、需求讨论欢迎加入。
+

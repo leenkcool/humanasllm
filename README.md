@@ -75,6 +75,10 @@ npm start         # 监听 0.0.0.0:39000
 - [测试方案](docs/TESTING.md)
 - [项目全览](docs/PROJECT_OVERVIEW.md)
 
+## 💬 支持与交流
+
+本项目支持微信 / QQ 交流群：**6181193**。二次开发、问题反馈、需求讨论欢迎加入。
+
 ## 📄 License
 
 [MIT](LICENSE)
