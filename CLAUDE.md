@@ -65,7 +65,8 @@ scripts/seed.js        # 种子账户
 `TASK_PENDING_TIMEOUT_MIN`、`TASK_PROCESSING_TIMEOUT_MIN`、`UPSTREAM_API_KEY`(可选)、
 `AI_RELAY_ENABLED`、`AI_RELAY_BASE_URL`、`AI_RELAY_API_KEY`、`AI_RELAY_MODELS`、
 `USER_REGISTER_MODE`(open/audit)、`SMTP_HOST/PORT/SECURE/USER/PASS/FROM`(邮件，可选)、
-`NOTIFY_EMAIL_TO`、`NOTIFY_WEBHOOK_URL`(通知渠道：邮件收件人/企微钉钉webhook，可选)
+`NOTIFY_EMAIL_TO`、`NOTIFY_WEBHOOK_URL`(通知渠道：邮件收件人/企微钉钉webhook，可选)、
+`GATEWAY_INSTALL_ROOT`(服务器端安装根，可选；默认 data/installed)
 
 ## 命令
 - `npm install` → `npm run seed` → `npm start`（监听 `0.0.0.0:39000`）

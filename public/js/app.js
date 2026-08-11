@@ -307,7 +307,24 @@ window.HLM = window.HLM || {};
           <select class="form-select" id="gwFilePath" style="max-width:100%;margin-bottom:8px;font-family:monospace;font-size:12px;"></select>
           <textarea class="form-textarea" id="gwFile" rows="16" style="font-family:monospace;font-size:12px;"></textarea>
           <div style="margin-top:8px;"><button class="btn" onclick="window.HLM.App.saveFile()">${t('gateway.saveFile')}</button></div>
-        </div></div>`;
+        </div></div>
+      ${window.HLM.currentUser && window.HLM.currentUser.role === 'admin' ? `
+      <div class="card"><div class="card-head"><span class="t">${t('gateway.serverInstall')}</span>
+        <span class="chip" id="siRoot"></span></div>
+        <div class="card-body">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select class="form-select" id="siTool" style="max-width:200px;">
+              <option value="claude">Claude Code</option>
+              <option value="codex">Codex</option>
+              <option value="opencode">OpenCode</option>
+              <option value="agents">通用 AGENTS.md</option>
+              <option value="all">全装脚本</option>
+            </select>
+            <input class="form-input" id="siTarget" placeholder="${t('gateway.serverTarget')}" style="flex:1;min-width:200px;">
+            <button class="btn primary" onclick="window.HLM.App.serverInstall()">${t('gateway.serverInstallBtn')}</button>
+          </div>
+          <div class="ctx" id="siResult" style="margin-top:10px;display:none;"></div>
+        </div></div>` : ''}`;
     await loadGateway();
   }
 
@@ -318,6 +335,8 @@ window.HLM = window.HLM || {};
       $('#gwModel').value = c.data.model || 'human-llm';
       $('#gwKey').value = c.data.apiKey || '';
       $('#gwNote').value = c.data.note || '';
+      const root = await API.get('/gateway/install-root').catch(() => null);
+      if (root && $('#siRoot')) $('#siRoot').textContent = root.data.root;
       updatePrompt();
       loadInstall();
       renderGwFiles(_gwTool);
@@ -443,6 +462,19 @@ window.HLM = window.HLM || {};
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  // 服务器端安装（admin）：把当前工具文件写入服务器指定目标目录
+  async function serverInstall() {
+    try {
+      const tool = $('#siTool').value;
+      const target = $('#siTarget').value.trim();
+      const r = await API.post('/gateway/install-server', { tool, target });
+      const box = $('#siResult');
+      box.style.display = 'block';
+      box.innerHTML = `<div class="k">${esc(r.data.root)} / ${esc(r.data.target || '.')}（${r.data.count} 个文件）</div>${r.data.files.map(f => `<div style="font-size:12px;color:var(--muted);">${esc(f)}</div>`).join('')}`;
+      toast(t('gateway.saved'), 'success');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   async function loadProjects() {
     try {
       const r = await API.get('/projects');
@@ -526,7 +558,7 @@ window.HLM = window.HLM || {};
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt, onToolChange, copyInstall };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt, onToolChange, copyInstall, serverInstall };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

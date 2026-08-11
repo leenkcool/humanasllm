@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireRole } = require('../middleware/auth');
 
 const DATA_DIR = path.join(__dirname, '../data');
 const CONFIG_FILE = path.join(DATA_DIR, 'gateway_config.json');
@@ -18,6 +18,20 @@ const SKILL_TPL = path.join(__dirname, '../.claude/skills/dispatch-human/SKILL.m
 const AGENT_TPL = path.join(__dirname, '../.claude/agents/humanllm.md');
 const SKILL_OUT = path.join(DATA_DIR, 'gateway_skill.md');
 const AGENT_OUT = path.join(DATA_DIR, 'gateway_agent.md');
+// 服务器端安装根（env GATEWAY_INSTALL_ROOT 可指向真实项目根；默认 data/installed 沙箱）
+const INSTALL_ROOT = process.env.GATEWAY_INSTALL_ROOT
+  ? path.resolve(process.env.GATEWAY_INSTALL_ROOT)
+  : path.join(DATA_DIR, 'installed');
+
+/** 目标路径安全校验：必须落在 INSTALL_ROOT 内，禁止越界 */
+function safeTarget(root, target) {
+  const base = path.resolve(root);
+  const abs = path.resolve(base, String(target == null ? '' : target));
+  if (abs !== base && !abs.startsWith(base + path.sep)) {
+    throw Object.assign(new Error('目标路径越界，不允许写入安装根之外'), { status: 400 });
+  }
+  return abs;
+}
 
 const DEFAULT_CONFIG = { baseUrl: 'http://192.168.168.3:39000', model: 'human-llm', apiKey: '', note: '' };
 
@@ -199,6 +213,32 @@ console.log('P390 本机安装完成：' + n + ' 个文件。网关 ' + '${base}
 if (skipped.length) console.log('未检测到/未安装：' + skipped.join(', ') + '（可按构建指南手动安装）');
 `;
 }
+
+// 服务器端安装：把某工具文件写入 INSTALL_ROOT/target（admin，安全校验防越界）
+router.post('/install-server', authenticate, requireRole('admin'), (req, res) => {
+  try {
+    const { tool, target } = req.body || {};
+    if (!tool) return res.status(400).json({ success: false, message: 'tool 必填' });
+    const cfg = readJson(CONFIG_FILE, DEFAULT_CONFIG);
+    const dest = safeTarget(INSTALL_ROOT, target);
+    const files = getToolFiles(tool, cfg);
+    const written = [];
+    for (const f of files) {
+      const p = path.join(dest, f.path);
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, f.content, 'utf8');
+      written.push(p);
+    }
+    res.json({ success: true, data: { root: INSTALL_ROOT, target: target || '.', count: written.length, files: written } });
+  } catch (e) {
+    res.status(e.status || 500).json({ success: false, message: e.message || '服务器端安装失败' });
+  }
+});
+
+// 服务器安装根（展示给前端）
+router.get('/install-root', authenticate, (req, res) => {
+  res.json({ success: true, data: { root: INSTALL_ROOT } });
+});
 
 // 免认证安装接口：目标项目粘贴安装提示词后，Agent 拉取本接口写入项目
 // tool 支持：claude / codex / agents / opencode / gemini / cursor / windsurf / aider / workbuddy / openclaw / hermes / pi / build / all（本机全装脚本）

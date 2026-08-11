@@ -101,6 +101,9 @@ window.HLM = window.HLM || {};
     'gateway.copyInstall': '复制安装包',
     'gateway.allNoEdit': '本机全装脚本无需微调，直接复制运行',
     'gateway.noFile': '请先选择要编辑的文件',
+    'gateway.serverInstall': '服务器端安装（admin）',
+    'gateway.serverTarget': '目标子目录（如 myproject）',
+    'gateway.serverInstallBtn': '安装到服务器',
 
     // 统计
     'stat.pending': '待接单',
@@ -502,6 +505,9 @@ window.HLM = window.HLM || {};
     'gateway.copyInstall': 'Copy install package',
     'gateway.allNoEdit': 'Full-install script is not editable; copy and run directly',
     'gateway.noFile': 'Select a file to edit first',
+    'gateway.serverInstall': 'Server-side install (admin)',
+    'gateway.serverTarget': 'Target subdir (e.g. myproject)',
+    'gateway.serverInstallBtn': 'Install to server',
 
     'stat.pending': 'Awaiting',
     'stat.processing': 'Processing',
