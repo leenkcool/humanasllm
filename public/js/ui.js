@@ -535,10 +535,85 @@ window.HLM = window.HLM || {};
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  // ===== 分级规则管理（治理配置后台，admin） =====
+  let _rules = [];
+  async function showRules() {
+    try {
+      const r = await API.get('/rules');
+      _rules = r.data;
+      const html = `
+        <div style="margin-bottom:10px;"><button class="btn sm" onclick="window.HLM.UI.ruleForm()">${t('rules.add')}</button></div>
+        <div class="tbl-wrap"><table class="data">
+          <thead><tr><th>${t('rules.name')}</th><th>${t('rules.category')}</th><th>${t('rules.keywords')}</th><th>${t('rules.priority')}</th><th>${t('rules.enabled')}</th><th>${t('table.action')}</th></tr></thead>
+          <tbody>${_rules.map(rl => `<tr>
+            <td>${esc(rl.name)}</td>
+            <td><span class="tag ${rl.category}">${t('category.' + rl.category) || rl.category}</span></td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;" title="${esc(rl.keywords)}">${esc(rl.keywords)}</td>
+            <td>${rl.priority}</td>
+            <td>${rl.enabled ? t('common.yes') : t('common.no')}</td>
+            <td><div style="display:flex;gap:6px;">
+              <button class="btn sm" onclick="window.HLM.UI.ruleForm(${rl.id})">${t('common.edit')}</button>
+              <button class="btn sm" onclick="window.HLM.UI.toggleRule(${rl.id})">${rl.enabled ? t('rules.disable') : t('rules.enable')}</button>
+              <button class="btn sm danger" onclick="window.HLM.UI.delRule(${rl.id})">${t('common.delete')}</button>
+            </div></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`;
+      openModal(t('rules.title'), html, `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`, 'lg');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function ruleForm(id) {
+    const rl = _rules.find(x => x.id === id) || {};
+    const catOptions = ['general', 'confidential', 'ops'].map(c => `<option value="${c}" ${rl.category === c ? 'selected' : ''}>${t('category.' + c)}</option>`).join('');
+    openModal(id ? t('rules.edit') : t('rules.add'), `
+      <div class="form-group"><label class="form-label">${t('rules.name')}</label><input class="form-input" id="ruleName" value="${esc(rl.name || '')}"></div>
+      <div class="form-group"><label class="form-label">${t('rules.category')}</label><select class="form-select" id="ruleCategory">${catOptions}</select></div>
+      <div class="form-group"><label class="form-label">${t('rules.keywords')}</label><textarea class="form-textarea" id="ruleKeywords" rows="3" placeholder=",${t('rules.keywordsPh')}">${esc(rl.keywords || '')}</textarea></div>
+      <div class="form-group"><label class="form-label">${t('rules.priority')}</label><input class="form-input" type="number" id="rulePriority" value="${rl.priority || 100}"></div>`,
+      `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.cancel')}</button>
+       <button class="btn primary" onclick="window.HLM.UI.saveRule(${id || 0})">${t('common.save')}</button>`);
+  }
+
+  async function saveRule(id) {
+    const body = {
+      name: $('#ruleName').value.trim(),
+      category: $('#ruleCategory').value,
+      keywords: $('#ruleKeywords').value.trim(),
+      priority: parseInt($('#rulePriority').value) || 100,
+    };
+    if (!body.name || !body.keywords) { toast(t('rules.empty'), 'warning'); return; }
+    try {
+      if (id) await API.put('/rules/' + id, body);
+      else await API.post('/rules', body);
+      toast(t('rules.saved'), 'success');
+      closeModal();
+      showRules();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function toggleRule(id) {
+    const rl = _rules.find(x => x.id === id);
+    if (!rl) return;
+    try {
+      await API.put('/rules/' + id, { enabled: !rl.enabled });
+      closeModal();
+      showRules();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function delRule(id) {
+    if (!window.confirm(t('rules.delConfirm'))) return;
+    try {
+      await API.del('/rules/' + id);
+      closeModal();
+      showRules();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   window.HLM.UI = {
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
-    promptReopen, submitReopen, showAuditReport,
+    promptReopen, submitReopen, showAuditReport, showRules, ruleForm, saveRule, toggleRule, delRule,
     renderUsers, showUserForm, saveUser, delUser, renderLogs,
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
     renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,

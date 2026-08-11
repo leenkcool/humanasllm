@@ -33,6 +33,14 @@ const waiters = createWaiterStore();
 const PENDING_MIN = () => parseInt(process.env.TASK_PENDING_TIMEOUT_MIN) || 60;
 const PROCESSING_MIN = () => parseInt(process.env.TASK_PROCESSING_TIMEOUT_MIN) || 120;
 
+// SLA 分级：环境变量/默认作基准，按优先级比例调整（high 紧迫×0.5、low 放宽×2），治理层「差异化 SLA」
+function timeoutMinutes(phase, priority) {
+  const p = priority || 'medium';
+  const base = phase === 'pending' ? PENDING_MIN() : PROCESSING_MIN();
+  const ratio = { high: 0.5, medium: 1, low: 2 }[p] || 1;
+  return Math.max(5, Math.round(base * ratio));
+}
+
 /** SQL 表达式标记：{ __expr: 'NOW() + interval ...' } 直接拼 SQL，其余走参数绑定 */
 const expr = (s) => ({ __expr: s });
 const now = () => expr('NOW()');
@@ -130,7 +138,7 @@ async function createTaskFromRequest({ parsed, chatId, created }) {
     [chatId, parsed.model, parsed.stream, priority, category, ruleId, projectCode,
       metaTags ? JSON.stringify(metaTags) : null,
       JSON.stringify(payload),
-      PENDING_MIN()]
+      timeoutMinutes('pending', priority)]
   );
   await addLog(lastId, 'create', null, { status: 'pending' }, null, '上游请求接入');
   ws.broadcast('task:new', { id: lastId });
@@ -172,15 +180,17 @@ async function transition(taskId, to, actor, remark, updates = {}) {
   return { ok: true, task: await getTask(taskId) };
 }
 
-/** 工程师接单：pending/returned → processing */
+/** 工程师接单：pending/returned → processing（按优先级差异化 SLA 超时） */
 async function claimTask(taskId, engineerId, engineerName) {
+  const task = await getTask(taskId);
+  const priority = (task && task.priority) || 'medium';
   return transition(taskId, STATUS.PROCESSING, { id: engineerId, name: engineerName }, '工程师接单', {
     assignee_id: engineerId,
     claimed_at: now(),
     result_text: null,
     result_payload: null,
     reject_reason: null,
-    timeout_at: afterMin(PROCESSING_MIN()),
+    timeout_at: afterMin(timeoutMinutes('processing', priority)),
   });
 }
 
@@ -231,11 +241,13 @@ async function pauseTask(taskId, reason, actor) {
   return transition(taskId, STATUS.PAUSED, actor, reason || '暂停', { paused_reason: reason || null });
 }
 
-/** 恢复：paused → processing */
+/** 恢复：paused → processing（按优先级差异化 SLA 超时） */
 async function resumeTask(taskId, actor) {
+  const task = await getTask(taskId);
+  const priority = (task && task.priority) || 'medium';
   return transition(taskId, STATUS.PROCESSING, actor, '恢复处理', {
     paused_reason: null,
-    timeout_at: afterMin(PROCESSING_MIN()),
+    timeout_at: afterMin(timeoutMinutes('processing', priority)),
   });
 }
 

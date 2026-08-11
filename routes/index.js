@@ -12,6 +12,7 @@ const v1Routes = require('./v1');
 const approvalRoutes = require('./approvals');
 const projectRoutes = require('./projects');
 const auditRoutes = require('./audit');
+const ruleRoutes = require('./rules');
 
 module.exports = function (app) {
   // 工作台 REST
@@ -33,6 +34,9 @@ module.exports = function (app) {
 
   // 审计 / 合规报告
   app.use('/api/audit', auditRoutes);
+
+  // 分级规则管理（治理配置后台，admin）
+  app.use('/api/rules', ruleRoutes);
 
   // 健康检查
   const health = (req, res) => res.json({ status: 'ok', service: 'p390-human-llm', timestamp: new Date().toISOString() });

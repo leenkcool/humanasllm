@@ -95,6 +95,7 @@ window.HLM = window.HLM || {};
     content.innerHTML = `
       <div class="topbar"><div><div class="page-title">${t('page.dashboard.title')}</div><div class="page-desc">${t('page.dashboard.desc')}</div></div>
         <div class="spacer"></div><span class="chip">model: ${esc('human-llm')}</span>
+        ${currentUser.role === 'admin' ? `<button class="btn" onclick="window.HLM.UI.showRules()">${t('rules.title')}</button>` : ''}
         <button class="btn" onclick="window.HLM.UI.showAuditReport()">${t('page.audit.report')}</button>
         <button class="icon-btn" onclick="window.HLM.App.route()">${Icons.refresh}</button></div>
       <div class="stats" id="statsBox"></div>
