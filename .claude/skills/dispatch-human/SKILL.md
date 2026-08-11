@@ -24,11 +24,11 @@ description: 将涉密/私有逻辑/需人工判断/项目规则要求人工的�
    prompt: <任务原文 + 交人工原因标注>
    run_in_background: false      // /v1 异步受理，humanllm 登记未完成、之后回查交付；大任务可后台
    ```
-   humanllm 会按 `G:\dev\p390\.claude\agents\humanllm.md` 自动把任务整理成「完整上下文包」（【任务】【交人工原因】【项目与代码库】【接单流程】【环境约定】【要求】），写入 `data/human_task.json` 并提交 p390 网关。
+   humanllm 会按 `.claude/agents/humanllm.md` 自动把任务整理成「完整上下文包」（【任务】【交人工原因】【项目与代码库】【接单流程】【环境约定】【要求】），写入 `data/human_task.json` 并提交 p390 网关。
 4. **登记未完成（humanllm 执行）**：/v1 **异步受理**立即返回 `task_id`（人工小时级，不再挂起等待）。humanllm 把 task_id 登记到 `data/human_followup.json`（pending）。
 5. **回查交付（humanllm 执行）**：后续做相关工作再次调用时，humanllm 先回查 `GET /v1/tasks/:id`——`completed` 把人工产出**逐字**返回（保留代码块与换行）；未完成则如实反馈状态、保留登记继续轮候。
 
-> 主代理只负责「判断触发 → 委派 → 接收产出/状态」，**不直接读写** `data/` 下任何文件；登记、回查、交付全部由 humanllm 按 `G:\dev\p390\.claude\agents\humanllm.md` 自动完成。
+> 主代理只负责「判断触发 → 委派 → 接收产出/状态」，**不直接读写** `data/` 下任何文件；登记、回查、交付全部由 humanllm 按 `.claude/agents/humanllm.md` 自动完成。
 
 ## 跟进时机（何时再次委派 humanllm 回查）
 

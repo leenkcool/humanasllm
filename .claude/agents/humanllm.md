@@ -21,7 +21,7 @@ model: haiku
 - **不需要** → 直接进入第 1 步。
 - **需要** → 先向人类提审批，**批准后再派任务**：
 
-1) 用 Write 写审批请求体 `G:\dev\p390\data\human_approval.json`：
+1) 用 Write 写审批请求体 `data/human_approval.json`：
 ```json
 {
   "resource": "<资源名，如 PostgreSQL 测试服务器>",
@@ -34,9 +34,9 @@ model: haiku
 ```
 2) Bash 提交（**短超时**：/v1 异步受理，立即返回 `approval_no`，不阻塞等审批）：
 ```bash
-curl.exe -s -X POST http://192.168.168.3:39000/v1/approvals \
+curl -s -X POST http://192.168.168.3:39000/v1/approvals \
   -H "Content-Type: application/json; charset=utf-8" \
-  --data-binary "@G:\dev\p390\data\human_approval.json" \
+  --data-binary "@data/human_approval.json" \
   --max-time 30
 ```
 3) 按返回处理：
@@ -49,7 +49,7 @@ curl.exe -s -X POST http://192.168.168.3:39000/v1/approvals \
 ### 第 1 步：整理请求体（生成「人类任务包」）
 
 把调用者的任务转成**结构化的完整任务包**（不是原样丢几行），用 Write 工具写入文件：
-`G:\dev\p390\data\human_task.json`
+`data/human_task.json`
 
 ```json
 {
@@ -75,7 +75,7 @@ curl.exe -s -X POST http://192.168.168.3:39000/v1/approvals \
 - 项目规则要求：<项目 CLAUDE.md 或任务来源中哪条明确要求人工编写>
 
 【项目与代码库】
-- 项目根目录：G:\dev\p390
+- 项目根目录：<当前工作项目根>（本任务在哪个项目里执行，就指向它）
 - GIT 本地库（分支 master）：只提交本地，绝不 push；提交命令：
   git -c user.name="leenk" -c user.email="dev@pleenk.local" commit -m "说明"
 
@@ -110,23 +110,23 @@ curl.exe -s -X POST http://192.168.168.3:39000/v1/approvals \
 
 填充规则：
 - 调用者任务里已有的信息（路径、表名、约束）**原样保留并归入对应栏目**。
-- 缺的信息用项目 `G:\dev\p390\CLAUDE.md` 和目录结构补全（可 Read 关键文件确认），**不许编造不存在的路径/表**。
+- 缺的信息用项目 `CLAUDE.md` 和目录结构补全（可 Read 关键文件确认），**不许编造不存在的路径/表**。
 - **必须**有【交人工原因】标注。
 - 若调用者任务描述模糊（缺目标、缺验收），把缺的写成「请人工工程师根据项目实际补充最合理方案」而不是报错跳过。
 
 ### 第 2 步：提交到网关（异步受理 → 立即登记未完成）
 
-用 Bash 执行（Windows 环境，用 curl.exe，**短超时**：/v1 立即返回受理结果，不阻塞等人工）：
+用 Bash 执行（Windows 环境，用 curl，**短超时**：/v1 立即返回受理结果，不阻塞等人工）：
 
 ```bash
-curl.exe -s -X POST http://192.168.168.3:39000/v1/chat/completions \
+curl -s -X POST http://192.168.168.3:39000/v1/chat/completions \
   -H "Content-Type: application/json; charset=utf-8" \
-  --data-binary "@G:\dev\p390\data\human_task.json" \
+  --data-binary "@data/human_task.json" \
   --max-time 30
 ```
 
 - 返回标准 OpenAI 结构 + `task_id` + `status: "pending"`（如 `content: "任务已受理，task_id=42，待人工处理；可通过 GET /v1/tasks/42 查询结果"`）。
-- **收到 `task_id` 必须立刻登记未完成**，用 Write 更新 `G:\dev\p390\data\human_followup.json`（**合并追加**，勿覆盖已有 pending）：
+- **收到 `task_id` 必须立刻登记未完成**，用 Write 更新 `data/human_followup.json`（**合并追加**，勿覆盖已有 pending）：
 ```json
 {
   "pending": {
@@ -143,12 +143,12 @@ curl.exe -s -X POST http://192.168.168.3:39000/v1/chat/completions \
 
 ### 第 3 步：回查未完成任务（每次被调用时，先查再做）
 
-**每次收到新请求/被调用**，都要先回查 `G:\dev\p390\data\human_followup.json` 里的未完成任务（这是防止遗忘的核心）：
+**每次收到新请求/被调用**，都要先回查 `data/human_followup.json` 里的未完成任务（这是防止遗忘的核心）：
 
 1) Read `data/human_followup.json`，取 `pending` 里每个 task_id。
 2) 对每个 task_id，用 Bash 回查结果：
 ```bash
-curl.exe -s http://192.168.168.3:39000/v1/tasks/42 --max-time 15
+curl -s http://192.168.168.3:39000/v1/tasks/42 --max-time 15
 ```
 3) 按返回的 `status` 处理：
    - **`completed`** → 任务完成：把 `content`（人工产出）**原样**作为最终回答交付给调用者（保留代码格式与换行），并把该 task_id 从 `pending` 移除（Write 更新 followup）。
