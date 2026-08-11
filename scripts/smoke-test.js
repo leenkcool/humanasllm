@@ -114,7 +114,22 @@ async function poll(fn, max = 20) {
   const noAuth = await fetch(BASE + '/api/tasks/export');
   ok('CSV 未带 token 401', noAuth.status === 401);
 
-  // 7. 清理本次创建的测试数据
+  // 7. 治理 / 新功能
+  const rules = await api('GET', '/api/rules', null, token);
+  ok('分级规则列表', rules.status === 200 && rules.data.data.length >= 7, 'count=' + (rules.data.data || []).length);
+  const gov = await api('GET', '/api/workbench/governance', null, token);
+  ok('治理概览', gov.status === 200 && gov.data.data.qa && Array.isArray(gov.data.data.engineers) && 'ai_shift' in gov.data.data);
+  const report = await api('GET', '/api/audit/report', null, token);
+  ok('合规报告', report.status === 200 && !!report.data.data.compliance);
+  const ds = await api('GET', '/api/audit/dataset', null, token);
+  ok('数据资产导出', ds.status === 200);
+  const install = await api('GET', '/api/gateway/install?tool=agents');
+  ok('网关安装包(agents→AGENTS.md)', install.status === 200 && install.data.data.files[0].path === 'AGENTS.md');
+  const users = await api('GET', '/api/users', null, token);
+  const u0 = users.data.data[0];
+  ok('用户列表含租户+统计', 'tenant_name' in u0 && 'completed' in u0);
+
+  // 8. 清理本次创建的测试数据
   const db = getDb();
   await db.run(`DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM request_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);

@@ -101,7 +101,7 @@ router.post('/login', createLoginLimiter(), async (req, res) => {
       data: {
         token,
         user: {
-          id: user.id, username: user.username, role: user.role, name: user.name,
+          id: user.id, username: user.username, role: user.role, name: user.name, skills: user.skills || null,
           tenant_id: user.tenant_id, tenant_name: tenant ? tenant.name : null,
         },
       },

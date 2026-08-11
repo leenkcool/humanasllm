@@ -103,6 +103,33 @@ const EN = {
   '获取统计失败': 'Failed to fetch stats',
   '获取我的任务失败': 'Failed to fetch my tasks',
   '获取待接单任务失败': 'Failed to fetch queued tasks',
+  '获取治理概览失败': 'Failed to fetch governance overview',
+  '获取未完成列表失败': 'Failed to fetch unfinished tasks',
+
+  // rules / tenants / audit / gateway
+  '获取规则失败': 'Failed to fetch rules',
+  'name 与 keywords 必填': 'name and keywords are required',
+  'category 非法': 'Invalid category',
+  '新建规则失败': 'Failed to create rule',
+  '无更新字段': 'No fields to update',
+  '更新规则失败': 'Failed to update rule',
+  '删除规则失败': 'Failed to delete rule',
+  '获取租户失败': 'Failed to fetch tenants',
+  'code 与 name 必填': 'code and name are required',
+  '租户 code 已存在': 'Tenant code already exists',
+  '创建租户失败': 'Failed to create tenant',
+  '生成合规报告失败': 'Failed to generate compliance report',
+  '涉密/运维数据仅管理员可导出': 'Confidential/ops data can only be exported by admin',
+  '导出数据资产失败': 'Failed to export dataset',
+  '生成安装包失败': 'Failed to generate install package',
+  '网关地址必填': 'Gateway URL is required',
+  '读取失败': 'Failed to read',
+  'type 非法': 'Invalid type',
+  '审计验证失败': 'Failed to verify audit chain',
+
+  // queueService 验收单（运维/涉密类）
+  '运维/涉密任务需附验收说明（做了什么、自检结果）': 'Ops/confidential tasks require an acceptance note (what was done, self-check)',
+  '验收说明疑似占位，请填写实际完成情况': 'Acceptance note looks like a placeholder; please describe actual work',
 };
 
 // 动态模板消息：前缀 → 英文前缀
@@ -112,6 +139,8 @@ const PREFIX_EN = [
   ['任务被驳回:', 'Task rejected:'],
   ['审批发起失败:', 'Approval creation failed:'],
   ['AI 中继失败:', 'AI relay failed:'],
+  ['生成失败: ', 'Generation failed: '],
+  ['审批已受理，可通过 ', 'Approval accepted; query via '],
 ];
 
 function toEn(msg) {

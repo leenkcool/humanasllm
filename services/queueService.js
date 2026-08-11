@@ -131,16 +131,17 @@ async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenant
   const ruleId = cat.rule_id;
   const projectCode = parsed.extra.project_code || null;
   const metaTags = parsed.extra.meta_tags || parsed.extra.meta || null;
+  const skills = parsed.extra.skills || null;
   const payload = { ...parsed, created };
 
   const { lastId } = await db.run(
     `INSERT INTO tasks
-       (upstream_request_id, model, stream, priority, category, rule_id, project_code, meta_tags, request_payload, status, timeout_at, tenant_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?)`,
+       (upstream_request_id, model, stream, priority, category, rule_id, project_code, meta_tags, request_payload, status, timeout_at, tenant_id, skills)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?, ?)`,
     [chatId, parsed.model, parsed.stream, priority, category, ruleId, projectCode,
       metaTags ? JSON.stringify(metaTags) : null,
       JSON.stringify(payload),
-      timeoutMinutes('pending', priority), tenantId]
+      timeoutMinutes('pending', priority), tenantId, skills]
   );
   await addLog(lastId, 'create', null, { status: 'pending' }, null, '上游请求接入');
   ws.broadcast('task:new', { id: lastId });

@@ -11,6 +11,7 @@ const { getDb } = require('../db');
 const encoder = require('../services/openaiEncoder');
 const queue = require('../services/queueService');
 const aiRelay = require('../services/aiRelay');
+const aiShift = require('../services/aiShift');
 const { getTenantByUpstreamKey } = require('../middleware/auth');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
@@ -64,6 +65,19 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
     } catch (e) {
       console.error('[AI 中继失败]', e.message);
       return res.status(502).json(encoder.makeError(502, 'AI 中继失败: ' + e.message, 'server_error'));
+    }
+  }
+
+  // ===== 智能漂移：general 简单任务由 AI 直接承接（AI_SHIFT_ENABLED=true 时；confidential/ops 锁死不漂移） =====
+  if (await aiShift.shouldShift({ messages: parsed.messages, body: parsed.extra })) {
+    await queue.logRequest(null, 'in', req.body, parsed.model);
+    try {
+      const data = await aiRelay.chat({ ...req.body, stream: false });
+      const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      await queue.logRequest(null, 'out', { content, source: 'ai-shift' }, parsed.model);
+      return res.json(data);
+    } catch (e) {
+      console.error('[AI 漂移失败，回落人工]', e.message);
     }
   }
 

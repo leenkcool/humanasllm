@@ -73,10 +73,15 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!task) return res.status(404).json({ success: false, message: '任务不存在' });
     if (task.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '任务不存在' });
     const db = getDb();
+    let ruleName = null;
+    if (task.rule_id) {
+      const rn = await db.exec('SELECT name FROM task_rules WHERE id = ?', [task.rule_id]);
+      if (rn[0] && rn[0].values[0]) ruleName = rn[0].values[0][0];
+    }
     const logs = queue.rows(await db.exec(
       'SELECT * FROM task_logs WHERE task_id = ? ORDER BY id', [id]
     ));
-    res.json({ success: true, data: { ...task, logs } });
+    res.json({ success: true, data: { ...task, rule_name: ruleName, logs } });
   } catch (err) {
     console.error('[任务详情失败]', err.message);
     res.status(500).json({ success: false, message: '获取任务详情失败' });

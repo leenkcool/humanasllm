@@ -7,6 +7,15 @@ window.HLM = window.HLM || {};
   const { Icons, $, esc, fmt, jsonStr, nl, toast, openModal, closeModal, confirmDialog, STATUS_LABEL } = U;
   const { t } = window.HLM.I18n;
 
+  // 工程师技能与任务 required skills 匹配
+  function skillMatch(required) {
+    const my = (window.HLM.currentUser && window.HLM.currentUser.skills) || '';
+    if (!my || !required) return false;
+    const a = my.split(',').map(s => s.trim()).filter(Boolean);
+    const b = String(required).split(',').map(s => s.trim()).filter(Boolean);
+    return a.some(x => b.includes(x));
+  }
+
   // ===== 任务表格 =====
   function renderTasks(list, containerId) {
     const box = $(containerId);
@@ -19,7 +28,11 @@ window.HLM = window.HLM || {};
       const summary = task.request_payload?.messages?.find(m => m.role === 'user')?.content;
       return `<tr>
         <td class="nowrap"><span class="mono">#${task.id}</span></td>
-        <td><span class="tag ${task.priority}">${esc(task.priority)}</span>${task.category && task.category !== 'general' ? ` <span class="tag ${task.category}" title="${esc(t('category.hint.' + task.category))}">${t('category.' + task.category)}</span>` : ''}</td>
+        <td><span class="tag ${task.priority}">${esc(task.priority)}</span>
+          ${task.category && task.category !== 'general' ? ` <span class="tag ${task.category}" title="${esc(t('category.hint.' + task.category))}">${t('category.' + task.category)}</span>` : ''}
+          ${task.skills ? ` <span class="tag low">${esc(task.skills)}</span>` : ''}
+          ${task.skills && skillMatch(task.skills) ? ` <span class="tag medium" title="${esc(t('task.skillMatch'))}">${t('task.match')}</span>` : ''}
+        </td>
         <td><span class="tag ${task.status}">${STATUS_LABEL[task.status] || task.status}</span></td>
         <td>${esc(task.project_name || task.project_code || '-')}</td>
         <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(String(summary || '').slice(0, 60))}</td>
@@ -100,6 +113,8 @@ window.HLM = window.HLM || {};
           <span class="tag ${task.status}">${STATUS_LABEL[task.status] || task.status}</span>
           <span class="tag ${task.priority}">${esc(task.priority)}</span>
           ${task.category && task.category !== 'general' ? `<span class="tag ${task.category}" title="${esc(t('category.hint.' + task.category))}">${t('category.' + task.category)}</span>` : ''}
+          ${task.rule_name ? `<span class="chip" title="${esc(t('task.ruleHint'))}">${t('task.rule')}: ${esc(task.rule_name)}</span>` : ''}
+          ${task.skills ? `<span class="chip">${t('task.skills')}: ${esc(task.skills)}</span>` : ''}
           ${task.stream ? '<span class="tag pending">stream</span>' : ''}
           <span class="chip">model: ${esc(task.model)}</span>
           ${task.project_code ? `<span class="chip">${t('task.project')} ${esc(task.project_name || task.project_code)}</span>` : ''}
@@ -235,7 +250,8 @@ window.HLM = window.HLM || {};
       const users = r.data;
       box.innerHTML = `
         <div class="card"><div class="card-head"><span class="t">${t('user.cardTitle')}</span>
-          ${isAdmin ? `<button class="btn primary sm" onclick="window.HLM.UI.showUserForm()">${Icons.plus} ${t('user.add')}</button>` : ''}
+          ${isAdmin ? `<button class="btn primary sm" onclick="window.HLM.UI.showUserForm()">${Icons.plus} ${t('user.add')}</button>
+          <button class="btn sm" onclick="window.HLM.UI.showTenants()">${t('tenant.title')}</button>` : ''}
         </div>
         <div class="card-body-flush"><div class="tbl-wrap"><table class="data">
           <thead><tr><th>${t('table.id')}</th><th>${t('user.username')}</th><th>${t('user.name')}</th><th>${t('user.email')}</th><th>${t('user.skills')}</th><th>${t('user.tenant')}</th><th>${t('user.rate')}</th><th>${t('table.status')}</th><th>${t('table.action')}</th></tr></thead>
@@ -284,6 +300,43 @@ window.HLM = window.HLM || {};
         <div class="ctx"><div class="k">${t('table.status')}</div><div>${u.is_active ? t('user.active') : t('user.disabled')}</div></div>
         <div class="ctx"><div class="k">${t('table.createdAt')}</div><div>${fmt(u.created_at)}</div></div>`;
       openModal(t('user.detailTitle'), html, `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  // ===== 租户管理（admin） =====
+  async function showTenants() {
+    try {
+      const r = await API.get('/tenants');
+      const list = r.data;
+      const html = `
+        <div style="margin-bottom:10px;"><button class="btn sm" onclick="window.HLM.UI.tenantForm()">${t('tenant.add')}</button></div>
+        <div class="tbl-wrap"><table class="data">
+          <thead><tr><th>ID</th><th>${t('tenant.code')}</th><th>${t('tenant.name')}</th><th>${t('tenant.upstreamKey')}</th><th>${t('table.createdAt')}</th></tr></thead>
+          <tbody>${list.map(tn => `<tr><td>${tn.id}</td><td>${esc(tn.code)}</td><td>${esc(tn.name)}</td><td>${esc(tn.upstream_key || '-')}</td><td>${fmt(tn.created_at)}</td></tr>`).join('')}</tbody>
+        </table></div>`;
+      openModal(t('tenant.title'), html, `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`, 'lg');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function tenantForm() {
+    openModal(t('tenant.add'), `
+      <div class="form-group"><label class="form-label">${t('tenant.code')}</label><input class="form-input" id="tCode" placeholder="acme"></div>
+      <div class="form-group"><label class="form-label">${t('tenant.name')}</label><input class="form-input" id="tName"></div>
+      <div class="form-group"><label class="form-label">${t('tenant.upstreamKey')}</label><input class="form-input" id="tKey" placeholder="${t('tenant.upstreamKeyPh')}"></div>`,
+      `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.cancel')}</button>
+       <button class="btn primary" onclick="window.HLM.UI.saveTenant()">${t('common.save')}</button>`);
+  }
+
+  async function saveTenant() {
+    const code = $('#tCode').value.trim();
+    const name = $('#tName').value.trim();
+    const upstream_key = $('#tKey').value.trim();
+    if (!code || !name) { toast(t('tenant.req'), 'warning'); return; }
+    try {
+      await API.post('/tenants', { code, name, upstream_key });
+      toast(t('tenant.saved'), 'success');
+      closeModal();
+      showTenants();
     } catch (e) { toast(e.message, 'error'); }
   }
 
@@ -566,6 +619,7 @@ window.HLM = window.HLM || {};
         [t('audit.totalTasks'), d.total_tasks],
         [t('audit.protected'), `${d.protected.confidential} ${t('category.confidential')} + ${d.protected.ops} ${t('category.ops')}`],
         [t('audit.aiFallback'), `${d.ai_fallback.total} (${t('category.general')} ${d.ai_fallback.general} / ${t('audit.protectedAi')} ${d.ai_fallback.protected})`],
+        [t('audit.aiShift'), d.ai_shift_used],
         [t('audit.compliance'), d.compliance],
         [t('audit.auditChain'), `${d.audit_chains.valid} ${t('audit.valid')} / ${d.audit_chains.invalid} ${t('audit.invalid')}`],
         [t('audit.approvals'), `${d.approvals.total} (${t('audit.approved')} ${d.approvals.approved} / ${t('audit.rejected')} ${d.approvals.rejected})`],
@@ -675,7 +729,7 @@ window.HLM = window.HLM || {};
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
     promptReopen, submitReopen, showAuditReport, downloadDataset, showRules, ruleForm, saveRule, toggleRule, delRule,
-    renderUsers, showUserForm, saveUser, delUser, showUserDetail, renderLogs,
+    renderUsers, showUserForm, saveUser, delUser, showUserDetail, showTenants, tenantForm, saveTenant, renderLogs,
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
     renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,
     promptEditProject, submitEditProject, doArchiveProject,

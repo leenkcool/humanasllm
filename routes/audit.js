@@ -23,6 +23,11 @@ router.get('/report', authenticate, async (req, res) => {
     });
     const aiFallback = aiRelayTasks.length;
     const protectedAi = aiRelayTasks.filter(t => t.category !== 'general').length;
+    // 智能漂移承接（general 主动 AI，不计入违规兜底）
+    const aiShiftTasks = tasks.filter(t => {
+      const rp = t.result_payload;
+      return !!(rp && rp.source === 'ai-shift');
+    });
 
     // 审计链健康（哈希链完整性）
     let validChains = 0, invalidChains = 0;
@@ -43,6 +48,7 @@ router.get('/report', authenticate, async (req, res) => {
       total_tasks: tasks.length,
       protected: { confidential: protectedConf, ops: protectedOps, total: protectedConf + protectedOps },
       ai_fallback: { total: aiFallback, general: aiFallback - protectedAi, protected: protectedAi },
+      ai_shift_used: aiShiftTasks.length,
       compliance: protectedAi === 0
         ? 'PASS：受保护任务（涉密/运维）无 AI 兜底，数据未出网关'
         : `FAIL：${protectedAi} 个受保护任务被 AI 兜底，涉密/运维数据可能出网关，需核查`,
