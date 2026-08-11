@@ -20,32 +20,86 @@ const AGENT_OUT = path.join(DATA_DIR, 'gateway_agent.md');
 
 const DEFAULT_CONFIG = { baseUrl: 'http://192.168.168.3:39000', model: 'human-llm', apiKey: '', note: '' };
 
+// 通用 AGENTS.md 模板（Codex / OpenCode / Gemini / 通用 Agent 均读取的项目指令）
+const AGENTS_TPL = `# P390 人工路由规则（Human-as-LLM）
+
+本项目接入人工代理网关 P390（网关：<baseUrl>，模型：<model>）。
+
+## 何时走人工路由
+以下任务**不自己实现**，走人工工程师：
+- 涉密 / 私有内部逻辑 / 数据不出网关
+- 需人工判断 / 责任归属 / 物理世界 / 合规留痕
+- 用户明确要求「交给人工 / 派给人类 / 需要人工实现」
+
+## 调用方式（OpenAI 兼容，异步受理）
+1. 提交：POST <baseUrl>/v1/chat/completions
+   body: { "model": "<model>", "messages": [...], "category": "confidential|ops" }
+   立即返回 task_id（人工为小时级，不要同步等待）。
+2. 登记 task_id 到未完成清单。
+3. 回查：GET <baseUrl>/v1/tasks/<task_id>
+   - completed → 取 content（人工产出）逐字交付
+   - returned → 转达驳回原因，可补充上下文重派
+   - 其余 → 如实反馈状态，继续轮候
+4. 资源申请：POST <baseUrl>/v1/approvals → approval_no → GET <baseUrl>/v1/approvals/<approval_no>
+
+## 铁律
+- 涉密 / 运维类任务绝不交给公有大模型（上下文不出网关）
+- 人工产出逐字返回，不自行改写
+`;
+
+// OpenCode slash command 模板
+const OPENCODE_CMD_TPL = `---
+description: 派人工工程师处理（P390 人工路由）
+---
+按 AGENTS.md 的人工路由规则，把当前任务提交到 P390 网关（<baseUrl>），登记 task_id 并回查取回人工产出。
+`;
+
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; }
 }
 function writeText(file, content) { fs.writeFileSync(file, content, 'utf8'); }
 
-/** 用配置渲染模板：把模板里的默认网关地址替换为配置域名 */
+/** 用配置渲染模板：替换网关地址 + <baseUrl>/<model> 占位 */
 function renderTemplate(tpl, cfg) {
   const base = String(cfg.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/+$/, '');
+  const model = cfg.model || 'human-llm';
   return tpl
+    .replace(/<baseUrl>/g, base)
+    .replace(/<model>/g, model)
     .replace(/https?:\/\/192\.168\.168\.3:39000/g, base)
     .replace(/https?:\/\/127\.0\.0\.1:39000/g, base)
     .replace(/https?:\/\/localhost:39000/g, base);
 }
 
-// 免认证安装接口：目标项目粘贴安装提示词后，Claude Code 拉取本接口写入 .claude/
-// 返回当前配置渲染的 SKILL/AGENT + 网关地址（不含密钥）
+// 免认证安装接口：目标项目粘贴安装提示词后，Agent 拉取本接口写入项目
+// ?tool=claude → .claude SKILL+AGENT；tool=codex|gemini|agents → AGENTS.md；tool=opencode → AGENTS.md + .opencode command
 router.get('/install', (req, res) => {
   try {
     const cfg = readJson(CONFIG_FILE, DEFAULT_CONFIG);
-    const skill = fs.existsSync(SKILL_OUT)
-      ? fs.readFileSync(SKILL_OUT, 'utf8')
-      : renderTemplate(fs.readFileSync(SKILL_TPL, 'utf8'), cfg);
-    const agent = fs.existsSync(AGENT_OUT)
-      ? fs.readFileSync(AGENT_OUT, 'utf8')
-      : renderTemplate(fs.readFileSync(AGENT_TPL, 'utf8'), cfg);
-    res.json({ success: true, data: { gateway: cfg.baseUrl, model: cfg.model, skill, agent } });
+    const tool = req.query.tool || 'claude';
+    const base = String(cfg.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/+$/, '');
+    if (tool === 'opencode') {
+      return res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: [
+        { path: 'AGENTS.md', content: renderTemplate(AGENTS_TPL, cfg) },
+        { path: '.opencode/command/dispatch-human.md', content: renderTemplate(OPENCODE_CMD_TPL, cfg) },
+      ] } });
+    }
+    if (tool === 'claude') {
+      const skill = fs.existsSync(SKILL_OUT)
+        ? fs.readFileSync(SKILL_OUT, 'utf8')
+        : renderTemplate(fs.readFileSync(SKILL_TPL, 'utf8'), cfg);
+      const agent = fs.existsSync(AGENT_OUT)
+        ? fs.readFileSync(AGENT_OUT, 'utf8')
+        : renderTemplate(fs.readFileSync(AGENT_TPL, 'utf8'), cfg);
+      return res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: [
+        { path: '.claude/skills/dispatch-human/SKILL.md', content: skill },
+        { path: '.claude/agents/humanllm.md', content: agent },
+      ] } });
+    }
+    // codex / gemini / 通用 → AGENTS.md
+    res.json({ success: true, data: { tool, gateway: base, model: cfg.model, files: [
+      { path: 'AGENTS.md', content: renderTemplate(AGENTS_TPL, cfg) },
+    ] } });
   } catch (e) {
     console.error('[安装包生成失败]', e.message);
     res.status(500).json({ success: false, message: '生成安装包失败' });

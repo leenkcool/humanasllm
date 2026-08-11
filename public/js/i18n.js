@@ -90,6 +90,10 @@ window.HLM = window.HLM || {};
     'gateway.copy': '复制安装提示词',
     'gateway.copied': '已复制',
     'gateway.copyFail': '复制失败，请手动选择复制',
+    'gateway.tool': '目标工具',
+    'gateway.installPkg': '安装包预览',
+    'gateway.installFiles': '生成的文件（按工具）',
+    'gateway.copyInstall': '复制安装包',
 
     // 统计
     'stat.pending': '待接单',
@@ -464,6 +468,10 @@ window.HLM = window.HLM || {};
     'gateway.copy': 'Copy install prompt',
     'gateway.copied': 'Copied',
     'gateway.copyFail': 'Copy failed, please select and copy manually',
+    'gateway.tool': 'Target tool',
+    'gateway.installPkg': 'Install package preview',
+    'gateway.installFiles': 'Generated files (per tool)',
+    'gateway.copyInstall': 'Copy install package',
 
     'stat.pending': 'Awaiting',
     'stat.processing': 'Processing',

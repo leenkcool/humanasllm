@@ -252,6 +252,7 @@ window.HLM = window.HLM || {};
   // ===== 接入配置（生成 SKILL/AGENT + 在线微调） =====
   let _gwType = 'skill';
   let _gwFiles = { skill: '', agent: '' };
+  let _gwTool = 'claude';
 
   async function renderGateway() {
     const content = $('#content');
@@ -266,6 +267,13 @@ window.HLM = window.HLM || {};
             <div class="form-group" style="flex:1;min-width:180px;"><label class="form-label">${t('gateway.apiKey')}</label><input class="form-input" id="gwKey" placeholder="${t('gateway.apiKeyPh')}"></div>
           </div>
           <div class="form-group"><label class="form-label">${t('gateway.note')}</label><input class="form-input" id="gwNote" placeholder="${t('gateway.notePh')}"></div>
+          <div class="form-group"><label class="form-label">${t('gateway.tool')}</label>
+            <select class="form-select" id="gwTool" style="max-width:240px;" onchange="window.HLM.App.onToolChange()">
+              <option value="claude">Claude Code</option>
+              <option value="codex">Codex (OpenAI)</option>
+              <option value="opencode">OpenCode</option>
+              <option value="agents">通用 Agent (AGENTS.md)</option>
+            </select></div>
           <div style="display:flex;gap:8px;">
             <button class="btn primary" onclick="window.HLM.App.generateGateway()">${t('gateway.generate')}</button>
             <button class="btn" onclick="window.HLM.App.saveGateway()">${t('gateway.save')}</button>
@@ -276,6 +284,12 @@ window.HLM = window.HLM || {};
         <div class="card-body">
           <textarea class="form-textarea" id="gwPrompt" rows="8" readonly style="font-family:monospace;font-size:12px;"></textarea>
           <div style="margin-top:8px;"><button class="btn" onclick="window.HLM.App.copyPrompt()">${t('gateway.copy')}</button></div>
+        </div></div>
+      <div class="card"><div class="card-head"><span class="t">${t('gateway.installPkg')}</span>
+        <span class="chip">${t('gateway.installFiles')}</span></div>
+        <div class="card-body">
+          <textarea class="form-textarea" id="gwInstall" rows="16" readonly style="font-family:monospace;font-size:12px;"></textarea>
+          <div style="margin-top:8px;"><button class="btn" onclick="window.HLM.App.copyInstall()">${t('gateway.copyInstall')}</button></div>
         </div></div>
       <div class="card"><div class="card-head"><span class="t">${t('gateway.files')}</span>
         <span class="chip">${t('gateway.editable')}</span></div>
@@ -303,6 +317,7 @@ window.HLM = window.HLM || {};
       _gwFiles = f.data;
       renderGwFile(_gwType);
       updatePrompt();
+      loadInstall();
     } catch (e) { toast(e.message, 'error'); }
   }
 
@@ -312,26 +327,50 @@ window.HLM = window.HLM || {};
     if (box) box.value = _gwFiles[type] || '';
   }
 
-  // 生成「安装提示词」：在目标项目的 Claude Code 里粘贴即自动安装
-  function buildInstallPrompt(baseUrl, model) {
-    return `请从 P390 人工代理网关安装「人工路由」能力到本项目的 .claude/ 目录：
+  // 生成「安装提示词」：在目标项目粘贴即自动安装（按工具）
+  function buildInstallPrompt(baseUrl, model, tool) {
+    return `请从 P390 人工代理网关安装「人工路由」能力到本项目（工具：${tool}）：
 
-1. 调用 GET ${baseUrl}/api/gateway/install 获取安装包（返回 data.skill / data.agent）
-2. 把 data.skill 写入 .claude/skills/dispatch-human/SKILL.md
-3. 把 data.agent 写入 .claude/agents/humanllm.md
-4. 确认安装完成，并说明网关地址为 ${baseUrl}、模型为 ${model}`;
+1. 调用 GET ${baseUrl}/api/gateway/install?tool=${tool} 获取安装包（返回 data.files 数组）
+2. 把每个文件的 content 写入对应 path（如 AGENTS.md / .claude/...）
+3. 确认安装完成，并说明网关地址为 ${baseUrl}、模型为 ${model}`;
   }
 
   function updatePrompt() {
     const base = $('#gwUrl').value.trim();
     const model = $('#gwModel').value.trim() || 'human-llm';
     const box = $('#gwPrompt');
-    if (box && base) box.value = buildInstallPrompt(base, model);
+    if (box && base) box.value = buildInstallPrompt(base, model, _gwTool);
   }
 
   async function copyPrompt() {
     try {
       await navigator.clipboard.writeText($('#gwPrompt').value);
+      toast(t('gateway.copied'), 'success');
+    } catch (e) { toast(t('gateway.copyFail'), 'error'); }
+  }
+
+  function onToolChange() {
+    _gwTool = $('#gwTool').value;
+    updatePrompt();
+    loadInstall();
+  }
+
+  // 拉取当前工具的安装包预览（只读，可复制）
+  async function loadInstall() {
+    const base = $('#gwUrl').value.trim();
+    const box = $('#gwInstall');
+    if (!box || !base) return;
+    try {
+      const r = await API.get('/gateway/install?tool=' + _gwTool);
+      const files = r.data.files || [];
+      box.value = files.map(f => `===== ${f.path} =====\n${f.content}`).join('\n\n');
+    } catch (e) { /* 预览失败不阻塞，提示词仍可用 */ }
+  }
+
+  async function copyInstall() {
+    try {
+      await navigator.clipboard.writeText($('#gwInstall').value);
       toast(t('gateway.copied'), 'success');
     } catch (e) { toast(t('gateway.copyFail'), 'error'); }
   }
@@ -458,7 +497,7 @@ window.HLM = window.HLM || {};
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt, onToolChange, copyInstall };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
