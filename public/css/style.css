@@ -35,6 +35,12 @@ body { font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; bac
 .sidebar.collapsed .nav-item .txt, .sidebar.collapsed .title, .sidebar.collapsed .sub { display: none; }
 .nav-item .badge { margin-left: auto; background: var(--danger); color: #fff; font-size: 11px; border-radius: 10px; padding: 0 6px; line-height: 16px; }
 .sidebar.collapsed .badge { display: none; }
+/* 手动折叠（64px 图标态）：footer 只显图标/色点，隐藏文字防溢出 */
+.sidebar.collapsed .sidebar-head { justify-content: center; }
+.sidebar.collapsed .nav-item { justify-content: center; }
+.sidebar.collapsed .sidebar-foot { padding: 8px 4px; align-items: center; }
+.sidebar.collapsed .sidebar-foot .btn { font-size: 0; padding: 6px; width: 36px; justify-content: center; }
+.sidebar.collapsed .sidebar-foot .chip { font-size: 0; padding: 4px; }
 
 .sidebar-foot { padding: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
 
@@ -45,6 +51,7 @@ body { font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; bac
 .icon-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .icon-btn:hover { background: var(--primary-weak); }
 .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; font-size: 12px; color: var(--muted); }
+.dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--border); display: inline-block; flex-shrink: 0; }
 
 /* ===== 卡片 / 统计 ===== */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -158,13 +165,16 @@ td .mono { font-family: Consolas, monospace; font-size: 12px; background: var(--
   .menu-btn { display: inline-flex; }
   .stats { grid-template-columns: repeat(2, 1fr); }
 }
-@media (min-width: 769px) and (max-width: 1024px) {
-  .stats { grid-template-columns: repeat(3, 1fr); }
-}
-@media (min-width: 1025px) and (orientation: portrait) {
+@media (min-width: 769px) and (max-width: 1024px),
+       (min-width: 1025px) and (orientation: portrait) {
   .sidebar { width: 64px; }
+  .sidebar-head { justify-content: center; padding: 12px 0; }
+  .sidebar-head .title, .sidebar-head .sub { display: none; }
   .sidebar .txt, .sidebar .title, .sidebar .sub { display: none; }
   .sidebar .nav-item { justify-content: center; }
   .sidebar .badge { display: none; }
+  .sidebar .sidebar-foot { padding: 8px 4px; align-items: center; }
+  .sidebar .sidebar-foot .chip { font-size: 0; padding: 4px; }
+  .sidebar .sidebar-foot .btn { font-size: 0; padding: 6px; width: 36px; justify-content: center; }
   .main { margin-left: 64px; }
 }

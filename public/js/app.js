@@ -17,6 +17,8 @@ window.HLM = window.HLM || {};
     { id: 'mori', label: () => t('theme.mori') },
     { id: 'dark', label: () => t('theme.dark') },
   ];
+  const THEME_DOTS = { light: '#ffffff', warm: '#f0d9a8', mori: '#d8d4cb', dark: '#1e1e22' };
+  const GLOBE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
 
   // ===== 认证 =====
   function checkAuth() {
@@ -55,9 +57,9 @@ window.HLM = window.HLM || {};
     const otherLang = lang() === 'en' ? '中文' : 'English';
     foot.innerHTML = `
       <div class="chip"><span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block"></span><span id="wsStatus"></span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">${THEMES.map(th => `<button class="btn sm" data-theme-btn="${th.id}">${th.label()}</button>`).join('')}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">${THEMES.map(th => `<button class="btn sm" data-theme-btn="${th.id}" title="${th.label()}"><span class="dot" style="background:${THEME_DOTS[th.id]}"></span>${th.label()}</button>`).join('')}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="btn sm" onclick="window.HLM.App.switchLang()">${otherLang}</button>
+        <button class="btn sm" onclick="window.HLM.App.switchLang()" title="${otherLang}">${GLOBE_ICON}${otherLang}</button>
         <button class="btn sm" onclick="window.HLM.App.logout()">${Icons.logout} ${t('app.logout')}</button>
       </div>`;
     foot.querySelectorAll('[data-theme-btn]').forEach(b => {
