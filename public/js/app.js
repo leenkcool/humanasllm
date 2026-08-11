@@ -43,6 +43,7 @@ window.HLM = window.HLM || {};
     { id: 'logs', label: () => t('nav.logs'), icon: 'logs', show: () => true },
     { id: 'approvals', label: () => t('nav.approvals'), icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
     { id: 'projects', label: () => t('nav.projects'), icon: 'folder', show: () => true },
+    { id: 'gateway', label: () => t('nav.gateway'), icon: 'bot', show: () => true },
     { id: 'users', label: () => t('nav.users'), icon: 'users', show: () => (currentUser.role === 'admin') },
   ];
 
@@ -248,6 +249,99 @@ window.HLM = window.HLM || {};
     await loadProjects();
   }
 
+  // ===== 接入配置（生成 SKILL/AGENT + 在线微调） =====
+  let _gwType = 'skill';
+  let _gwFiles = { skill: '', agent: '' };
+
+  async function renderGateway() {
+    const content = $('#content');
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">${t('page.gateway.title')}</div><div class="page-desc">${t('page.gateway.desc')}</div></div>
+        <div class="spacer"></div></div>
+      <div class="card"><div class="card-head"><span class="t">${t('gateway.config')}</span></div>
+        <div class="card-body">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div class="form-group" style="flex:2;min-width:240px;"><label class="form-label">${t('gateway.baseUrl')}</label><input class="form-input" id="gwUrl" placeholder="http://192.168.168.3:39000"></div>
+            <div class="form-group" style="flex:1;min-width:140px;"><label class="form-label">${t('gateway.model')}</label><input class="form-input" id="gwModel" value="human-llm"></div>
+            <div class="form-group" style="flex:1;min-width:180px;"><label class="form-label">${t('gateway.apiKey')}</label><input class="form-input" id="gwKey" placeholder="${t('gateway.apiKeyPh')}"></div>
+          </div>
+          <div class="form-group"><label class="form-label">${t('gateway.note')}</label><input class="form-input" id="gwNote" placeholder="${t('gateway.notePh')}"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn primary" onclick="window.HLM.App.generateGateway()">${t('gateway.generate')}</button>
+            <button class="btn" onclick="window.HLM.App.saveGateway()">${t('gateway.save')}</button>
+          </div>
+        </div></div>
+      <div class="card"><div class="card-head"><span class="t">${t('gateway.files')}</span>
+        <span class="chip">${t('gateway.editable')}</span></div>
+        <div class="card-body">
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <button class="btn sm" data-gwtab="skill">SKILL.md</button>
+            <button class="btn sm" data-gwtab="agent">AGENT.md</button>
+          </div>
+          <textarea class="form-textarea" id="gwFile" rows="18" style="font-family:monospace;font-size:12px;"></textarea>
+          <div style="margin-top:8px;"><button class="btn" onclick="window.HLM.App.saveFile()">${t('gateway.saveFile')}</button></div>
+        </div></div>`;
+    content.querySelector('[data-gwtab="skill"]').onclick = () => renderGwFile('skill');
+    content.querySelector('[data-gwtab="agent"]').onclick = () => renderGwFile('agent');
+    await loadGateway();
+  }
+
+  async function loadGateway() {
+    try {
+      const c = await API.get('/gateway/config');
+      $('#gwUrl').value = c.data.baseUrl || '';
+      $('#gwModel').value = c.data.model || 'human-llm';
+      $('#gwKey').value = c.data.apiKey || '';
+      $('#gwNote').value = c.data.note || '';
+      const f = await API.get('/gateway/files');
+      _gwFiles = f.data;
+      renderGwFile(_gwType);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function renderGwFile(type) {
+    _gwType = type;
+    const box = $('#gwFile');
+    if (box) box.value = _gwFiles[type] || '';
+  }
+
+  async function generateGateway() {
+    try {
+      const cfg = {
+        baseUrl: $('#gwUrl').value.trim(),
+        model: $('#gwModel').value.trim() || 'human-llm',
+        apiKey: $('#gwKey').value.trim(),
+        note: $('#gwNote').value.trim(),
+      };
+      if (!cfg.baseUrl) { toast(t('gateway.baseUrlReq'), 'warning'); return; }
+      const r = await API.post('/gateway/generate', cfg);
+      _gwFiles = r.data;
+      renderGwFile(_gwType);
+      toast(t('gateway.generated'), 'success');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function saveGateway() {
+    try {
+      await API.put('/gateway/config', {
+        baseUrl: $('#gwUrl').value.trim(),
+        model: $('#gwModel').value.trim(),
+        apiKey: $('#gwKey').value.trim(),
+        note: $('#gwNote').value.trim(),
+      });
+      toast(t('gateway.saved'), 'success');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function saveFile() {
+    try {
+      const content = $('#gwFile').value;
+      await API.put('/gateway/files/' + _gwType, { content });
+      _gwFiles[_gwType] = content;
+      toast(t('gateway.saved'), 'success');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   async function loadProjects() {
     try {
       const r = await API.get('/projects');
@@ -256,7 +350,7 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, projects: renderProjects, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, projects: renderProjects, gateway: renderGateway, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');
@@ -331,7 +425,7 @@ window.HLM = window.HLM || {};
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

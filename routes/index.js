@@ -14,6 +14,7 @@ const projectRoutes = require('./projects');
 const auditRoutes = require('./audit');
 const ruleRoutes = require('./rules');
 const tenantRoutes = require('./tenants');
+const gatewayRoutes = require('./gateway');
 
 module.exports = function (app) {
   // 工作台 REST
@@ -41,6 +42,9 @@ module.exports = function (app) {
 
   // 租户管理（多租户 v1）
   app.use('/api/tenants', tenantRoutes);
+
+  // 网关接入配置（生成 SKILL/AGENT + 在线微调）
+  app.use('/api/gateway', gatewayRoutes);
 
   // 健康检查
   const health = (req, res) => res.json({ status: 'ok', service: 'p390-human-llm', timestamp: new Date().toISOString() });
