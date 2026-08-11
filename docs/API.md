@@ -62,11 +62,19 @@
 上游凭 `task_id` 查询人工任务处理结果（异步受理后轮询取回）。
 ```json
 { "task_id": 12, "status": "completed", "content": "<人工产出>",
-  "model": "human-llm", "category": "general", "created_at": "…", "completed_at": "…" }
+  "model": "human-llm", "category": "general", "rule_id": 1, "rule_name": "合规备案安全",
+  "category_source": "rule", "quality": { "completion_note": null }, "audit": { "valid": true },
+  "created_at": "…", "completed_at": "…" }
 ```
-- `status: completed` → `content` 为人工产出
-- `status: returned` → `content` 为驳回原因说明（人工驳回/超时回落）
-- `status: pending|processing|paused` → `content` 为「任务处理中，请稍后查询」
+- `status: completed` → `content` 为人工产出；`returned` → 驳回原因；`pending|processing|paused` → 处理中
+- **治理决策**（阶段三）：`rule_id`/`rule_name` 分级规则、`category_source`（rule=规则锁定 / manual=人工或默认）、`quality.completion_note` 质量验收说明、`audit.valid` 审计哈希链健康
+
+### GET /v1/governance/rules
+治理 API：上游可查当前租户可见的分级规则（全局 + 租户专属），理解什么会被人工拦截。
+```json
+{ "object": "list", "data": [ { "id": 1, "name": "合规备案安全", "category": "confidential",
+  "match_field": "content", "keywords": "备案,等保,…", "priority": 10 } ] }
+```
 
 ### POST /v1/approvals
 AI 向人类提审批（资源/权限/项目申请），**异步受理**：创建后立即返回 `approval_no`，不阻塞等待（人类审批是小时级），凭它回查结果。

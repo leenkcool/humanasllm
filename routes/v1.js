@@ -7,6 +7,7 @@
  */
 const express = require('express');
 const router = express.Router();
+const { getDb } = require('../db');
 const encoder = require('../services/openaiEncoder');
 const queue = require('../services/queueService');
 const aiRelay = require('../services/aiRelay');
@@ -106,6 +107,23 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
   res.json(accepted);
 });
 
+// GET /v1/governance/rules — 治理 API：上游可查分级规则（当前租户可见：全局 + 租户专属）
+router.get('/governance/rules', requireUpstreamKey, async (req, res) => {
+  try {
+    const auth = req.headers.authorization || '';
+    const upKey = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.api_key || '');
+    const tenant = await getTenantByUpstreamKey(upKey);
+    const r = await getDb().exec(
+      'SELECT id, name, category, match_field, keywords, priority FROM task_rules WHERE enabled = true AND (tenant_id IS NULL OR tenant_id = ?) ORDER BY (tenant_id = ?) DESC, priority ASC, id ASC',
+      [tenant || null, tenant || null]);
+    const rules = r[0] ? r[0].values.map(row => { const o = {}; r[0].columns.forEach((c, i) => { o[c] = row[i]; }); return o; }) : [];
+    res.json({ object: 'list', data: rules });
+  } catch (e) {
+    console.error('[治理规则查询失败]', e.message);
+    res.status(500).json(encoder.makeError(500, '查询分级规则失败', 'server_error'));
+  }
+});
+
 // GET /v1/tasks/:id — 上游凭 task_id 查询人工任务处理结果（异步受理后回查）
 router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
   try {
@@ -115,6 +133,13 @@ router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
     let content = '任务处理中，请稍后查询';
     if (task.status === 'completed') content = task.result_text || '';
     else if (task.status === 'returned') content = `任务被驳回: ${task.reject_reason || '未填写原因'}`;
+    // 治理决策（阶段三：上游可查分级理由/质量验收/审计健康）
+    const ruleRow = task.rule_id
+      ? (await getDb().exec('SELECT name FROM task_rules WHERE id = ?', [task.rule_id]))[0]
+      : null;
+    const ruleName = ruleRow && ruleRow.values[0] ? ruleRow.values[0][0] : null;
+    const rp = task.result_payload;
+    const audit = await queue.verifyAuditChain(task.id);
     res.json({
       task_id: task.id,
       status: task.status,
@@ -122,6 +147,10 @@ router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
       model: task.model,
       category: task.category || 'general',
       rule_id: task.rule_id || null,
+      rule_name: ruleName,
+      category_source: task.rule_id ? 'rule' : 'manual',
+      quality: { completion_note: (rp && rp.completion_note) || null },
+      audit: { valid: audit.valid },
       created_at: task.created_at,
       completed_at: task.completed_at,
     });

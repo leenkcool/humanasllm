@@ -83,6 +83,7 @@ window.HLM = window.HLM || {};
     'gov.engineers': '工程师评级',
     'gov.claimed': '完成',
     'gov.reopened': '打回',
+    'gov.aiShift': 'AI 可承接候选',
 
     // 合规报告
     'page.audit.report': '合规报告',
@@ -427,6 +428,7 @@ window.HLM = window.HLM || {};
     'gov.engineers': 'Engineer ratings',
     'gov.claimed': 'Completed',
     'gov.reopened': 'Reopened',
+    'gov.aiShift': 'AI shift candidate',
 
     // Compliance report
     'page.audit.report': 'Compliance Report',

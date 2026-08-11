@@ -91,6 +91,16 @@ router.get('/governance', authenticate, async (req, res) => {
         rate: c > 0 ? Math.max(0, Math.round((1 - r / c) * 1000) / 10) : null,
       };
     });
+    // 策略智能漂移 v1 基础：general 池规模/质量（AI 可评估承接的候选；不自动漂移——confidential/ops 制度锁死）
+    const shift = queue.rows(await db.exec(
+      `SELECT COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+              COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM task_logs l WHERE l.task_id = tasks.id AND l.action = 'reopen')) AS reopened
+         FROM tasks WHERE tenant_id = ? AND category = 'general'`,
+      [req.tenant_id]
+    ))[0] || {};
+    const shiftTotal = parseInt(shift.total) || 0;
+    const shiftReopened = parseInt(shift.reopened) || 0;
     res.json({ success: true, data: {
       categories,
       qa: { completed, reopened, rate: completed > 0 ? Math.max(0, Math.round((1 - reopened / completed) * 1000) / 10) : null },
@@ -98,6 +108,11 @@ router.get('/governance', authenticate, async (req, res) => {
       timeout: { count: timeoutCount, rate: total > 0 ? Math.round((timeoutCount / total) * 1000) / 10 : 0 },
       total_tasks: total,
       engineers: engineerStats,
+      ai_shift: {
+        total: shiftTotal,
+        completed: parseInt(shift.completed) || 0,
+        rate: shiftTotal > 0 ? Math.max(0, Math.round((1 - shiftReopened / shiftTotal) * 1000) / 10) : null,
+      },
     } });
   } catch (err) {
     console.error('[治理概览失败]', err.message);

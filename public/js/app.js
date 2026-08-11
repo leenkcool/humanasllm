@@ -123,6 +123,7 @@ window.HLM = window.HLM || {};
         <div class="stat"><div class="num">${gd.qa.rate != null ? gd.qa.rate + '%' : '-'}</div><div class="lbl">${t('gov.passRate')}</div></div>
         <div class="stat"><div class="num">${gd.approval.avg_min != null ? gd.approval.avg_min + t('gov.min') : '-'}</div><div class="lbl">${t('gov.approvalAvg')}</div></div>
         <div class="stat"><div class="num">${gd.timeout.rate}%</div><div class="lbl">${t('gov.timeoutRate')}</div></div>
+        <div class="stat"><div class="num">${gd.ai_shift.rate != null ? gd.ai_shift.rate + '%' : '-'}</div><div class="lbl">${t('gov.aiShift')}</div></div>
         <div class="stat"><div class="num" style="font-size:14px;line-height:1.5;white-space:normal;">${catLabel}</div><div class="lbl">${t('gov.categories')}</div></div>`;
       $('#engBox').innerHTML = (gd.engineers && gd.engineers.length)
         ? gd.engineers.map(e => `
