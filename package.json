@@ -8,6 +8,7 @@
     "dev": "node --watch server.js",
     "seed": "node scripts/seed.js",
     "test": "node --test --test-isolation=process \"tests/**/*.test.js\"",
+    "test:coverage": "node --test --test-isolation=process --experimental-test-coverage \"tests/**/*.test.js\"",
     "test:smoke": "node scripts/smoke-test.js"
   },
   "dependencies": {

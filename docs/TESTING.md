@@ -73,7 +73,7 @@ npm run test:smoke  # API 回归（需服务 + DB 已就绪）
 | **2 · 单元补齐** | 哈希链、智能漂移、网关、通知（mock） | 待做 |
 | **3 · 集成** | 任务/审批/多租户 service+DB 全链路 | 待做 |
 | **4 · API 回归扩展** | smoke 补权限/租户/多工具/服务器端安装 | 待做 |
-| **5 · CI + 覆盖率** | Gitea Actions + `--experimental-test-coverage` | 待做 |
+| **5 · CI + 覆盖率** | Gitea Actions（`.gitea/workflows/test.yml`）+ `npm run test:coverage`（语句覆盖率 71%） | ✅ 已落地 |
 
 ---
 
@@ -81,4 +81,5 @@ npm run test:smoke  # API 回归（需服务 + DB 已就绪）
 
 - `npm test` 全绿（单元 + 集成）
 - `npm run test:smoke` 全绿（API 回归）
+- `npm run test:coverage` 输出覆盖率（当前语句 71%）
 - 关键安全边界有测试：分级白名单锁死、租户隔离、越界拒绝、涉密禁 AI 兜底
