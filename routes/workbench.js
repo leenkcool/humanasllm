@@ -22,6 +22,19 @@ router.get('/summary', authenticate, async (req, res) => {
     ));
     // 未完成聚合：所有尚未结束的人肉任务（防遗忘，人工为小时级节奏）
     stats.unfinished = (stats.pending || 0) + (stats.processing || 0) + (stats.returned || 0) + (stats.paused || 0);
+    // 一次通过率（质量治理）：completed 中未被 reopen 打回的比例
+    const qa = queue.rows(await db.exec(
+      `SELECT (SELECT COUNT(*) FROM tasks WHERE status = 'completed') AS completed,
+              (SELECT COUNT(*) FROM task_logs WHERE action = 'reopen') AS reopened`
+    ));
+    const q = qa[0] || {};
+    const completed = parseInt(q.completed) || 0;
+    const reopened = parseInt(q.reopened) || 0;
+    stats.qa = {
+      completed,
+      reopened,
+      rate: completed > 0 ? Math.max(0, Math.round((1 - reopened / completed) * 1000) / 10) : null,
+    };
     res.json({ success: true, data: { stats, engineers } });
   } catch (err) {
     console.error('[统计失败]', err.message);

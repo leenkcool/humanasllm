@@ -98,7 +98,7 @@ router.post('/:id/complete', authenticate, async (req, res) => {
     const id = parseInt(req.params.id);
     const content = (req.body.content || '').toString();
     if (!content.trim()) return res.status(400).json({ success: false, message: '提交内容不能为空' });
-    const r = await queue.completeTask(id, content, { id: req.user.id, name: req.user.name || req.user.username });
+    const r = await queue.completeTask(id, content, { id: req.user.id, name: req.user.name || req.user.username }, { completion_note: req.body.completion_note });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
     res.json({ success: true, data: r.task });
   } catch (err) {

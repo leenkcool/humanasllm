@@ -49,13 +49,15 @@ function rows(result) {
   });
 }
 
-/** 人工产出质量校验：拦截空 / 过短 / 占位乱答 */
+/** 人工产出质量校验：拦截空 / 过短 / 占位乱答；运维/涉密类允许简短（另附验收说明，见 completeTask） */
 const MIN_RESULT_LEN = 20;
+const MIN_OPS_LEN = 10;
 const PLACEHOLDER_RE = /^(完成|已完|已ok|ok|done|finish|好的|嗯|你检查吧|稍后|待会儿|待补|待完善)[。．.！!\s]*$/i;
-function qualityCheck(content) {
+function qualityCheck(content, category = 'general') {
   const c = String(content == null ? '' : content).trim();
   if (!c) return '提交内容不能为空';
-  if (c.length < MIN_RESULT_LEN) return `产出过短（${c.length} 字符，至少 ${MIN_RESULT_LEN}），请补充实际实现内容`;
+  const minLen = (category === 'ops' || category === 'confidential') ? MIN_OPS_LEN : MIN_RESULT_LEN;
+  if (c.length < minLen) return `产出过短（${c.length} 字符，至少 ${minLen}），请补充实际内容`;
   if (PLACEHOLDER_RE.test(c)) return '疑似占位/乱答复，请提交实际实现内容';
   return null;
 }
@@ -151,13 +153,21 @@ async function claimTask(taskId, engineerId, engineerName) {
   });
 }
 
-/** 提交结果：processing → completed（先过质量校验） */
-async function completeTask(taskId, content, actor) {
-  const bad = qualityCheck(content);
+/** 提交结果：processing → completed（先过质量校验；运维/涉密类需人工验收单） */
+async function completeTask(taskId, content, actor, opts = {}) {
+  const task = await getTask(taskId);
+  const category = (task && task.category) || 'general';
+  const bad = qualityCheck(content, category);
   if (bad) return { ok: false, message: bad };
+  // 治理层「质量是人的标准」：运维/涉密类提交需附验收说明（做了什么 + 自检结果），允许简短产出但拦截占位
+  if (category !== 'general') {
+    const note = String(opts.completion_note || '').trim();
+    if (!note) return { ok: false, message: '运维/涉密任务需附验收说明（做了什么、自检结果）' };
+    if (PLACEHOLDER_RE.test(note)) return { ok: false, message: '验收说明疑似占位，请填写实际完成情况' };
+  }
   const t = await transition(taskId, STATUS.COMPLETED, actor, '提交结果', {
     result_text: content,
-    result_payload: JSON.stringify({ content }),
+    result_payload: JSON.stringify({ content, completion_note: opts.completion_note || null }),
     completed_at: now(),
     timeout_at: null,
   });

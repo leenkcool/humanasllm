@@ -158,14 +158,19 @@ window.HLM = window.HLM || {};
       <div class="form-group">
         <label class="form-label">${t('modal.complete.content')}</label>
         <textarea class="form-textarea" id="completeText" rows="8" placeholder="${t('modal.complete.placeholder')}"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('modal.complete.note')}</label>
+        <textarea class="form-textarea" id="completeNote" rows="3" placeholder="${t('modal.complete.notePlaceholder')}"></textarea>
       </div>`,
       `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.cancel')}</button>
        <button class="btn success" onclick="window.HLM.UI.submitComplete(${id})">${t('common.submit')}</button>`);
   }
   function submitComplete(id) {
     const content = $('#completeText').value;
+    const note = $('#completeNote').value;
     if (!content.trim()) { toast(t('modal.complete.empty'), 'warning'); return; }
-    doAction('complete', id, { content });
+    doAction('complete', id, { content, completion_note: note });
   }
 
   function promptReject(id) {
