@@ -11,3 +11,11 @@ data/.job_result
 
 # CodeGraph index (local generated, not committed)
 .codegraph/
+
+# gateway 运行数据（接入配置/微调/服务器端安装）
+data/gateway_config.json
+data/gateway_files.json
+data/gateway_skill.md
+data/gateway_agent.md
+data/installed/
+data/human_followup.json

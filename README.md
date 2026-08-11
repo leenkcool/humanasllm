@@ -1,4 +1,4 @@
-# P390 · 人工代理网关（Human-as-LLM）
+# Human as Agent（人即智能体）
 
 让工程师作为「人肉大模型」接入现有多模型 Agent 调度框架。对外完全兼容 **OpenAI 标准接口**，调度池新增一条 `human-llm` 模型路由即可接入，**零代码改动**。涉密/私有逻辑任务经此路由派发给人工工程师，完成后按大模型格式返回，AI 工作链路不中断。
 
@@ -14,8 +14,8 @@ npm run seed      # 建表 + 种子账户（admin/engineer1/engineer2，密码 a
 npm start         # 监听 0.0.0.0:39000
 ```
 
-- 工作台：`http://192.168.168.3:39000/login.html`
-- OpenAI 接口：`http://192.168.168.3:39000/v1/chat/completions`
+- 工作台：`http://你的服务器IP:39000/login.html`
+- OpenAI 接口：`http://你的服务器IP:39000/v1/chat/completions`
 
 > 数据库：PostgreSQL 5433 / 库 `p390`（密码见 `.env` 的 `PG_PASSWORD`）。
 
@@ -27,15 +27,15 @@ npm start         # 监听 0.0.0.0:39000
 
 | 模型 | 用途 | 指向 |
 |---|---|---|
-| `human-llm` | 涉密/私有/需人工任务 → 派发人工工程师 | `http://192.168.168.3:39000/v1` |
+| `human-llm` | 涉密/私有/需人工任务 → 派发人工工程师 | `http://你的服务器IP:39000/v1` |
 | `deepseek-v4-flash` | 常规任务 → **中继**到真实 DeepSeek | 同上 |
 
 ```jsonc
 // 调度池配置示例（示意）
 {
   "models": [
-    { "id": "human-llm",           "base_url": "http://192.168.168.3:39000/v1" },
-    { "id": "deepseek-v4-flash",   "base_url": "http://192.168.168.3:39000/v1" }
+    { "id": "human-llm",           "base_url": "http://你的服务器IP:39000/v1" },
+    { "id": "deepseek-v4-flash",   "base_url": "http://你的服务器IP:39000/v1" }
   ]
 }
 ```
@@ -45,7 +45,7 @@ npm start         # 监听 0.0.0.0:39000
 ### 1.1 人工任务（涉密走人工）
 
 ```bash
-curl -X POST http://192.168.168.3:39000/v1/chat/completions \
+curl -X POST http://你的服务器IP:39000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "human-llm",
@@ -68,7 +68,7 @@ curl -X POST http://192.168.168.3:39000/v1/chat/completions \
 ### 1.3 AI 提审批（agent 向人类要资源）
 
 ```bash
-curl -X POST http://192.168.168.3:39000/v1/approvals \
+curl -X POST http://你的服务器IP:39000/v1/approvals \
   -H "Content-Type: application/json" \
   -d '{
     "resource": "PostgreSQL 测试服务器",
@@ -94,7 +94,7 @@ curl -X POST http://192.168.168.3:39000/v1/approvals \
 
 ## 二、人工工程师工作台
 
-`http://192.168.168.3:39000/login.html`
+`http://你的服务器IP:39000/login.html`
 
 | 页面 | 能力 |
 |---|---|
@@ -186,11 +186,15 @@ routes/
   v1.js                # OpenAI 兼容 /v1/models + /v1/chat/completions
   approvals.js         # /v1/approvals + 工作台审批
   projects.js          # 项目管理 + 申请建项目
-  tasks.js workbench.js logs.js users.js auth.js
+  tasks.js workbench.js logs.js users.js auth.js gateway.js rules.js tenants.js audit.js
 services/
-  queueService.js      # 任务状态机 + 等待者 + 超时扫描 + 质量校验 + AI 降级
+  queueService.js      # 任务状态机 + 等待者 + 超时扫描 + 质量校验 + AI 降级 + SLA
   approvalService.js   # 审批状态机 + 等待者 + 24h 超时提醒
   aiRelay.js           # DeepSeek 中继（一次 + stream 透传）
+  aiShift.js           # 智能漂移（general 直接 AI 承接）
+  categoryEngine.js    # 分级策略引擎（规则 + 白名单锁死）
+  notifier.js          # 通知（邮件 + Webhook）
+  i18n.js              # 后端 message 双语
   openaiEncoder.js     # OpenAI 响应/SSE 封装
   projectService.js    # 项目 CRUD + 审批批准回调
   mailer.js            # SMTP 邮件（可配置降级）
@@ -215,3 +219,17 @@ npm run dev        # 开发热重载
 # 后台常驻（防会话结束挂）：
 powershell -ExecutionPolicy Bypass -File G:\dev\scripts\bg.ps1 start -Name p390-gateway -Command "node server.js" -Dir "G:\dev\p390"
 ```
+
+## 更多功能
+
+- **接入配置**（`#/gateway`）：一键生成多工具安装包（Claude Code / Codex / OpenCode / Gemini / Cursor / Windsurf / Aider 等 13 种），支持**在线微调**、**本机全装脚本**、**服务器端安装**（admin）
+- **多租户**：`upstream_key` 路由租户，数据隔离 + 租户级分级规则
+- **治理层**：分级策略引擎（白名单锁死涉密）、审批异步化、质量验收分类、审计哈希链、合规报告、工程师评级、智能漂移
+
+## 文档
+
+- [部署手册（Windows/Linux）](docs/DEPLOY.md)
+- [接口文档](docs/API.md)
+- [人工路由场景分级](docs/HUMAN_ROUTES.md)
+- [治理层规划](docs/GOVERNANCE.md)
+- [上游接入指南](docs/UPSTREAM_INTEGRATION.md)
