@@ -21,6 +21,8 @@ body { font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; bac
 .sidebar.collapsed { width: 64px; }
 .main { flex: 1; margin-left: var(--sidebar-w); padding: 20px 24px; transition: margin-left .2s; }
 .main.full { margin-left: 0; }
+/* 折叠态（64px 图标侧栏）：主内容扣除侧栏宽度，不被遮挡 */
+.sidebar.collapsed ~ .main { margin-left: 64px; }
 
 .sidebar-head { display: flex; align-items: center; gap: 10px; padding: 16px 14px; border-bottom: 1px solid var(--border); }
 .sidebar-head .logo { width: 34px; height: 34px; border-radius: 8px; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -165,16 +167,7 @@ td .mono { font-family: Consolas, monospace; font-size: 12px; background: var(--
   .menu-btn { display: inline-flex; }
   .stats { grid-template-columns: repeat(2, 1fr); }
 }
-@media (min-width: 769px) and (max-width: 1024px),
-       (min-width: 1025px) and (orientation: portrait) {
-  .sidebar { width: 64px; }
-  .sidebar-head { justify-content: center; padding: 12px 0; }
-  .sidebar-head .title, .sidebar-head .sub { display: none; }
-  .sidebar .txt, .sidebar .title, .sidebar .sub { display: none; }
-  .sidebar .nav-item { justify-content: center; }
-  .sidebar .badge { display: none; }
-  .sidebar .sidebar-foot { padding: 8px 4px; align-items: center; }
-  .sidebar .sidebar-foot .chip { font-size: 0; padding: 4px; }
-  .sidebar .sidebar-foot .btn { font-size: 0; padding: 6px; width: 36px; justify-content: center; }
-  .main { margin-left: 64px; }
+@media (min-width: 769px) and (max-width: 1024px) {
+  .stats { grid-template-columns: repeat(3, 1fr); }
 }
+/* 窄窗/竖屏自动折叠由 app.js applyResponsive 加 .collapsed 控制，可手动展开 */
