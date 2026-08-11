@@ -303,7 +303,7 @@ window.HLM = window.HLM || {};
   // ===== 侧栏交互 =====
   function initSidebar() {
     const sb = $('#sidebar');
-    $('#collapseBtn').onclick = () => sb.classList.toggle('collapsed');
+    $('#expandBtn').onclick = () => sb.classList.toggle('collapsed');
     $('#menuBtn').onclick = () => sb.classList.toggle('open');
     document.querySelector('.main').addEventListener('click', () => sb.classList.remove('open'));
     applyResponsive();

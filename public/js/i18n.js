@@ -12,6 +12,7 @@ window.HLM = window.HLM || {};
     'app.sub': 'Human-as-LLM 工作台',
     'app.menu': '菜单',
     'app.collapse': '折叠侧栏',
+    'app.expand': '展开侧栏',
     'app.logout': '退出登录',
 
     // 状态
@@ -364,6 +365,7 @@ window.HLM = window.HLM || {};
     'app.sub': 'Human-as-LLM Workbench',
     'app.menu': 'Menu',
     'app.collapse': 'Collapse sidebar',
+    'app.expand': 'Expand sidebar',
     'app.logout': 'Logout',
 
     'status.pending': 'Awaiting claim',
