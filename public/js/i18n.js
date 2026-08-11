@@ -99,6 +99,8 @@ window.HLM = window.HLM || {};
     'audit.approved': '批准',
     'audit.rejected': '驳回',
     'audit.generatedAt': '生成时间',
+    'audit.dataset': '导出数据集(general)',
+    'audit.datasetOk': '数据集已导出',
 
     // 分级规则管理
     'rules.title': '分级规则',
@@ -444,6 +446,8 @@ window.HLM = window.HLM || {};
     'audit.approved': 'approved',
     'audit.rejected': 'rejected',
     'audit.generatedAt': 'Generated at',
+    'audit.dataset': 'Export dataset (general)',
+    'audit.datasetOk': 'Dataset exported',
 
     // Rules management
     'rules.title': 'Rules',

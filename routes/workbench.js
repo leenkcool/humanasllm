@@ -101,6 +101,19 @@ router.get('/governance', authenticate, async (req, res) => {
     ))[0] || {};
     const shiftTotal = parseInt(shift.total) || 0;
     const shiftReopened = parseInt(shift.reopened) || 0;
+    // 漂移评估 v2：general 池按优先级——高完成率+低驳回的模式标记为「可评估划给 AI」候选（只建议，不自动漂移）
+    const shiftByP = queue.rows(await db.exec(
+      `SELECT priority, COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+              COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM task_logs l WHERE l.task_id = tasks.id AND l.action = 'reopen')) AS reopened
+         FROM tasks WHERE tenant_id = ? AND category = 'general' GROUP BY priority`,
+      [req.tenant_id]
+    ));
+    const byPriority = (shiftByP || []).map(p => {
+      const t = parseInt(p.total) || 0;
+      const r = parseInt(p.reopened) || 0;
+      return { priority: p.priority, total: t, completed: parseInt(p.completed) || 0, rate: t > 0 ? Math.max(0, Math.round((1 - r / t) * 1000) / 10) : null };
+    });
     res.json({ success: true, data: {
       categories,
       qa: { completed, reopened, rate: completed > 0 ? Math.max(0, Math.round((1 - reopened / completed) * 1000) / 10) : null },
@@ -112,6 +125,7 @@ router.get('/governance', authenticate, async (req, res) => {
         total: shiftTotal,
         completed: parseInt(shift.completed) || 0,
         rate: shiftTotal > 0 ? Math.max(0, Math.round((1 - shiftReopened / shiftTotal) * 1000) / 10) : null,
+        by_priority: byPriority,
       },
     } });
   } catch (err) {

@@ -538,7 +538,27 @@ window.HLM = window.HLM || {};
         [t('audit.generatedAt'), d.generated_at],
       ];
       const html = rows.map(([k, v]) => `<div class="ctx"><div class="k">${esc(k)}</div><div>${esc(String(v))}</div></div>`).join('');
-      openModal(t('page.audit.report'), html, `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`);
+      openModal(t('page.audit.report'), html,
+        `<button class="btn" onclick="window.HLM.UI.downloadDataset()">${t('audit.dataset')}</button>
+         <button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  // 数据资产导出（JSONL，默认 general 类，合规）
+  async function downloadDataset() {
+    try {
+      const token = localStorage.getItem('hlm_token');
+      const res = await fetch(window.location.origin + '/api/audit/dataset', {
+        headers: { Authorization: 'Bearer ' + token, 'Accept-Language': HLM.I18n.acceptHeader() },
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message || t('csv.exportFail')); }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'p390-dataset-general.jsonl';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast(t('audit.datasetOk'), 'success');
     } catch (e) { toast(e.message, 'error'); }
   }
 
@@ -620,7 +640,7 @@ window.HLM = window.HLM || {};
   window.HLM.UI = {
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
-    promptReopen, submitReopen, showAuditReport, showRules, ruleForm, saveRule, toggleRule, delRule,
+    promptReopen, submitReopen, showAuditReport, downloadDataset, showRules, ruleForm, saveRule, toggleRule, delRule,
     renderUsers, showUserForm, saveUser, delUser, renderLogs,
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
     renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,
