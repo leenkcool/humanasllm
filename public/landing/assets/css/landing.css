@@ -180,6 +180,14 @@ section { padding: 76px 0; }
 .footer-links { display: flex; gap: 20px; font-size: 14px; color: var(--lp-ink-mute); }
 .footer-links a:hover { color: var(--lp-primary); }
 
+/* 站点页脚（foot.html 引入，管理员维护） */
+.site-foot {
+  text-align: center; padding: 18px 24px;
+  font-size: 12px; color: var(--lp-ink-mute);
+  border-top: 1px solid var(--lp-hairline); background: var(--lp-canvas);
+}
+.site-foot a { color: var(--lp-primary); }
+
 /* ===== 响应式（四屏） ===== */
 @media (max-width: 900px) {
   .card-grid, .steps { grid-template-columns: repeat(2, 1fr); }

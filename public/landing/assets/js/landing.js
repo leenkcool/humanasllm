@@ -42,4 +42,17 @@
 
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
+
+  // 引入 foot.html（管理员维护：鸣谢公司/备案号）。留空则不显示。
+  fetch('foot.html')
+    .then(function (r) { return r.text(); })
+    .then(function (t) {
+      if (t && t.trim()) {
+        var div = document.createElement('div');
+        div.className = 'site-foot';
+        div.innerHTML = t;
+        document.body.appendChild(div);
+      }
+    })
+    .catch(function () { /* 无 foot.html 时忽略 */ });
 })();
