@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="i18n-title" content="meta.title.login">
+  <title>登录 · Human as Agent</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%232563eb'/><path d='M10 22l6-6 4 4 8-9v5h-2v4H26l2-2 2 2z' fill='white'/></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+      </div>
+      <h1 data-i18n="login.heading">Human as Agent</h1>
+      <p data-i18n="login.sub">Human as Agent 工程师工作台</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label" data-i18n="login.username">用户名</label>
+          <input class="form-input" id="username" data-i18n-placeholder="login.usernamePlaceholder" placeholder="admin / engineer1 / engineer2" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="login.password">密码</label>
+          <input class="form-input" id="password" type="password" data-i18n-placeholder="login.passwordPlaceholder" placeholder="默认 admin123" autocomplete="current-password" required>
+        </div>
+        <button class="btn primary" type="submit" id="loginBtn" data-i18n="login.btn">登 录</button>
+        <p id="errMsg" style="color:var(--danger);font-size:13px;margin-top:12px;min-height:18px;"></p>
+      </form>
+      <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:13px;">
+        <a href="javascript:showRegister()" data-i18n="login.noAccount" style="color:var(--primary);text-decoration:none;">没有账号？注册</a>
+        <a href="javascript:showForgot()" data-i18n="login.forgot" style="color:var(--muted);text-decoration:none;">忘记密码</a>
+      </div>
+      <p data-i18n="login.demo" style="color:var(--muted);font-size:12px;margin-top:14px;">演示账户：admin / engineer1 / engineer2，密码 admin123</p>
+    </div>
+  </div>
+  <a id="langSwitch" href="javascript:void(0)" style="position:fixed;top:16px;right:20px;font-size:13px;color:var(--primary);text-decoration:none;z-index:10;">English</a>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/utils.js"></script>
+  <script>
+    (function () {
+      var I = window.HLM.I18n;
+      var t = I.t;
+      var form = document.getElementById('loginForm');
+      var err = document.getElementById('errMsg');
+      var btn = document.getElementById('loginBtn');
+      var U = window.HLM.U;
+      var langSwitch = document.getElementById('langSwitch');
+
+      function applyLang() {
+        I.applyStatic();
+        langSwitch.textContent = I.lang() === 'en' ? '中文' : 'English';
+      }
+      langSwitch.onclick = function () {
+        I.setLang(I.lang() === 'en' ? 'zh' : 'en');
+        applyLang();
+      };
+      applyLang();
+
+      function langHeaders() {
+        return { 'Content-Type': 'application/json; charset=utf-8', 'Accept-Language': I.acceptHeader() };
+      }
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var username = document.getElementById('username').value.trim();
+        var password = document.getElementById('password').value;
+        if (!username || !password) { err.textContent = t('login.errRequired'); return; }
+        btn.disabled = true; err.textContent = '';
+        try {
+          var res = await fetch(window.location.origin + '/api/auth/login', {
+            method: 'POST',
+            headers: langHeaders(),
+            body: JSON.stringify({ username: username, password: password })
+          });
+          var data = await res.json();
+          if (!res.ok || !data.success) { throw new Error(data.message || t('login.fail')); }
+          localStorage.setItem('hlm_token', data.data.token);
+          localStorage.setItem('hlm_user', JSON.stringify(data.data.user));
+          window.location.href = '/workbench.html';
+        } catch (ex) {
+          err.textContent = ex.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // ===== 注册 =====
+      function showRegister() {
+        U.openModal(t('reg.title'), `
+          <div class="form-group"><label class="form-label">${t('reg.username')}</label><input class="form-input" id="regUsername" placeholder="${t('reg.usernamePlaceholder')}"></div>
+          <div class="form-group"><label class="form-label">${t('reg.email')}</label><input class="form-input" id="regEmail" placeholder="${t('reg.emailPlaceholder')}"></div>
+          <div class="form-group"><label class="form-label">${t('reg.password')}</label><input class="form-input" id="regPassword" type="password"></div>
+          <div class="form-group"><label class="form-label">${t('reg.name')}</label><input class="form-input" id="regName"></div>
+        `, `
+          <button class="btn" onclick="HLM.U.closeModal()">${t('common.cancel')}</button>
+          <button class="btn primary" onclick="doRegister()">${t('reg.submit')}</button>
+        `, 'sm');
+      }
+      async function doRegister() {
+        var username = document.getElementById('regUsername').value.trim();
+        var email = document.getElementById('regEmail').value.trim();
+        var password = document.getElementById('regPassword').value;
+        var name = document.getElementById('regName').value.trim();
+        if (!username || !email || !password) { alert(t('reg.required')); return; }
+        try {
+          var res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: langHeaders(),
+            body: JSON.stringify({ username: username, email: email, password: password, name: name })
+          });
+          var data = await res.json();
+          if (!data.success) throw new Error(data.message || t('reg.fail'));
+          U.closeModal();
+          if (data.data && data.data.token) {
+            localStorage.setItem('hlm_token', data.data.token);
+            localStorage.setItem('hlm_user', JSON.stringify(data.data.user));
+            window.location.href = '/workbench.html';
+          } else {
+            err.textContent = (data.data && data.data.message) || t('reg.success');
+          }
+        } catch (ex) { alert(ex.message); }
+      }
+
+      // ===== 忘记密码 =====
+      function showForgot() {
+        U.openModal(t('forgot.title'), `
+          <div class="form-group"><label class="form-label">${t('forgot.email')}</label><input class="form-input" id="forgotEmail" placeholder="${t('forgot.emailPlaceholder')}"></div>
+          <p style="color:var(--muted);font-size:12px;">${t('forgot.note')}</p>
+        `, `
+          <button class="btn" onclick="HLM.U.closeModal()">${t('common.cancel')}</button>
+          <button class="btn primary" onclick="doForgot()">${t('forgot.send')}</button>
+        `, 'sm');
+      }
+      async function doForgot() {
+        var email = document.getElementById('forgotEmail').value.trim();
+        if (!email) { alert(t('forgot.required')); return; }
+        try {
+          var res = await fetch('/api/auth/forgot-password', {
+            method: 'POST',
+            headers: langHeaders(),
+            body: JSON.stringify({ email: email })
+          });
+          var data = await res.json();
+          if (!data.success) throw new Error(data.message || t('forgot.fail'));
+          U.closeModal();
+          err.textContent = (data.data && data.data.demoPassword)
+            ? t('forgot.done', { pwd: data.data.demoPassword })
+            : data.message;
+          err.style.color = 'var(--success)';
+        } catch (ex) { alert(ex.message); }
+      }
+
+      window.showRegister = showRegister;
+      window.doRegister = doRegister;
+      window.showForgot = showForgot;
+      window.doForgot = doForgot;
+    })();
+  </script>
+</body>
+</html>
