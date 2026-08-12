@@ -44,6 +44,7 @@ window.HLM = window.HLM || {};
     { id: 'approvals', label: () => t('nav.approvals'), icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
     { id: 'projects', label: () => t('nav.projects'), icon: 'folder', show: () => true },
     { id: 'gateway', label: () => t('nav.gateway'), icon: 'bot', show: () => true },
+    { id: 'prd', label: () => t('nav.prd'), icon: 'file', show: () => true },
     { id: 'users', label: () => t('nav.users'), icon: 'users', show: () => (currentUser.role === 'admin') },
   ];
 
@@ -208,6 +209,43 @@ window.HLM = window.HLM || {};
     content.innerHTML = `<div class="topbar"><div><div class="page-title">${t('page.users.title')}</div><div class="page-desc">${t('page.users.desc')}</div></div>
       <div class="spacer"></div></div><div id="usersBox"></div>`;
     await UI.renderUsers($('#usersBox'), currentUser.role === 'admin');
+  }
+
+  // ===== 需求 / PRD（沉淀到 PRD.md，git 本地提交） =====
+  async function renderPrd() {
+    const content = $('#content');
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">${t('page.prd.title')}</div><div class="page-desc">${t('page.prd.desc')}</div></div>
+        <div class="spacer"></div></div>
+      <div class="card"><div class="card-head"><span class="t">${t('prd.appendTitle')}</span></div>
+        <div class="card-body">
+          <div class="form-group"><label class="form-label">${t('prd.titleLabel')}</label><input class="form-input" id="prdTitle" placeholder="${t('prd.phTitle')}"></div>
+          <div class="form-group"><label class="form-label">${t('prd.descLabel')}</label><textarea class="form-textarea" id="prdDesc" rows="3" placeholder="${t('prd.phDesc')}"></textarea></div>
+          <div style="display:flex;gap:8px;"><button class="btn primary" onclick="window.HLM.App.appendPrd()">${t('prd.submit')}</button></div>
+        </div></div>
+      <div class="card"><div class="card-head"><span class="t">${t('prd.view')}</span></div>
+        <div class="card-body"><pre id="prdBody" style="white-space:pre-wrap;font-family:monospace;font-size:13px;line-height:1.7;max-height:60vh;overflow:auto;margin:0;color:var(--text);"></pre></div></div>`;
+    await loadPrd();
+  }
+
+  async function loadPrd() {
+    try {
+      const r = await API.get('/prd');
+      const body = $('#prdBody');
+      if (body) body.textContent = (r.data && r.data.content) ? r.data.content : t('prd.empty');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function appendPrd() {
+    const title = $('#prdTitle').value.trim();
+    const desc = $('#prdDesc').value.trim();
+    if (!title || !desc) { toast(t('prd.required'), 'warning'); return; }
+    try {
+      await API.post('/prd', { title, description: desc });
+      toast(t('prd.saved'), 'success');
+      $('#prdTitle').value = ''; $('#prdDesc').value = '';
+      await loadPrd();
+    } catch (e) { toast(e.message, 'error'); }
   }
 
   // ===== 审批页 =====
@@ -484,7 +522,7 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, projects: renderProjects, gateway: renderGateway, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, projects: renderProjects, gateway: renderGateway, prd: renderPrd, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');
@@ -559,7 +597,7 @@ window.HLM = window.HLM || {};
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt, onToolChange, copyInstall, serverInstall };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt, onToolChange, copyInstall, serverInstall, appendPrd };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

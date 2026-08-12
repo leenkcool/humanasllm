@@ -15,6 +15,7 @@ const auditRoutes = require('./audit');
 const ruleRoutes = require('./rules');
 const tenantRoutes = require('./tenants');
 const gatewayRoutes = require('./gateway');
+const prdRoutes = require('./prd');
 
 module.exports = function (app) {
   // 工作台 REST
@@ -45,6 +46,9 @@ module.exports = function (app) {
 
   // 网关接入配置（生成 SKILL/AGENT + 在线微调）
   app.use('/api/gateway', gatewayRoutes);
+
+  // PRD 需求沉淀（二次开发验证过的需求写入 PRD.md，git 本地提交）
+  app.use('/api/prd', prdRoutes);
 
   // 健康检查
   const health = (req, res) => res.json({ status: 'ok', service: 'p390-human-as-agent', timestamp: new Date().toISOString() });

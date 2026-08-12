@@ -20,17 +20,34 @@ middleware/
   auth.js              # authenticate / signToken / requireRole
   security.js          # 基础安全头（无 CSP/HSTS）+ CORS + 限流
 routes/
-  v1.js                # OpenAI 兼容：/v1/models + /v1/chat/completions
+  v1.js                # OpenAI 兼容：/v1/models + /v1/chat/completions + /v1/tasks/:id 回查
   auth.js              # 登录/me/改密
   users.js             # 工程师账户管理
   tasks.js             # 任务列表/详情/状态流转
-  workbench.js         # 统计/我的任务/待接单队列
+  workbench.js         # 统计/治理概览/我的任务/待接单/未完成聚合
+  approvals.js         # 审批列表 + 批准/驳回
+  projects.js          # 项目管理 + 申请建项目
   logs.js              # 请求出入日志 + 任务审计
+  rules.js             # 分级规则管理（治理配置后台）
+  tenants.js           # 租户管理（多租户）
+  gateway.js           # 网关配置 + 多工具 SKILL/AGENT 生成/微调/安装
+  audit.js             # 合规报告 + 质量数据资产导出
+  prd.js               # PRD 需求沉淀（git 本地提交）
+  index.js             # 路由总挂载
 services/
-  openaiEncoder.js     # 请求解析 + OpenAI 响应/SSE chunk 封装
-  queueService.js      # 状态机 + 等待者唤醒 + 超时扫描
+  stateMachine.js      # 状态机单例（任务/审批转换表 + 校验）
+  categoryEngine.js    # 分级策略引擎（规则白名单锁死 > 上游显式 > 默认）
+  queueService.js      # 任务状态机流转 + AI 降级 + 质量校验 + 30s 超时扫描
+  aiShift.js           # 智能漂移（general 简单任务 AI 承接，confidential/ops 锁死）
+  approvalService.js   # 审批状态机 + 挂起等待 + 24h 超时提醒
+  aiRelay.js           # DeepSeek 中继（一次 + SSE 透传）
+  openaiEncoder.js     # OpenAI 请求解析 + 响应/SSE chunk 封装
+  projectService.js    # 项目 CRUD + 审批批准回调
+  notifier.js / mailer.js  # 通知（邮件 + Webhook），可降级
+  waiters.js           # 等待者单例（审批挂起等待）
+  i18n.js / csv.js     # 消息翻译 / CSV 导出
   websocket.js         # Socket.IO 推送（task:new/update/timeout）
-public/                # 登录页 + 工作台（utils/api/ws/ui/app.js）
+public/                # 落地页(landing/) + 登录页 + 工作台(workbench.html + utils/api/ws/ui/app/i18n.js)
 scripts/seed.js        # 种子账户
 ```
 
@@ -46,10 +63,15 @@ scripts/seed.js        # 种子账户
 - `POST /api/auth/login`（admin/engineer1/engineer2，密码 admin123）
 - `POST /api/auth/register`（用户名/邮箱/密码；`USER_REGISTER_MODE` 控制 open 注册即用 / audit 管理员审核启用）
 - `POST /api/auth/forgot-password`（用注册邮箱重置密码，向该邮箱发新密码；SMTP 可配置）
-- `/api/workbench/summary | queue | mine`
+- `/api/workbench/summary | governance | queue | mine | unfinished`
 - `/api/tasks` + `/api/tasks/:id/{claim|complete|reject|pause|resume|requeue|reopen|cancel|project}`
 - `/api/approvals` + `/api/approvals/:id/{approve|reject}`（审批列表/批准并提供资源/驳回）
 - `/api/projects` + `/api/projects/apply`（项目列表/管理员创建/申请建项目走审批）
+- `/api/rules`（分级规则 CRUD，admin，治理配置后台）
+- `/api/tenants`（租户管理，多租户）
+- `/api/gateway/config | generate | files | install | install-server`（接入配置 + 多工具 SKILL/AGENT 生成/微调/安装）
+- `/api/audit/report | dataset`（合规报告 + 质量数据资产导出）
+- `/api/prd`（读 PRD.md / 追加需求，git 本地提交）
 - `/api/logs/requests | tasks`、`/api/users`
 
 ## 任务状态机

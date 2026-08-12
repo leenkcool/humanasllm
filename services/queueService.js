@@ -11,7 +11,6 @@ const { getDb } = require('../db');
 const ws = require('./websocket');
 const aiRelay = require('./aiRelay');
 const { TASK_TRANSITIONS } = require('./stateMachine');
-const { createWaiterStore } = require('./waiters');
 const { classify } = require('./categoryEngine');
 const notifier = require('./notifier');
 
@@ -26,9 +25,6 @@ const STATUS = {
 
 // 状态机合法转换表（独立单例，见 services/stateMachine.js）
 const TRANSITIONS = TASK_TRANSITIONS;
-
-// 等待者：taskId → { resolve, timer }（通用 store，见 services/waiters.js）
-const waiters = createWaiterStore();
 
 const PENDING_MIN = () => parseInt(process.env.TASK_PENDING_TIMEOUT_MIN) || 60;
 const PROCESSING_MIN = () => parseInt(process.env.TASK_PROCESSING_TIMEOUT_MIN) || 120;
@@ -217,7 +213,6 @@ async function completeTask(taskId, content, actor, opts = {}) {
   });
   if (t.ok) {
     await logRequest(taskId, 'out', { content, model: t.task.model }, t.task.model);
-    resolveWaiter(taskId, { completed: true, content, model: t.task.model, task: t.task });
   }
   return t;
 }
@@ -230,12 +225,6 @@ async function rejectTask(taskId, reason, actor) {
     claimed_at: null,
     timeout_at: null,
   });
-  if (t.ok) {
-    resolveWaiter(taskId, {
-      completed: false, status: STATUS.RETURNED,
-      content: `任务被驳回: ${reason || '工程师要求补充说明'}`, task: t.task,
-    });
-  }
   return t;
 }
 
@@ -290,17 +279,6 @@ async function reopenTask(taskId, reason, actor) {
   });
 }
 
-/** /v1 接口挂起等待（Promise，超时兜底） */
-function waitForTask(taskId, timeoutMs) {
-  return waiters.wait(taskId, timeoutMs, () => ({
-    timedOut: true, content: '请求等待超时，任务仍在处理中，可稍后查询', task: null,
-  }));
-}
-
-function resolveWaiter(taskId, result) {
-  waiters.resolve(taskId, result);
-}
-
 /** 超时处理：待接单超时优先 AI 降级代答，失败回落 returned；处理中超时 → returned */
 async function timeoutTask(taskId, phase) {
   const label = phase === 'pending' ? '待接单' : '处理中';
@@ -324,7 +302,6 @@ async function timeoutTask(taskId, phase) {
             await logRequest(taskId, 'out', { content, source: 'ai-relay' }, t.task.model);
             ws.broadcast('task:update', { id: taskId, status: 'completed', aiRelay: true });
             ws.broadcast('task:timeout', { id: taskId, phase, aiRelay: true });
-            resolveWaiter(taskId, { completed: true, content, model: t.task.model, task: t.task, aiRelay: true });
             return;
           }
         }
@@ -343,7 +320,6 @@ async function timeoutTask(taskId, phase) {
   });
   if (t.ok) {
     ws.broadcast('task:timeout', { id: taskId, phase });
-    resolveWaiter(taskId, { completed: false, status: STATUS.RETURNED, content: `任务${label}超时`, task: t.task });
     // 通知：涉密/运维类不 AI 代答，需人工重派；general 类 AI 兜底失败也通知
     const cat = (t.task && t.task.category) || 'general';
     notifier.send({
@@ -389,5 +365,5 @@ module.exports = {
   STATUS, TRANSITIONS, getTask, rows, addLog, logRequest,
   createTaskFromRequest, transition, claimTask, completeTask,
   rejectTask, pauseTask, resumeTask, requeueTask, cancelTask, reopenTask,
-  qualityCheck, waitForTask, startTimeoutScanner, timeoutTask, verifyAuditChain,
+  qualityCheck, startTimeoutScanner, timeoutTask, verifyAuditChain,
 };

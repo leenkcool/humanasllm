@@ -7,34 +7,38 @@
 | 层 | 选型 |
 |---|---|
 | 后端 | Node.js + Express 4 + Socket.IO |
-| 数据库 | PostgreSQL 5433（库 `p390`，6 张表） |
+| 数据库 | PostgreSQL 5433（库 `p390`，8 张表） |
 | 认证 | JWT（jsonwebtoken + bcryptjs），admin / engineer 双角色 |
-| 前端 | Vanilla HTML/JS/CSS（IIFE 模块，SVG 图标，4 主题，响应式） |
+| 前端 | Vanilla HTML/JS/CSS（IIFE 模块，SVG 图标，4 主题，响应式，中英 i18n） |
 | AI 中继 | 原生 `fetch`（OpenAI 兼容，一次 + stream 透传） |
-| 邮件 | nodemailer（SMTP 可配置，未配置降级） |
+| 通知 | notifier（邮件 nodemailer + Webhook，均可配置，未配置降级） |
 | 安全 | 基础头 + CORS + 限流（按项目约定禁 CSP/HSTS） |
 
 ## 二、目录结构
 
 ```
 server.js            # 入口：Socket.IO 认证 + 安全头 + 路由 + 启动双扫描器
-├── middleware/       # auth(JWT) / security(头+CORS+限流)
-├── db/               # index(连接+建表+迁移) / adapters/pg / dialect
-├── routes/           # v1(OpenAI) approvals projects tasks workbench auth users logs index
+├── middleware/       # auth(JWT+角色+租户key) / security(头+CORS+限流)
+├── db/               # index(连接+建表+迁移) / adapters/{pg,mysql,sqlite} / dialect
+├── routes/           # v1(OpenAI) approvals projects tasks workbench auth users logs
+│                     #   rules(分级配置) tenants(租户) gateway(多工具安装) audit prd index
 ├── services/         # 业务核心（见下）
 │   ├── stateMachine.js    # 状态机单例（任务/审批转换表 + 校验）
-│   ├── waiters.js         # 等待者单例工厂（挂起等待/唤醒/超时）
-│   ├── queueService.js    # 任务状态机流转 + AI 降级 + 质量校验 + 30s 超时扫描
-│   ├── approvalService.js # 审批状态机 + 60s 超时提醒(24h)
+│   ├── waiters.js         # 等待者单例工厂（审批挂起等待/唤醒/超时）
+│   ├── queueService.js    # 任务状态机流转 + 分级定级 + AI 降级 + 质量校验 + 30s 超时扫描
+│   ├── categoryEngine.js  # 分级策略引擎（规则白名单锁死 > 上游显式 > 默认 general）
+│   ├── aiShift.js         # 智能漂移（general 简单任务 AI 承接，confidential/ops 锁死）
+│   ├── approvalService.js # 审批状态机 + 挂起等待 + 60s 超时提醒(24h)
 │   ├── aiRelay.js         # DeepSeek 中继（shouldRelay/chat/relayStream）
 │   ├── openaiEncoder.js   # OpenAI 响应 / SSE chunk 封装
 │   ├── projectService.js  # 项目 CRUD + 审批批准回调
-│   ├── mailer.js          # SMTP 邮件（降级）
+│   ├── notifier.js / mailer.js  # 通知（邮件 + Webhook），可降级
+│   ├── i18n.js / csv.js   # 消息翻译 / CSV 导出
 │   └── websocket.js       # Socket.IO 推送
-├── public/           # login.html + index.html + css + js(utils/api/ws/ui/app)
-├── scripts/          # seed.js（建表+种子） demo-client.js（调度池演示）
-├── data/             # 运行时文件（human_task.json 等，gitignore）
-└── docs/             # PROJECT_OVERVIEW / API / ARCHITECTURE
+├── public/           # login/index/workbench.html + landing/ + css + js(utils/api/ws/ui/app/i18n)
+├── scripts/          # seed.js（建表+种子） demo-client.js（调度池演示） smoke-test.js check-secret.js
+├── data/             # 运行时文件（gateway 配置/生成文件等，gitignore）
+└── docs/             # PROJECT_OVERVIEW / API / ARCHITECTURE / GOVERNANCE 等
 ```
 
 ## 三、核心机制
@@ -48,12 +52,13 @@ flowchart LR
   C -->|是 命中 AI_RELAY_MODELS| D[aiRelay 中继 DeepSeek]
   D -->|一次 / SSE 透传| A
   C -->|否 human-llm| E[创建人工任务 pending]
-  E --> F[waiters.wait 挂起]
+  E -->|异步受理| F[返回 task_id]
   F --> G[工作台工程师接单→完成]
-  G --> H[resolveWaiter 唤醒]
-  H --> I[封装 OpenAI 结构]
-  I --> A
+  G --> H[上游 GET /v1/tasks/:id 轮询取回]
+  H --> A
 ```
+
+> 任务为小时级，`/v1/chat/completions` **异步受理**（立即返回 `task_id`，不挂起），上游凭 `GET /v1/tasks/:id` 轮询取回人工产出。审批（分钟级）才走挂起等待，见「等待者」。
 
 ### 2. 任务状态机（单例 stateMachine）
 
@@ -74,12 +79,12 @@ stateDiagram-v2
   cancelled --> [*]
 ```
 
-### 3. 等待者（单例 waiters）
+### 3. 交互模式：任务异步回查、审批挂起等待
 
-- `/v1/chat/completions` 与 `/v1/approvals` 进来后，`waiters.wait(id, timeout, onTimeout)` 注册挂起。
-- 工程师/人类在 Web 端操作 → `waiters.resolve(id, result)` 唤醒，HTTP 请求继续返回。
+- **任务（`/v1/chat/completions`）**：人工为小时级，异步受理——创建任务后立即返回 `task_id`，上游 `GET /v1/tasks/:id` 轮询取结果，不阻塞请求（`routes/v1.js`）。SSE 请求也只回受理信息即结束。
+- **审批（`/v1/approvals`）**：人类响应为分钟级，`approvalService.waitForApproval(id, timeout)` 挂起等待，批准/驳回后 `waiters.resolve` 唤醒返回。
 - 超时 → `onTimeout()` 返回兜底（`timedOut: true`）。
-- 任务与审批各自 `createWaiterStore()` 实例化（id 均为自增数字，避免 key 冲突）。
+- 审批使用 `createWaiterStore()` 实例（id 为自增数字）；任务不使用等待者。
 
 ### 4. 双扫描器
 
@@ -92,7 +97,7 @@ stateDiagram-v2
 
 `routes/v1.js`：解析请求 → `aiRelay.shouldRelay(model)`：
 - 命中 `AI_RELAY_MODELS`（如 `deepseek-v4-flash`）→ 中继转发真实 LLM（一次 `chat()` / SSE `relayStream()` 透传）；
-- 否则走人工：`createTaskFromRequest` → 任务入队 → 挂起等待 → 人工产出封装返回。
+- 否则走人工：`createTaskFromRequest`（分级定级 + 创建 pending）→ **异步受理返回 `task_id`** → 上游轮询 `GET /v1/tasks/:id` 取回人工产出。
 
 ### 6. 质量闭环
 
@@ -118,8 +123,10 @@ Socket.IO 房间模型（`user:*` / `admin` / `system`），事件：
 | `request_logs` | task_id, direction(in/out), payload(JSONB), model | 请求/输出日志 |
 | `approvals` | approval_no, type(resource/project), resource, amount, purpose, detail, status(pending/approved/rejected), provider_name, provided, reject_reason, decided_at | 审批单 |
 | `projects` | code(unique), name, description, status(active/archived), created_by | 项目 |
+| `task_rules` | name, category(general/confidential/ops), match_field(content/project/meta_tags), keywords, priority, enabled, tenant_id | 分级策略规则（白名单锁死） |
+| `tenants` | code, name, upstream_key | 租户（上游 API key 路由租户） |
 
-**关系**：`tasks.project_code` → `projects.code`（列表 join 出 `project_name`）；`approvals.type=project` 批准后自动写入 `projects`。
+**关系**：`tasks.project_code` → `projects.code`（列表 join 出 `project_name`）；`users/tasks/approvals/projects.task_rules.tenant_id` → `tenants.id`；`tasks.rule_id` → `task_rules.id`（分级理由留痕）；`approvals.type=project` 批准后自动写入 `projects`。
 
 ## 五、关键设计点
 
