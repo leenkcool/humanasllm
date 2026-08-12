@@ -113,19 +113,23 @@ The request body matches standard OpenAI `chat/completions`, with optional busin
 
 ## 🗺️ Roadmap
 
-**Near term**
-- 📱 Mobile / PWA + on-call duty: engineers claim tasks from phone, duty rotation
-- 🧑‍💻 Multi-engineer scheduling: skill tags + load-balanced smart assignment
-- 💰 Metering & billing: task cost accounting (human cost becomes measurable)
-- 🛠️ Admin console: fine-grained RBAC, configurable audit
+> Full version: [`docs/ROADMAP.md`](docs/ROADMAP.md) (status overview, experience diagnosis, monetization plan). This is just the directional summary.
 
-**Mid term**
-- 🤖 Smart policy drift: AI capability assessment auto-tunes the `general` pool boundary (confidential stays locked)
-- 📊 Quality data assets: human output feeds back into private eval sets / fine-tuning (within compliance)
-- 🔔 Escalation sequence: on-call tiered escalation, timeout alerts
+**Experience foundation (near term)**
+- 🐳 Docker one-click deployment (lower the self-host barrier)
+- 📡 SSE mid-stream status push + completion webhook (no more manual polling)
+- 🛠️ tools / function calling (agent calls "human-provided functions")
+- 📱 Mobile / PWA + on-call duty + timeout escalation sequence
 
-**Long term**
-- 🌐 Human capability marketplace: external agent ecosystems plug in, governance-as-a-service
+**Enterprise ready (mid term)**
+- 🔐 Enterprise SSO (OAuth2 / LDAP / WeCom / DingTalk)
+- 🧑‍💻 Multi-engineer load-balanced assignment (skill tags already supported)
+- 💰 Metering & billing (human cost becomes measurable)
+- 📊 Monitoring /metrics + data backup + compliance report PDF export
+
+**Ecosystem & monetization (long term)**
+- 🌐 Human capability marketplace (FDE onboarding + settlement)
+- 🔁 Output feedback labeling → private eval-set loop (export already shipped)
 - 🏛️ Governance hub: approvals are human power, trails are human evidence, quality is the human standard, tiering is the human boundary
 
 ## 💬 Get Involved
@@ -140,6 +144,7 @@ The request body matches standard OpenAI `chat/completions`, with optional busin
 
 ## 📚 Documentation
 
+- [Roadmap & open-source monetization](docs/ROADMAP.md)
 - [Deployment guide (Windows/Linux)](docs/DEPLOY.md)
 - [API reference](docs/API.md)
 - [Human-route scenario tiering](docs/HUMAN_ROUTES.md)
