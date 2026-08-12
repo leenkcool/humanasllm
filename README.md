@@ -19,9 +19,9 @@
 
 **FDE（Forward Deployed Engineer，前沿/前置部署工程师）** 是 2026 硅谷最火岗位：源自 Palantir 的「跨界翻译官」模式——兼具技术、产业与落地能力，派驻企业现场，把 AI 模型与具体业务场景深度融合落地。
 
-**P390 是 FDE 的「平台化」**：FDE 是一个人，P390 把 N 个 FDE 变成调度池里一条可随时调用的模型路由。
+**Human as LLM 是 FDE 的「平台化」**：FDE 是一个人，Human as LLM 把 N 个 FDE 变成调度池里一条可随时调用的模型路由。
 
-| FDE 职责 | P390 能力 |
+| FDE 职责 | Human as LLM 能力 |
 |---|---|
 | 派驻现场处理涉密/私有数据 | `confidential` 分级白名单锁死，上下文不出网关 |
 | 部署、集成、运维落地 | `ops` 分级任务走人工路由 |
@@ -29,23 +29,23 @@
 | 向客户申请资源/权限 | `/v1/approvals` AI 提审批 → 人批/驳 |
 | 稀缺人力，一人难服务多家 | `human-llm` 模型路由：Agent 零代码接入、按需调度 |
 
-> 一句话：**FDE 解决「AI 落地缺人」，P390 解决「人的产能怎么被 AI 调度、怎么留痕、怎么合规」**——二者是上下游。
+> 一句话：**FDE 解决「AI 落地缺人」，Human as LLM 解决「人的产能怎么被 AI 调度、怎么留痕、怎么合规」**——二者是上下游。
 
 ## 🧭 与 AI 生态的关系
 
-2026 最热的 AI 概念几乎都在说同一件事：**AI 越多，越需要人把关**。P390 恰好是「人把关」的**调度 + 治理基础设施**——任何 AI 生态接入，都自动获得一条可随时调用、可留痕、可合规的真人路由。
+2026 最热的 AI 概念几乎都在说同一件事：**AI 越多，越需要人把关**。Human as LLM 恰好是「人把关」的**调度 + 治理基础设施**——任何 AI 生态接入，都自动获得一条可随时调用、可留痕、可合规的真人路由。
 
-| 概念 | 热度 / 生态代表 | P390 对应 |
+| 概念 | 热度 / 生态代表 | Human as LLM 对应 |
 |---|---|---|
 | **Agentic AI**（智能体自主干活） | 2026 最热趋势（吴恩达「从 Agent 到 Agentic」） | 给任意 agent 加一条 `human-llm` 真人路由，AI 干不了的交给真人 |
-| **Model Routing / LLM Gateway** | coai / ClawRouter / semantic-router | P390 即网关：路由目标可以是「人」；分级引擎 = 治理版语义路由 |
-| **AgentOps / LLMOps** | mlflow / agentops / coze-loop | 别人观测 AI，P390 治理「人 agent」：分级 / 审批 / 审计哈希链 / 质量验收 |
+| **Model Routing / LLM Gateway** | coai / ClawRouter / semantic-router | Human as LLM 即网关：路由目标可以是「人」；分级引擎 = 治理版语义路由 |
+| **AgentOps / LLMOps** | mlflow / agentops / coze-loop | 别人观测 AI，Human as LLM 治理「人 agent」：分级 / 审批 / 审计哈希链 / 质量验收 |
 | **Human-in-the-loop（HITL）** | AgentTeams / langchain | 协议化 HITL：`/v1` 异步受理 + 审批流，零代码接入，无需手工干预单个任务 |
 | **Mixture of Agents（MoA）** | Together 官方 MoA | 调度池里 `human-llm` + AI 模型混编 = MoA 的「人类成员」 |
 | **Data Flywheel（数据飞轮）** | 业界成熟方法论 | 人工产出回流私有评测集 / 精调（Roadmap「质量数据资产」） |
 | **FDE（前沿部署工程师）** | 2026 硅谷最火岗位 | FDE 的平台化，详见上节 |
 
-> 定位一句话：**别的工具把 AI 变成「更聪明」，P390 把「人」变成 AI 随时可调、可留痕、可合规的模型——AI 生态里的真人底座。**
+> 定位一句话：**别的工具把 AI 变成「更聪明」，Human as LLM 把「人」变成 AI 随时可调、可留痕、可合规的模型——AI 生态里的真人底座。**
 
 ## 🔒 私有化部署
 
