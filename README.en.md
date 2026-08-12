@@ -132,6 +132,11 @@ The request body matches standard OpenAI `chat/completions`, with optional busin
 - 🔁 Output feedback labeling → private eval-set loop (export already shipped)
 - 🏛️ Governance hub: approvals are human power, trails are human evidence, quality is the human standard, tiering is the human boundary
 
+## 👥 Authors
+
+- **Author / Maintainer**: leenkcool (leenk@126.com)
+- **Community**: QQ group 6181193 · full list in [AUTHORS.md](AUTHORS.md)
+
 ## 💬 Get Involved
 
 - **Completely free**: open-source, MIT licensed, **free forever**, no paid plans

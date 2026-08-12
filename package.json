@@ -2,6 +2,7 @@
   "name": "p390-human-llm",
   "version": "1.0.0",
   "description": "Human-as-LLM 人工代理网关 - OpenAI 兼容接口，人工工程师伪装成大模型返回",
+  "author": "leenkcool <leenk@126.com>",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
