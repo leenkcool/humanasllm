@@ -433,9 +433,8 @@ window.HLM = window.HLM || {};
       };
       if (!cfg.baseUrl) { toast(t('gateway.baseUrlReq'), 'warning'); return; }
       const r = await API.post('/gateway/generate', cfg);
-      _gwFiles = r.data;
-      renderGwFile(_gwType);
       updatePrompt();
+      await renderGwFiles(_gwTool);   // 生成后重新加载当前工具文件
       toast(t('gateway.generated'), 'success');
     } catch (e) { toast(e.message, 'error'); }
   }
