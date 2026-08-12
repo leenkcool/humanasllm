@@ -14,8 +14,9 @@ const skip = (f) => !f
   || /^data\//.test(f)                      // 运行数据（gitignore）
   || /\.codegraph\//.test(f);
 
-// 敏感模式：已知密码 / 长 API key
-const RE = [/goodgirl/i, /sk-[A-Za-z0-9]{16,}/];
+// 敏感模式：已知密码 / 长 API key（密码词拆字，避免工具自匹配）
+const PWD = 'good' + 'girl';
+const RE = [/sk-[A-Za-z0-9]{16,}/, new RegExp(PWD, 'i')];
 
 const files = execSync('git ls-files', { encoding: 'utf8' })
   .split('\n')
