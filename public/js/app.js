@@ -366,21 +366,23 @@ window.HLM = window.HLM || {};
   }
 
   // 生成「安装提示词」：在目标项目粘贴即自动安装（按工具）
+  // 规范化 baseUrl 去尾斜杠，避免拼出 //api 导致路由 404
   function buildInstallPrompt(baseUrl, model, tool) {
+    const base = String(baseUrl || '').replace(/\/+$/, '');
     if (tool === 'all') {
       return `请从 P390 (Human as Agent) 「本机全装」到本项目：
 
-1. 调用 GET ${baseUrl}/api/gateway/install?tool=all 获取 p390-install.js
+1. 调用 GET ${base}/api/gateway/install?tool=all 获取 p390-install.js
 2. 写入项目根目录并运行：node p390-install.js
 3. 装完本机 Claude Code 的 skill/agent 后，主动询问用户是否让本机其他 AI agent 工具也安装
 4. 同意则运行脚本（会自动扫描本机已装 CLI：codex/opencode/gemini/cursor/aider，对检测到的工具写入 skill/agent/规则，未检测到的提示跳过）
-5. 确认安装完成（网关 ${baseUrl}，模型 ${model}）`;
+5. 确认安装完成（网关 ${base}，模型 ${model}）`;
     }
     return `请从 P390 人工代理网关安装「人工路由」能力到本项目（工具：${tool}）：
 
-1. 调用 GET ${baseUrl}/api/gateway/install?tool=${tool} 获取安装包（返回 data.files 数组）
+1. 调用 GET ${base}/api/gateway/install?tool=${tool} 获取安装包（返回 data.files 数组）
 2. 把每个文件的 content 写入对应 path（如 AGENTS.md / .claude/...）
-3. 确认安装完成，并说明网关地址为 ${baseUrl}、模型为 ${model}`;
+3. 确认安装完成，并说明网关地址为 ${base}、模型为 ${model}`;
   }
 
   function updatePrompt() {
