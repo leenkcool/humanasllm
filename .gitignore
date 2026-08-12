@@ -19,3 +19,6 @@ data/gateway_skill.md
 data/gateway_agent.md
 data/installed/
 data/human_followup.json
+
+# Claude Code 会话日志（本地，不入库；文件名含特殊连字符，用通配符匹配）
+session*log*.txt
