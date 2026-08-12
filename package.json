@@ -9,7 +9,8 @@
     "seed": "node scripts/seed.js",
     "test": "node --test --test-isolation=process \"tests/**/*.test.js\"",
     "test:coverage": "node --test --test-isolation=process --experimental-test-coverage \"tests/**/*.test.js\"",
-    "test:smoke": "node scripts/smoke-test.js"
+    "test:smoke": "node scripts/smoke-test.js",
+    "check:secret": "node scripts/check-secret.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
