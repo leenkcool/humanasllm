@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Human as Agent · 人即智能体</title>
+  <meta name="description" content="Human as LLM 人工代理网关——把工程师变成模型，接入你的 AI Agent 调度池。涉密/需人工任务一键路由给真实工程师。">
+  <link rel="stylesheet" href="assets/css/landing.css">
+</head>
+<body>
+
+<!-- ===== 导航 ===== -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>
+      <span>Human&nbsp;as&nbsp;Agent</span>
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="#models">模型墙</a>
+      <a href="#agents">为智能体提效</a>
+      <a href="#platform">为平台提效</a>
+      <a href="#how">工作原理</a>
+      <a href="#governance">治理合规</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn" href="#cta">开始使用</a>
+      <button class="nav-burger" id="navBurger" aria-label="菜单" aria-expanded="false">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ===== Hero ===== -->
+<section class="hero">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="container hero-inner">
+    <p class="hero-badge">Human as LLM · 人即智能体</p>
+    <h1 class="hero-title">把工程师变成模型，<br>接入你的 Agent 调度池</h1>
+    <p class="hero-sub">涉密、需人工判断的任务，经 <code>human-llm</code> 路由给真实工程师，完成后按大模型格式返回——你的 AI 工作链路不中断。</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-lg" href="#cta">免费开始</a>
+      <a class="btn btn-lg" href="#how">看它怎么工作</a>
+    </div>
+    <p class="hero-note">OpenAI 兼容 <code>/v1</code> · 调度池加一条模型路由即可 · 零代码改动</p>
+  </div>
+</section>
+
+<!-- ===== 模型墙 ===== -->
+<section class="models" id="models">
+  <div class="container">
+    <h2 class="section-title">一套网关，服务你的所有智能体</h2>
+    <p class="section-desc">为每种 AI 编码工具生成专属 SKILL / AGENT，粘贴即装。</p>
+    <ul class="model-grid" id="modelGrid">
+      <li>Claude Code</li>
+      <li>Codex</li>
+      <li>OpenCode</li>
+      <li>Gemini</li>
+      <li>Cursor</li>
+      <li>Windsurf</li>
+      <li>Aider</li>
+      <li>WorkBuddy</li>
+      <li>OpenClaw</li>
+      <li>Hermes</li>
+      <li>Pi</li>
+      <li class="more">+ 更多</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 给智能体提效 ===== -->
+<section class="features" id="agents">
+  <div class="container">
+    <h2 class="section-title">给 AI 智能体提效</h2>
+    <p class="section-desc">你已有的智能体，装上就能把「搞不定的任务」交给真人工。</p>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>一键安装 SKILL / AGENT</h3>
+        <p>13 种工具一键生成接入文件，在线微调、本机全装、服务器端安装。</p>
+      </div>
+      <div class="card">
+        <div class="card-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>人工路由不中断</h3>
+        <p>异步受理立即返回 task_id，工程师完成后回查取回，AI 链路无感知后端是人。</p>
+      </div>
+      <div class="card">
+        <div class="card-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>涉密保护锁死</h3>
+        <p>分级白名单锁死：涉密/运维任务禁 AI 兜底，上下文不出网关。</p>
+      </div>
+      <div class="card">
+        <div class="card-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>AI 兜底省人工</h3>
+        <p>general 简单任务可自动 AI 承接（可开关），涉密类绝不漂移。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 给平台提效 ===== -->
+<section class="features platform" id="platform">
+  <div class="container">
+    <h2 class="section-title">给平台 / 运维部门提效</h2>
+    <p class="section-desc">把「要人做的事」变成可跟踪、可治理、可审计的工单流。</p>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>工单快速收集</h3>
+        <p>派单 → 接单 → 提交 → 回查，全程状态可见，未完成聚合防遗忘。</p>
+      </div>
+      <div class="card">
+        <div class="card-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>分级治理</h3>
+        <p>涉密 / 运维 / 常规自动分级，规则可配置，白名单锁死不可降级。</p>
+      </div>
+      <div class="card">
+        <div class="card-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>审批流</h3>
+        <p>AI 提资源申请 → 人批 / 驳并附资源 → 回传，异步受理不阻塞。</p>
+      </div>
+      <div class="card">
+        <div class="card-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>质量与合规</h3>
+        <p>验收单、一次通过率、审计哈希链、合规报告——数据不出网关可证明。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 工作原理 ===== -->
+<section class="how" id="how">
+  <div class="container">
+    <h2 class="section-title">工作原理</h2>
+    <ol class="steps">
+      <li><strong>请求</strong>Agent 调 <code>POST /v1/chat/completions</code>，model=<code>human-llm</code></li>
+      <li><strong>受理</strong>立即返回 <code>task_id</code>（异步，不等人工）</li>
+      <li><strong>人工</strong>工程师在工作台接单、实现、提交产出</li>
+      <li><strong>返回</strong>按大模型格式回传，Agent 链路继续</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ===== 治理合规 ===== -->
+<section class="gov" id="governance">
+  <div class="container">
+    <h2 class="section-title">治理合规，可度量可证明</h2>
+    <ul class="gov-list">
+      <li>分级白名单锁死——涉密/运维任务绝不交给公有大模型</li>
+      <li>审计哈希链——操作留痕防篡改</li>
+      <li>合规报告——「数据不出网关」一键证明</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== CTA ===== -->
+<section class="cta" id="cta">
+  <div class="container">
+    <h2 class="cta-title">今天就让人工智能多一个「人工」</h2>
+    <p class="cta-sub">开源 · MIT 协议 · 支持微信 / QQ 交流群</p>
+    <div class="cta-actions">
+      <a class="btn btn-primary btn-lg" href="#top">开始使用</a>
+      <a class="btn btn-lg" href="#">加入交流群 6181193</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== Footer ===== -->
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">Human as Agent（人即智能体）</div>
+    <div class="footer-links">
+      <a href="docs/API.html">文档</a>
+      <a href="#cta">交流群 6181193</a>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/landing.js"></script>
+</body>
+</html>
