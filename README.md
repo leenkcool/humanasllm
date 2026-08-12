@@ -1,5 +1,7 @@
 # Human as Agent（人即智能体）
 
+**[English](README.en.md) | 中文**
+
 让工程师作为「人肉大模型」接入多模型 Agent 调度框架。对外完全兼容 **OpenAI 标准接口**（`/v1`），调度池新增一条 `human-llm` 模型路由即可接入，**零代码改动**。涉密/私有/需人工判断的任务经此路由派发给人工工程师，完成后按大模型格式返回，AI 工作链路不中断。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
