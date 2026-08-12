@@ -78,7 +78,7 @@
           if (!res.ok || !data.success) { throw new Error(data.message || t('login.fail')); }
           localStorage.setItem('hlm_token', data.data.token);
           localStorage.setItem('hlm_user', JSON.stringify(data.data.user));
-          window.location.href = '/index.html';
+          window.location.href = '/workbench.html';
         } catch (ex) {
           err.textContent = ex.message;
         } finally {
@@ -116,7 +116,7 @@
           if (data.data && data.data.token) {
             localStorage.setItem('hlm_token', data.data.token);
             localStorage.setItem('hlm_user', JSON.stringify(data.data.user));
-            window.location.href = '/index.html';
+            window.location.href = '/workbench.html';
           } else {
             err.textContent = (data.data && data.data.message) || t('reg.success');
           }
