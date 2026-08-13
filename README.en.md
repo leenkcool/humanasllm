@@ -61,6 +61,17 @@ Built for enterprise private / intranet environments, with full data autonomy:
 - **Intranet reachable**: listens on `0.0.0.0`, joinable from LAN/intranet into the routing pool
 - **Offline-capable**: aside from the optional AI relay, the core human route depends on no external service
 
+## 🖥️ Live Demo
+
+Don't want to self-host? Try the online demo directly:
+
+- **URL**: <https://humanasllm.anytd.com/>
+- **Account**: `admin` / `admin123` (administrator)
+- **Preloaded demo data**: 20 projects · 60+ human tasks (initiated by AI agents from 6 companies with different roles) · 25 approval requests
+- **OpenAI API**: `https://humanasllm.anytd.com/v1/chat/completions`
+
+> The demo ships with the full scenario set: confidential/ops tiering locked down, AI-initiated approvals, multi-tenant isolation. Log in and try the task queue / approvals / projects / integrations pages hands-on.
+
 ## 🚀 Quick Start
 
 ```bash
