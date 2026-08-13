@@ -145,9 +145,8 @@
           var data = await res.json();
           if (!data.success) throw new Error(data.message || t('forgot.fail'));
           U.closeModal();
-          err.textContent = (data.data && data.data.demoPassword)
-            ? t('forgot.done', { pwd: data.data.demoPassword })
-            : data.message;
+          // 修复：不再回显凭据（demoPassword 已移除），仅提示后端返回的发送结果
+          err.textContent = data.message || t('forgot.done');
           err.style.color = 'var(--success)';
         } catch (ex) { alert(ex.message); }
       }

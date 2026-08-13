@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
   role VARCHAR(20) NOT NULL DEFAULT 'engineer',
   name VARCHAR(64),
   is_active BOOLEAN NOT NULL DEFAULT true,
+  reset_token VARCHAR(128),
+  reset_expires TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -165,6 +167,8 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS rule_id INTEGER`);
   await db.exec(`ALTER TABLE task_logs ADD COLUMN IF NOT EXISTS prev_hash TEXT`);
   await db.exec(`ALTER TABLE task_logs ADD COLUMN IF NOT EXISTS hash TEXT`);
+  await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(128)`);
+  await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMP`);
   // ===== 分级策略引擎种子规则（幂等：task_rules 为空时播种） =====
   await seedRules();
   return db;
