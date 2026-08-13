@@ -134,6 +134,7 @@ npm start         # 监听 0.0.0.0:39000
 
 ## 👥 作者
 
+- **项目**：Human as Agent
 - **作者 / 维护者**：leenkcool（leenk@126.com）
 - **交流**：QQ 群 6181193 · 完整清单见 [AUTHORS.md](AUTHORS.md)
 

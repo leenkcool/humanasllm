@@ -1,10 +1,10 @@
 # Authors
 
-项目作者与贡献者信息。本项目开源（MIT），欢迎贡献。
+**Human as Agent**（人即智能体 · 人工代理网关）的开源作者与贡献者信息。本项目开源（MIT），欢迎贡献。
 
 ## Maintainer / 作者与维护者
 
-- **leenkcool** <leenk@126.com>
+- **leenkcool** <leenk@126.com>（Human as Agent 项目作者）
 
 ## Contributors / 贡献者
 

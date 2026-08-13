@@ -134,6 +134,7 @@ The request body matches standard OpenAI `chat/completions`, with optional busin
 
 ## 👥 Authors
 
+- **Project**: Human as Agent
 - **Author / Maintainer**: leenkcool (leenk@126.com)
 - **Community**: QQ group 6181193 · full list in [AUTHORS.md](AUTHORS.md)
 
