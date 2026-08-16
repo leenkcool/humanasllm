@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { getDb } = require('../db');
 const { authenticate, signToken } = require('../middleware/auth');
@@ -46,8 +47,8 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// 忘记密码：向注册邮箱发送新密码
-router.post('/forgot-password', async (req, res) => {
+// 忘记密码：生成一次性重置 token 并发送重置链接（SMTP 未配置时链接写入服务端日志，绝不回显凭据）
+router.post('/forgot-password', createLoginLimiter(), async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: '请输入注册邮箱' });
@@ -56,23 +57,54 @@ router.post('/forgot-password', async (req, res) => {
     const user = list[0];
     if (!user) return res.status(404).json({ success: false, message: '该邮箱未注册' });
 
-    const newPwd = 'pwd' + Math.random().toString(36).slice(2, 8) + 'A1';
-    const hash = await bcrypt.hash(newPwd, 10);
-    await db.run('UPDATE users SET password = ? WHERE id = ?', [hash, user.id]);
+    // 一次性 token（30 分钟有效），仅用于换取重置表单，不直接携带凭据
+    const token = crypto.randomBytes(32).toString('hex');
+    await db.run(
+      `UPDATE users SET reset_token = ?, reset_expires = NOW() + interval '30 minutes' WHERE id = ?`,
+      [token, user.id]
+    );
 
-    const mail = await sendMail({
-      to: email,
-      subject: 'p390 人工代理网关 - 密码重置',
-      text: `你的新密码：${newPwd}\n请登录后尽快在「个人资料」中修改密码。`,
-    });
-    res.json({
-      success: true,
-      message: mail.delivered ? '新密码已发送至你的邮箱' : '邮件服务未配置，密码已重置（见响应 demoPassword）',
-      data: { delivered: mail.delivered, ...(mail.delivered ? {} : { demoPassword: newPwd }) },
-    });
+    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const link = `${base}/forgot-reset.html?token=${token}`;
+    const text = `你好 ${user.username}，\n\n请点击以下链接重置密码（30 分钟内有效，仅可使用一次）：\n${link}\n\n如非本人操作请忽略本邮件。`;
+    const mail = await sendMail({ to: email, subject: 'p390 人工代理网关 - 重置密码', text });
+
+    // SMTP 未配置/失败：重置链接写入服务端日志（管理员可见），响应绝不回显 token
+    if (!mail.delivered) {
+      console.log(`[密码重置] SMTP 未配置，重置链接（30 分钟有效，仅管理员可查日志获取）:\n${link}`);
+      return res.json({ success: true, message: '邮件服务未配置，重置链接已写入服务端日志，请联系管理员获取' });
+    }
+    res.json({ success: true, message: '重置链接已发送至你的邮箱' });
   } catch (err) {
     console.error('[重置密码失败]', err.message);
     res.status(500).json({ success: false, message: '重置密码失败' });
+  }
+});
+
+// 通过一次性 token 重置密码（forgot-reset.html 调用）
+router.post('/reset-password', createLoginLimiter(), async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ success: false, message: '缺少 token 或新密码' });
+    if (String(newPassword).length < 6) return res.status(400).json({ success: false, message: '新密码至少 6 位' });
+    const db = getDb();
+    const list = rows(await db.exec(
+      'SELECT id FROM users WHERE reset_token = ? AND reset_expires > NOW()',
+      [token]
+    ));
+    const user = list[0];
+    if (!user) return res.status(400).json({ success: false, message: '重置链接无效或已过期' });
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    // 一次性：重置后清空 token，防止重复使用
+    await db.run(
+      'UPDATE users SET password = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?',
+      [hash, user.id]
+    );
+    res.json({ success: true, message: '密码重置成功，请用新密码登录' });
+  } catch (err) {
+    console.error('[密码重置失败]', err.message);
+    res.status(500).json({ success: false, message: '密码重置失败' });
   }
 });
 

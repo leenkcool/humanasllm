@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>重置密码 · Human as Agent</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%232563eb'/><path d='M10 22l6-6 4 4 8-9v5h-2v4H26l2-2 2 2z' fill='white'/></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+      </div>
+      <h1 data-i18n="login.heading">Human as Agent</h1>
+      <p data-i18n="login.sub">Human as Agent 工程师工作台</p>
+      <form id="resetForm">
+        <div class="form-group">
+          <label class="form-label" data-i18n="forgot.newPwd">新密码</label>
+          <input class="form-input" id="newPassword" type="password" placeholder="至少 6 位" autocomplete="new-password" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="forgot.confirmPwd">确认新密码</label>
+          <input class="form-input" id="confirmPassword" type="password" autocomplete="new-password" required>
+        </div>
+        <button class="btn primary" type="submit" id="resetBtn" data-i18n="forgot.resetBtn">重置密码</button>
+        <p id="msg" style="color:var(--danger);font-size:13px;margin-top:12px;min-height:18px;"></p>
+      </form>
+      <div style="margin-top:12px;font-size:13px;">
+        <a href="/login.html" data-i18n="login.back" style="color:var(--primary);text-decoration:none;">返回登录</a>
+      </div>
+    </div>
+  </div>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/utils.js"></script>
+  <script>
+    (function () {
+      var I = window.HLM.I18n;
+      var t = I.t;
+      var form = document.getElementById('resetForm');
+      var msg = document.getElementById('msg');
+      var btn = document.getElementById('resetBtn');
+
+      // 从 URL 读取 token（可能带 hash 前缀，兼容两种写法）
+      var params = new URLSearchParams(window.location.search);
+      var token = params.get('token') || (window.location.hash.replace(/^#/, ''));
+
+      function langHeaders() {
+        return { 'Content-Type': 'application/json; charset=utf-8', 'Accept-Language': I.acceptHeader() };
+      }
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var newPassword = document.getElementById('newPassword').value;
+        var confirmPassword = document.getElementById('confirmPassword').value;
+        if (!token) { msg.textContent = t('forgot.invalidLink') || '重置链接无效或已过期'; return; }
+        if (newPassword.length < 6) { msg.textContent = t('forgot.pwdShort') || '新密码至少 6 位'; return; }
+        if (newPassword !== confirmPassword) { msg.textContent = t('forgot.pwdMismatch') || '两次输入的密码不一致'; return; }
+        btn.disabled = true; msg.textContent = '';
+        try {
+          var res = await fetch(window.location.origin + '/api/auth/reset-password', {
+            method: 'POST',
+            headers: langHeaders(),
+            body: JSON.stringify({ token: token, newPassword: newPassword })
+          });
+          var data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || t('forgot.fail'));
+          msg.style.color = 'var(--success)';
+          msg.textContent = data.message || '密码重置成功';
+          setTimeout(function () { window.location.href = '/login.html'; }, 1500);
+        } catch (ex) {
+          msg.style.color = 'var(--danger)';
+          msg.textContent = ex.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

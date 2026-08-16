@@ -144,6 +144,15 @@ router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
     const id = parseInt(req.params.id);
     const task = await queue.getTask(id);
     if (!task) return res.status(404).json(encoder.makeError(404, 'Task not found', 'invalid_request_error'));
+    // 多租户隔离（越权/枚举防护）：调用方 key 路由到的租户与任务租户不一致则拒绝。
+    // 无 key 或默认租户 key 可读默认租户任务（演示模式），跨租户一律 404 不泄露存在性。
+    const auth = req.headers.authorization || '';
+    const upKey = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.api_key || '');
+    const callerTenant = await getTenantByUpstreamKey(upKey);
+    const taskTenant = task.tenant_id || null;
+    if (callerTenant && taskTenant && callerTenant !== taskTenant) {
+      return res.status(404).json(encoder.makeError(404, 'Task not found', 'invalid_request_error'));
+    }
     let content = '任务处理中，请稍后查询';
     if (task.status === 'completed') content = task.result_text || '';
     else if (task.status === 'returned') content = `任务被驳回: ${task.reject_reason || '未填写原因'}`;

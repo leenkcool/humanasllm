@@ -12,6 +12,23 @@ const { toCSV } = require('../services/csv');
 
 const VALID_STATUS = ['pending', 'processing', 'completed', 'returned', 'paused', 'cancelled'];
 
+/**
+ * 加载任务并校验租户 + 可选归属（越权防护）
+ * - 跨租户一律按 404 处理（不泄露任务存在性）
+ * - ownerOnly=true 时仅「接单人本人」或 admin 可操作
+ */
+async function assertTaskAccess(req, res, id, { ownerOnly = false } = {}) {
+  const task = await queue.getTask(id);
+  if (!task) return { error: res.status(404).json({ success: false, message: '任务不存在' }) };
+  if (task.tenant_id !== req.tenant_id) return { error: res.status(404).json({ success: false, message: '任务不存在' }) };
+  if (ownerOnly) {
+    const isAdmin = req.user.role === 'admin';
+    const isAssignee = task.assignee_id === req.user.id;
+    if (!isAdmin && !isAssignee) return { error: res.status(403).json({ success: false, message: '无权限操作该任务' }) };
+  }
+  return { task };
+}
+
 // 导出任务 CSV（utf-8 BOM，Excel 兼容）
 router.get('/export', authenticate, async (req, res) => {
   try {
@@ -92,6 +109,8 @@ router.get('/:id', authenticate, async (req, res) => {
 router.post('/:id/claim', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { error } = await assertTaskAccess(req, res, id);
+    if (error) return error;
     const r = await queue.claimTask(id, req.user.id, req.user.name || req.user.username);
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
     res.json({ success: true, data: r.task });
@@ -105,6 +124,8 @@ router.post('/:id/claim', authenticate, async (req, res) => {
 router.post('/:id/complete', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { error } = await assertTaskAccess(req, res, id, { ownerOnly: true });
+    if (error) return error;
     const content = (req.body.content || '').toString();
     if (!content.trim()) return res.status(400).json({ success: false, message: '提交内容不能为空' });
     const r = await queue.completeTask(id, content, { id: req.user.id, name: req.user.name || req.user.username }, { completion_note: req.body.completion_note });
@@ -120,6 +141,8 @@ router.post('/:id/complete', authenticate, async (req, res) => {
 router.post('/:id/reject', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { error } = await assertTaskAccess(req, res, id, { ownerOnly: true });
+    if (error) return error;
     const reason = (req.body.reason || '').toString();
     if (!reason.trim()) return res.status(400).json({ success: false, message: '请填写驳回原因' });
     const r = await queue.rejectTask(id, reason, { id: req.user.id, name: req.user.name || req.user.username });
@@ -135,6 +158,8 @@ router.post('/:id/reject', authenticate, async (req, res) => {
 router.post('/:id/pause', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { error } = await assertTaskAccess(req, res, id, { ownerOnly: true });
+    if (error) return error;
     const reason = (req.body.reason || '').toString();
     const r = await queue.pauseTask(id, reason || null, { id: req.user.id, name: req.user.name || req.user.username });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
@@ -149,6 +174,8 @@ router.post('/:id/pause', authenticate, async (req, res) => {
 router.post('/:id/resume', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { error } = await assertTaskAccess(req, res, id, { ownerOnly: true });
+    if (error) return error;
     const r = await queue.resumeTask(id, { id: req.user.id, name: req.user.name || req.user.username });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
     res.json({ success: true, data: r.task });
@@ -162,6 +189,8 @@ router.post('/:id/resume', authenticate, async (req, res) => {
 router.post('/:id/requeue', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { error } = await assertTaskAccess(req, res, id);
+    if (error) return error;
     const r = await queue.requeueTask(id, req.body.request_payload || null, { id: req.user.id, name: req.user.name || req.user.username });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
     res.json({ success: true, data: r.task });
@@ -175,6 +204,8 @@ router.post('/:id/requeue', authenticate, async (req, res) => {
 router.post('/:id/cancel', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { error } = await assertTaskAccess(req, res, id, { ownerOnly: true });
+    if (error) return error;
     const r = await queue.cancelTask(id, { id: req.user.id, name: req.user.name || req.user.username });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
     res.json({ success: true, data: r.task });
@@ -188,8 +219,8 @@ router.post('/:id/cancel', authenticate, async (req, res) => {
 router.post('/:id/reopen', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const task = await queue.getTask(id);
-    if (!task) return res.status(404).json({ success: false, message: '任务不存在' });
+    const { error, task } = await assertTaskAccess(req, res, id);
+    if (error) return error;
     const isAdmin = req.user.role === 'admin';
     const isOwner = task.assignee_id === req.user.id;
     if (!isAdmin && !isOwner) return res.status(403).json({ success: false, message: '无权限打回该任务' });
@@ -208,12 +239,13 @@ router.post('/:id/reopen', authenticate, async (req, res) => {
 router.post('/:id/project', authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { error, task } = await assertTaskAccess(req, res, id);
+    if (error) return error;
     const code = (req.body.project_code || '').toString().trim();
-    const task = await queue.getTask(id);
-    if (!task) return res.status(404).json({ success: false, message: '任务不存在' });
     if (code) {
       const p = await project.getProjectByCode(code);
       if (!p) return res.status(400).json({ success: false, message: '项目不存在' });
+      if (p.tenant_id !== req.tenant_id) return res.status(400).json({ success: false, message: '项目不存在' });
     }
     await getDb().run('UPDATE tasks SET project_code = ? WHERE id = ?', [code || null, id]);
     res.json({ success: true, data: await queue.getTask(id) });
