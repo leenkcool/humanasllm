@@ -11,6 +11,7 @@
 欢迎任何形式的贡献（Issue / PR / 文档 / 想法）。Fork 后提交 Pull Request，或加入交流群参与开发讨论。
 
 - **aaravarr** — [@aaravarr](https://github.com/aaravarr)
+- **chenshj73** — [@chenshj73](https://github.com/chenshj73)（多租户日志越权问题报告 · Issue #3）
 
 ## Acknowledgements / 致谢
 

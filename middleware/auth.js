@@ -11,6 +11,18 @@ async function getTenantByUpstreamKey(key) {
   return r[0] && r[0].values[0] ? r[0].values[0][0] : null;
 }
 
+/** 默认租户 id（上游未带 key / key 未匹配时的回退租户） */
+async function getDefaultTenantId() {
+  const { getDb } = require('../db');
+  const r = await getDb().exec('SELECT id FROM tenants WHERE code = ?', ['default']);
+  return r[0] && r[0].values[0] ? r[0].values[0][0] : null;
+}
+
+/** 解析调用方租户：上游 key 命中优先，未命中回退默认租户（与建任务的归属逻辑一致） */
+async function resolveCallerTenantId(key) {
+  return (await getTenantByUpstreamKey(key)) || (await getDefaultTenantId());
+}
+
 /**
  * JWT 认证中间件
  * 从 Authorization header 读取 Bearer token 并验证
@@ -60,4 +72,4 @@ function requireRole(role) {
   };
 }
 
-module.exports = { authenticate, signToken, requireRole, getTenantByUpstreamKey };
+module.exports = { authenticate, signToken, requireRole, getTenantByUpstreamKey, getDefaultTenantId, resolveCallerTenantId };

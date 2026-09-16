@@ -108,10 +108,10 @@ async function addLog(taskId, action, oldValue, newValue, actor, remark) {
   );
 }
 
-async function logRequest(taskId, direction, payload, model) {
+async function logRequest(taskId, direction, payload, model, tenantId) {
   await getDb().run(
-    'INSERT INTO request_logs (task_id, direction, payload, model) VALUES (?, ?, ?::jsonb, ?)',
-    [taskId, direction, JSON.stringify(payload), model || null]
+    'INSERT INTO request_logs (task_id, direction, payload, model, tenant_id) VALUES (?, ?, ?::jsonb, ?, ?)',
+    [taskId, direction, JSON.stringify(payload), model || null, tenantId || null]
   );
 }
 
@@ -212,7 +212,7 @@ async function completeTask(taskId, content, actor, opts = {}) {
     timeout_at: null,
   });
   if (t.ok) {
-    await logRequest(taskId, 'out', { content, model: t.task.model }, t.task.model);
+    await logRequest(taskId, 'out', { content, model: t.task.model }, t.task.model, t.task.tenant_id);
   }
   return t;
 }
@@ -299,7 +299,7 @@ async function timeoutTask(taskId, phase) {
             timeout_at: null,
           });
           if (t.ok) {
-            await logRequest(taskId, 'out', { content, source: 'ai-relay' }, t.task.model);
+            await logRequest(taskId, 'out', { content, source: 'ai-relay' }, t.task.model, t.task.tenant_id);
             ws.broadcast('task:update', { id: taskId, status: 'completed', aiRelay: true });
             ws.broadcast('task:timeout', { id: taskId, phase, aiRelay: true });
             return;

@@ -12,7 +12,7 @@ const encoder = require('../services/openaiEncoder');
 const queue = require('../services/queueService');
 const aiRelay = require('../services/aiRelay');
 const aiShift = require('../services/aiShift');
-const { getTenantByUpstreamKey } = require('../middleware/auth');
+const { getTenantByUpstreamKey, resolveCallerTenantId } = require('../middleware/auth');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
 function requireUpstreamKey(req, res, next) {
@@ -49,18 +49,23 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
     return res.status(e.status || 400).json(encoder.makeError(e.status || 400, e.message));
   }
 
+  // 调用方租户（上游 key 路由，未命中回退默认租户）：任务归属与请求日志隔离共用
+  const authHeader = req.headers.authorization || '';
+  const upKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : (req.query.api_key || '');
+  const callerTenantId = await resolveCallerTenantId(upKey);
+
   // ===== AI 降级路由：模型名匹配 → 中继到真实 LLM（DeepSeek） =====
   if (aiRelay.shouldRelay(parsed.model)) {
-    await queue.logRequest(null, 'in', req.body, parsed.model).catch(() => {});
+    await queue.logRequest(null, 'in', req.body, parsed.model, callerTenantId).catch(() => {});
     try {
       if (parsed.stream) {
-        await queue.logRequest(null, 'out', { relay: parsed.model }, parsed.model).catch(() => {});
+        await queue.logRequest(null, 'out', { relay: parsed.model }, parsed.model, callerTenantId).catch(() => {});
         return await aiRelay.relayStream(req, res);
       }
       const data = await aiRelay.chat(req.body);
       await queue.logRequest(null, 'out',
         { content: data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content },
-        parsed.model).catch(() => {});
+        parsed.model, callerTenantId).catch(() => {});
       return res.json(data);
     } catch (e) {
       console.error('[AI 中继失败]', e.message);
@@ -70,11 +75,11 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
 
   // ===== 智能漂移：general 简单任务由 AI 直接承接（AI_SHIFT_ENABLED=true 时；confidential/ops 锁死不漂移） =====
   if (await aiShift.shouldShift({ messages: parsed.messages, body: parsed.extra })) {
-    await queue.logRequest(null, 'in', req.body, parsed.model);
+    await queue.logRequest(null, 'in', req.body, parsed.model, callerTenantId);
     try {
       const data = await aiRelay.chat({ ...req.body, stream: false });
       const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-      await queue.logRequest(null, 'out', { content, source: 'ai-shift' }, parsed.model);
+      await queue.logRequest(null, 'out', { content, source: 'ai-shift' }, parsed.model, callerTenantId);
       return res.json(data);
     } catch (e) {
       console.error('[AI 漂移失败，回落人工]', e.message);
@@ -87,16 +92,13 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
   // 接入 → 创建人工任务（pending）→ 推送工作台（上游 API key 路由租户）
   let taskId;
   try {
-    const auth = req.headers.authorization || '';
-    const upKey = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.api_key || '');
-    const upstreamTenant = await getTenantByUpstreamKey(upKey);
-    const createdRes = await queue.createTaskFromRequest({ parsed, chatId, created, tenantId: upstreamTenant });
+    const createdRes = await queue.createTaskFromRequest({ parsed, chatId, created, tenantId: callerTenantId });
     taskId = createdRes.taskId;
   } catch (e) {
     console.error('[创建任务失败]', e.message);
     return res.status(500).json(encoder.makeError(500, '任务创建失败', 'server_error'));
   }
-  await queue.logRequest(taskId, 'in', req.body, parsed.model);
+  await queue.logRequest(taskId, 'in', req.body, parsed.model, callerTenantId);
 
   // 异步受理：人工接单为小时级，/v1 不阻塞等待（分钟级挂起与人工节奏不匹配）
   // 创建任务后立即返回 task_id，上游凭 GET /v1/tasks/:id 轮询取回人工处理结果

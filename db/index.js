@@ -82,6 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_task_logs_task ON task_logs(task_id);
 CREATE TABLE IF NOT EXISTS request_logs (
   id SERIAL PRIMARY KEY,
   task_id INTEGER REFERENCES tasks(id),
+  tenant_id INTEGER,
   direction VARCHAR(8) NOT NULL,
   payload JSONB,
   model VARCHAR(64),
@@ -160,6 +161,9 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
   await db.exec(`ALTER TABLE projects ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
   await db.exec(`ALTER TABLE task_rules ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
+  // request_logs 的中继/漂移日志无 task_id 可关联，必须自存租户才能做隔离筛选
+  await db.exec(`ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS tenant_id INTEGER`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_request_logs_tenant ON request_logs(tenant_id)`);
   await db.exec(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS upstream_key VARCHAR(64)`);
   await seedTenants();
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
@@ -187,6 +191,9 @@ async function seedTenants() {
   await db.run('UPDATE tasks SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
   await db.run('UPDATE approvals SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
   await db.run('UPDATE projects SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
+  // 存量 request_logs 回填：挂任务的按任务租户回填；无任务的中继/漂移日志归默认租户
+  await db.run('UPDATE request_logs SET tenant_id = (SELECT t.tenant_id FROM tasks t WHERE t.id = request_logs.task_id) WHERE task_id IS NOT NULL AND tenant_id IS NULL');
+  await db.run('UPDATE request_logs SET tenant_id = ? WHERE tenant_id IS NULL', [defaultId]);
 }
 
 /** 播种分级策略种子规则（白名单锁死：confidential/ops 命中即定级，不可被上游声明降级） */

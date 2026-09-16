@@ -18,11 +18,13 @@ router.get('/requests', authenticate, async (req, res) => {
     const offset = (page - 1) * size;
     const where = [];
     const params = [];
-    if (req.query.task_id) { where.push('task_id = ?'); params.push(parseInt(req.query.task_id)); }
-    if (['in', 'out'].includes(req.query.direction)) { where.push('direction = ?'); params.push(req.query.direction); }
-    const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    // 多租户隔离：仅返回本租户日志。中继/漂移日志无 task_id，靠 request_logs.tenant_id 归属
+    where.push('r.tenant_id = ?'); params.push(req.tenant_id);
+    if (req.query.task_id) { where.push('r.task_id = ?'); params.push(parseInt(req.query.task_id)); }
+    if (['in', 'out'].includes(req.query.direction)) { where.push('r.direction = ?'); params.push(req.query.direction); }
+    const whereSql = 'WHERE ' + where.join(' AND ');
 
-    const count = await db.exec(`SELECT COUNT(*) AS c FROM request_logs ${whereSql}`, params);
+    const count = await db.exec(`SELECT COUNT(*) AS c FROM request_logs r ${whereSql}`, params);
     const total = count[0].values[0][0];
     const list = queue.rows(await db.exec(
       `SELECT r.*, t.model AS task_model
@@ -46,13 +48,15 @@ router.get('/tasks', authenticate, async (req, res) => {
     const offset = (page - 1) * size;
     const where = [];
     const params = [];
-    if (req.query.task_id) { where.push('task_id = ?'); params.push(parseInt(req.query.task_id)); }
-    const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    // 多租户隔离：task_logs 经 tasks 关联到本租户（task_id 为 NOT NULL 外键，关联可靠）
+    where.push('t.tenant_id = ?'); params.push(req.tenant_id);
+    if (req.query.task_id) { where.push('l.task_id = ?'); params.push(parseInt(req.query.task_id)); }
+    const whereSql = 'WHERE ' + where.join(' AND ');
 
-    const count = await db.exec(`SELECT COUNT(*) AS c FROM task_logs ${whereSql}`, params);
+    const count = await db.exec(`SELECT COUNT(*) AS c FROM task_logs l JOIN tasks t ON l.task_id = t.id ${whereSql}`, params);
     const total = count[0].values[0][0];
     const list = queue.rows(await db.exec(
-      `SELECT * FROM task_logs ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      `SELECT l.* FROM task_logs l JOIN tasks t ON l.task_id = t.id ${whereSql} ORDER BY l.id DESC LIMIT ? OFFSET ?`,
       [...params, size, offset]
     ));
     res.json({ success: true, data: { data: list, total, page, size } });
@@ -69,6 +73,8 @@ router.get('/tasks/:id/audit', authenticate, async (req, res) => {
     const db = getDb();
     const task = await queue.getTask(id);
     if (!task) return res.status(404).json({ success: false, message: '任务不存在' });
+    // 多租户隔离：跨租户按 404 处理（与 /api/tasks 一致，不泄露存在性）
+    if (task.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '任务不存在' });
     const chain = await queue.verifyAuditChain(id);
     res.json({ success: true, data: {
       valid: chain.valid,
