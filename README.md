@@ -128,6 +128,8 @@ npm start         # 监听 0.0.0.0:39000
 > 完整版见 [`docs/ROADMAP.md`](docs/ROADMAP.md)（含现状全景、体验诊断、开源变现规划）。此处仅留方向摘要。
 
 **体验筑基（近期）**
+- ✅ 📡 SSE 中途状态推送 + 完成回调 webhook（告别手动轮询）—— **已交付 2026-09**
+- ✅ 🛠️ tools / function calling（agent 调「人提供的函数」）—— **已交付 2026-09**
 - 🐳 Docker 一键部署（私有化落地门槛）
 - 📱 移动端 / PWA + on-call 值班 + 超时告警升级序列
 

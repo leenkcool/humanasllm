@@ -128,6 +128,8 @@ The request body matches standard OpenAI `chat/completions`, with optional busin
 > Full version: [`docs/ROADMAP.md`](docs/ROADMAP.md) (status overview, experience diagnosis, monetization plan). This is just the directional summary.
 
 **Experience foundation (near term)**
+- ✅ 📡 SSE mid-stream status push + completion webhook (no more manual polling) — **shipped 2026-09**
+- ✅ 🛠️ tools / function calling (agent calls "human-provided functions") — **shipped 2026-09**
 - 🐳 Docker one-click deployment (lower the self-host barrier)
 - 📱 Mobile / PWA + on-call duty + timeout escalation sequence
 
