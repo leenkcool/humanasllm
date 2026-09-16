@@ -10,12 +10,13 @@
 
 ## ✨ 特性
 
-- **OpenAI 兼容**：`/v1/chat/completions`（一次性 + SSE 流式）+ `/v1/approvals`（AI 提审批）。**异步受理**：立即返回 `task_id`，人工完成后 `GET /v1/tasks/:id` 回查，或请求带 `callback_url` 由服务端**主动回调**（免轮询）
-- **治理层**（Human-as-LLM 的核心）：分级策略引擎（**涉密/运维白名单锁死，禁 AI 兜底**）、审批异步化、质量验收分类、审计哈希链（防篡改）、合规报告（数据不出网关证明）、工程师评级
+- **OpenAI 兼容**：`/v1/chat/completions`（一次性 + SSE 流式）+ `/v1/approvals`（AI 提审批）。**异步受理**：立即返回 `task_id`；三种取回方式——`GET /v1/tasks/:id` 轮询、`callback_url` **完成回调**、`stream_events:true` **SSE 中途状态推送**（接单/完成实时到达，均免轮询）
+- **函数调用（tools）**：请求声明 `tools`，人类工程师照此执行并回填 `tool_calls`（OpenAI 原生结构），agent 直接调用「人提供的函数」
+- **治理层**（Human-as-LLM 的核心）：分级策略引擎（**涉密/运维白名单锁死，禁 AI 兜底**）、审批异步化、质量验收分类、审计哈希链（防篡改 + 工作台链上校验）、合规报告（数据不出网关证明）、工程师评级
 - **多租户**：`upstream_key` 路由租户，任务/审批/项目/规则数据隔离
 - **多工具安装**：为 13 种 AI Agent 工具（Claude Code / Codex / OpenCode / Gemini / Cursor / Windsurf / Aider / WorkBuddy / OpenClaw / Hermes / Pi 等）一键生成 SKILL / AGENT / 规则，支持在线微调、本机全装、服务器端安装
 - **智能漂移**：general 简单任务可自动 AI 承接（可开关），涉密类锁死
-- **测试体系**：36 项单元/集成测试 + 30 项 API 回归，关键安全边界全覆盖
+- **测试体系**：40 项单元/集成测试 + 30 项 API 回归，关键安全边界全覆盖
 
 ## 🌐 与 FDE（前沿部署工程师）的关系
 
@@ -128,8 +129,6 @@ npm start         # 监听 0.0.0.0:39000
 
 **体验筑基（近期）**
 - 🐳 Docker 一键部署（私有化落地门槛）
-- 📡 SSE 中途状态推送（告别手动轮询）
-- 🛠️ tools / function calling（agent 调「人提供的函数」）
 - 📱 移动端 / PWA + on-call 值班 + 超时告警升级序列
 
 **企业就绪（中期）**

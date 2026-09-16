@@ -2,7 +2,7 @@
 
 > 产品级长期蓝图：现状全景、真实缺口、体验诊断、三阶段路线、开源变现。
 > 对应 README「Roadmap」章节的完整版，README 仅留方向摘要。
-> 状态核对日期：2026-09-16（源码逐条核实；完成回调 webhook、哈希链可视化、SLA 倒计时已交付）。
+> 状态核对日期：2026-09-16（源码逐条核实；**接入层阶段 A 前三项已交付**：完成回调 webhook、SSE 中途状态推送、tools/function calling、哈希链可视化、SLA 倒计时）。
 
 ---
 
@@ -30,8 +30,8 @@
 | # | 缺口 | 现状 |
 |---|---|---|
 | 1 | **Docker 部署** | 无 Dockerfile/compose，私有化部署仅 pm2/systemd，首装门槛高 |
-| 2 | **SSE 中途状态推送** | 现 SSE 仅回「已受理」，上游拿不到接单/完成/驳回的中途事件 |
-| 3 | **tools / function calling** | `/v1` 不解析 `tools`，agent 无法声明「让人类执行函数」 |
+| 2 | ~~**SSE 中途状态推送**~~ ✅ | **已交付（2026-09-16）**：`stream_events:true` 时保持 SSE 连接，实时推接单/完成/驳回事件（opt-in，零破坏） |
+| 3 | ~~**tools / function calling**~~ ✅ | **已交付（2026-09-16）**：请求声明 `tools`，人类可回填 `tool_calls`，按 OpenAI 原生结构返回 |
 | 4 | ~~**完成回调 webhook**~~ ✅ | **已交付（2026-09-16）**：请求带 `callback_url` → 任务终态主动 POST 结果，上游免轮询 |
 | 5 | **数据备份** | PG 自动备份 + 审计异地备份 + 恢复演练，全无 |
 | 6 | **监控 /metrics** | 无 Prometheus 指标，看不到任务量/负载/超时率（工作台内有 dashboard，但无标准指标） |
@@ -66,7 +66,7 @@
 
 按全链路找断点，**最伤体验的是接入层**：
 
-- **接入（对 agent/开发者）**：异步受理 + 手动轮询，无回调 webhook、无中途 SSE → 「零代码接入」打折，开发者心智负担重；无 tools，agent 能力表达受限。
+- **接入（对 agent/开发者）**：~~异步受理 + 手动轮询，无回调 webhook、无中途 SSE；无 tools~~ ✅ **已补齐（2026-09-16）**：回调 webhook + SSE 中途推送 + tools/function calling 全部交付，接入层断点清除。
 - **交互一致性断裂**：任务 = 异步轮询（小时级），审批 = 同步挂起（分钟级）——设计各自合理，但上游要理解两套契约。
 - **使用（对工程师）**：工作台桌面单页、移动端弱 → on-call 接单不及时；SLA 有倒计时无（前端不展示 deadline）；超时靠人盯。
 - **治理（对管理员）**：RBAC 粗糙、审计不可配置、合规证明不可导出（仅 JSON）。
@@ -80,8 +80,8 @@
 ### 阶段 A「体验筑基」（1–2 月）
 
 1. Docker 一键部署（compose + 镜像 + .env 模板）→ 验收：`docker compose up` 一条命令跑通 PG + app
-2. ~~完成回调 webhook~~ ✅ **已交付 2026-09-16**；剩余 SSE 中途状态推送 → 验收：上游收到接单/完成事件，无需轮询
-3. tools / function calling → 验收：agent 传 `tools` 人类可执行并返回 `tool_calls`
+2. ~~完成回调 webhook~~ ✅、~~SSE 中途状态推送~~ ✅ **均已交付 2026-09-16** → 验收达成：上游收到接单/完成事件，无需轮询
+3. ~~tools / function calling~~ ✅ **已交付 2026-09-16** → 验收达成：agent 传 `tools` 人类可执行并返回 `tool_calls`
 4. 工作台补：~~SLA 倒计时~~ ✅、~~哈希链可视化~~ ✅ **已交付 2026-09-16**；剩余模板工单
 5. 移动端 PWA + on-call 值班 + 通知升级序列
 6. 备份脚本 + 恢复演练 + Prometheus `/metrics`
@@ -138,7 +138,8 @@
 
 | 日期 | 问题 | 处理 |
 |---|---|---|
-| 2026-09-16 | 完成回调 webhook 缺失（上游只能轮询，接入层最大体验断点） | 新增 `callback_url` + `services/callback.js`：终态主动 POST，降级安全；`/v1/tasks/:id` 补进度字段 |
+| 2026-09-16 | 上游只能轮询，无主动推送（接入层最大体验断点） | 完成回调 webhook + SSE 中途状态推送（`stream_events:true`，opt-in 零破坏）+ `/v1/tasks/:id` 补进度字段 |
+| 2026-09-16 | agent 无法声明「让人类执行函数」 | tools/function calling：声明 `tools` → 人工回填 `tool_calls`（仅限声明过的函数）→ OpenAI 原生结构返回 |
 | 2026-09-16 | 哈希链完整但工作台无可视化视图 | 任务详情加「链上校验」：服务端结论 + 客户端逐条复核 `prev_hash` |
 | 2026-09-16 | 日志接口跨租户越权（`/api/logs/*`，Issue #3） | 三接口加租户隔离；`request_logs` 增 `tenant_id` 并回填 |
 | 2026-08-13 | `routes/prd.js` 未挂载，PRD 功能 404 | 挂载 `/api/prd`，移除 `git push gitea`（违反「绝不 push」规则） |

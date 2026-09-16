@@ -7,6 +7,8 @@ window.HLM = window.HLM || {};
   const { Icons, $, esc, fmt, jsonStr, nl, toast, openModal, closeModal, confirmDialog, STATUS_LABEL } = U;
   const { t } = window.HLM.I18n;
 
+  let detailTask = null; // 当前详情任务（供提交函数调用等二次操作读取声明信息）
+
   // 工程师技能与任务 required skills 匹配
   function skillMatch(required) {
     const my = (window.HLM.currentUser && window.HLM.currentUser.skills) || '';
@@ -87,6 +89,7 @@ window.HLM = window.HLM || {};
     try {
       const r = await API.get('/tasks/' + id);
       const task = r.data;
+      detailTask = task;
       const p = task.request_payload || {};
       const messages = Array.isArray(p.messages) ? p.messages : [];
 
@@ -104,6 +107,16 @@ window.HLM = window.HLM || {};
       if (task.status === 'completed' && task.result_text) {
         resultHtml = `<div class="ctx"><div class="k">${t('task.result')}</div><pre>${esc(nl(task.result_text))}</pre></div>`;
       }
+      // 函数调用产出（tools/function calling）：上游按 OpenAI tool_calls 取回
+      const outCalls = (task.result_payload && task.result_payload.tool_calls) || null;
+      if (outCalls && outCalls.length) {
+        resultHtml += `<div class="ctx"><div class="k">${t('task.toolCalls', { n: outCalls.length })}</div><pre>${esc(JSON.stringify(outCalls, null, 2))}</pre></div>`;
+      }
+      // 上游声明的可调用函数（人类照此回填）
+      const declared = (p.tools || []).filter(x => x && x.function && x.function.name);
+      const toolsHtml = declared.length
+        ? `<div class="ctx"><div class="k">${t('task.tools', { n: declared.length })}</div><pre style="font-size:11px;">${declared.map(x => `• ${esc(x.function.name)}${x.function.description ? ' — ' + esc(x.function.description) : ''}`).join('\n')}</pre></div>`
+        : '';
       if (task.reject_reason) {
         resultHtml += `<div class="ctx" style="border-left:3px solid var(--danger);"><div class="k">${t('task.rejectReason')}</div><pre>${esc(nl(task.reject_reason))}</pre></div>`;
       }
@@ -123,6 +136,7 @@ window.HLM = window.HLM || {};
         </div>
         <div class="ctx" style="display:flex;gap:8px;flex-wrap:wrap;">${metaHtml || `<span class="k">${t('task.noTags')}</span>`} ${params ? `<span style="color:var(--muted);font-size:12px;align-self:center;">${params}</span>` : ''}</div>
         <div class="ctx"><div class="k">${t('task.context', { n: messages.length })}</div>${msgsHtml}</div>
+        ${toolsHtml}
         ${resultHtml}
         <div class="ctx"><div class="k">${t('task.audit')} <button class="btn sm" onclick="window.HLM.UI.verifyChain(${task.id})">${t('task.verifyChain')}</button></div><pre style="font-size:11px;">${(task.logs || []).map(l => `[${fmt(l.created_at)}] ${esc(l.action)} — ${esc(l.actor_name || t('task.system'))}${l.remark ? ' · ' + esc(l.remark) : ''}`).join('\n') || t('task.none')}</pre><div id="chainBox"></div></div>
       `;
@@ -186,6 +200,8 @@ window.HLM = window.HLM || {};
     if (task.status === 'pending') btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('claim', ${id})">${t('task.claim')}</button>`;
     if (task.status === 'processing' && isOwner) {
       btns += `<button class="btn success" onclick="window.HLM.UI.promptComplete(${id})">${t('task.submitResult')}</button>`;
+      // 上游声明了 tools → 允许提交函数调用产出
+      if (declaredTools(task).length) btns += `<button class="btn" onclick="window.HLM.UI.promptToolCall(${id})">${t('task.submitToolCall')}</button>`;
       btns += `<button class="btn danger" onclick="window.HLM.UI.promptReject(${id})">${t('task.reject')}</button>`;
       btns += `<button class="btn" onclick="window.HLM.UI.doAction('pause', ${id})">${t('task.pause')}</button>`;
     }
@@ -229,6 +245,58 @@ window.HLM = window.HLM || {};
     const note = $('#completeNote').value;
     if (!content.trim()) { toast(t('modal.complete.empty'), 'warning'); return; }
     doAction('complete', id, { content, completion_note: note });
+  }
+
+  /** 上游为本任务声明的可调用函数（request_payload.tools，OpenAI 格式） */
+  function declaredTools(task) {
+    const tools = (task && task.request_payload && task.request_payload.tools) || [];
+    return tools.filter(x => x && x.function && x.function.name);
+  }
+
+  // ===== 函数调用产出（tools / function calling）=====
+  function promptToolCall(id) {
+    const tools = declaredTools(detailTask);
+    if (!tools.length) { toast(t('toolCall.none'), 'warning'); return; }
+    const opts = tools.map(x => `<option value="${esc(x.function.name)}">${esc(x.function.name)}</option>`).join('');
+    openModal(t('toolCall.title'), `
+      <div class="form-group">
+        <label class="form-label">${t('toolCall.function')}</label>
+        <select class="form-select" id="toolCallName" onchange="window.HLM.UI.syncToolArgs()">${opts}</select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('toolCall.args')}</label>
+        <textarea class="form-textarea" id="toolCallArgs" rows="8" placeholder="{}"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('modal.complete.note')}</label>
+        <textarea class="form-textarea" id="toolCallNote" rows="2" placeholder="${t('modal.complete.notePlaceholder')}"></textarea>
+      </div>`,
+      `<button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.cancel')}</button>
+       <button class="btn success" onclick="window.HLM.UI.submitToolCall(${id})">${t('common.submit')}</button>`);
+    syncToolArgs();
+  }
+
+  /** 切换函数时按 parameters.properties 生成参数骨架，降低手填 JSON 出错率 */
+  function syncToolArgs() {
+    const sel = $('#toolCallName');
+    const box = $('#toolCallArgs');
+    if (!sel || !box) return;
+    const tool = declaredTools(detailTask).find(x => x.function.name === sel.value);
+    const props = tool && tool.function.parameters && tool.function.parameters.properties;
+    if (!props) { if (!box.value.trim()) box.value = '{}'; return; }
+    const skeleton = {};
+    Object.keys(props).forEach(k => { skeleton[k] = ''; });
+    box.value = JSON.stringify(skeleton, null, 2);
+  }
+
+  function submitToolCall(id) {
+    const name = $('#toolCallName') && $('#toolCallName').value;
+    const raw = $('#toolCallArgs') ? $('#toolCallArgs').value : '{}';
+    const note = $('#toolCallNote') ? $('#toolCallNote').value : '';
+    let args;
+    try { args = raw.trim() ? JSON.parse(raw) : {}; } catch (e) { toast(t('toolCall.badJson'), 'error'); return; }
+    // 函数调用产出：content 留空，结果在 tool_calls（后端校验函数须为本任务声明过的）
+    doAction('complete', id, { content: '', tool_call: { name, arguments: args }, completion_note: note });
   }
 
   function promptReject(id) {
@@ -770,6 +838,7 @@ window.HLM = window.HLM || {};
 
   window.HLM.UI = {
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
+    promptToolCall, submitToolCall, syncToolArgs,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
     promptReopen, submitReopen, showAuditReport, downloadDataset, showRules, ruleForm, saveRule, toggleRule, delRule,
     renderUsers, showUserForm, saveUser, delUser, showUserDetail, showTenants, tenantForm, saveTenant, renderLogs,

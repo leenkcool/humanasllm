@@ -11,6 +11,12 @@
 - 描述：**`/v1/tasks/:id` 进度补全**——补 `priority`/`assignee`/`timeout_at`/`sla_remaining_sec`；回查与回调共用 `services/taskView.js` 视图，避免字段漂移
 - 验证：单测/集成 36 项通过 + 30 项 API smoke 通过 + 完成回调端到端实测通过
 
+## 2026-09-16 - 接入层阶段 A 收口（SSE 中途推送 + 函数调用）
+- 描述：**SSE 中途状态推送**（opt-in `stream_events:true`）——连接保持打开，实时推 `task.accepted|processing|completed|returned|cancelled|paused`，终态推 `[DONE]`；含保活与最长保持；**不传该字段行为完全不变**（对既有上游零破坏）。新增 `services/sseStream.js` + `services/taskEvents.js`
+- 描述：**tools / function calling**——请求声明 `tools`（OpenAI 函数定义），人工在工作台选函数并填参数，产出按 **OpenAI 原生 `tool_calls`** 返回（`content=null` / `finish_reason=tool_calls`）；仅允许调用本任务声明过的函数，未声明一律拒绝。新增 `services/toolCalls.js`
+- 验证：单测/集成 40 项通过 + 两项端到端实测通过（SSE 事件序列 = accepted→processing→completed→[DONE]；未声明函数提交返回 400）
+- 说明：路线图阶段 A「体验筑基」**接入层三项（回调 webhook / SSE 中途推送 / 函数调用）至此全部交付**
+
 
 ---
 

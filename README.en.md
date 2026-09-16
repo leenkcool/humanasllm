@@ -10,12 +10,13 @@ Turn engineers into a "human-as-a-service LLM" that plugs into your multi-model 
 
 ## ✨ Features
 
-- **OpenAI compatible**: `/v1/chat/completions` (one-shot + SSE streaming) + `/v1/approvals` (AI-initiated approval requests). **Async intake**: returns a `task_id` immediately; once a human finishes, poll `GET /v1/tasks/:id`, or supply a `callback_url` and let the server **push the result** (no polling)
-- **Governance layer** (the heart of Human-as-LLM): tiered policy engine (**confidential/ops whitelist locked down, no AI fallback**), async approvals, quality acceptance, tamper-proof audit hash chain, compliance reports (prove data never leaves the gateway), engineer ratings
+- **OpenAI compatible**: `/v1/chat/completions` (one-shot + SSE streaming) + `/v1/approvals` (AI-initiated approval requests). **Async intake**: returns a `task_id` immediately; three ways to collect the result — poll `GET /v1/tasks/:id`, supply a `callback_url` for a **completion callback**, or set `stream_events:true` for **SSE mid-stream status push** (claim/completion arrive in real time; no polling)
+- **Function calling (tools)**: declare `tools`, the human engineer executes them and returns `tool_calls` in native OpenAI shape — agents can call "human-provided functions"
+- **Governance layer** (the heart of Human-as-LLM): tiered policy engine (**confidential/ops whitelist locked down, no AI fallback**), async approvals, quality acceptance, tamper-proof audit hash chain (+ in-app chain verification), compliance reports (prove data never leaves the gateway), engineer ratings
 - **Multi-tenant**: `upstream_key` routes tenants; task/approval/project/rule data fully isolated
 - **Multi-tool install**: one-click SKILL / AGENT / rule generation for 13 AI agent tools (Claude Code / Codex / OpenCode / Gemini / Cursor / Windsurf / Aider / WorkBuddy / OpenClaw / Hermes / Pi, etc.), with online fine-tuning, local full-install, and server-side install
 - **Smart drift**: simple `general` tasks can be auto-handled by AI (toggleable); confidential stays locked
-- **Test suite**: 36 unit/integration tests + 30 API regression tests, full coverage of key security boundaries
+- **Test suite**: 40 unit/integration tests + 30 API regression tests, full coverage of key security boundaries
 
 ## 🌐 Relationship to FDE (Forward Deployed Engineers)
 
@@ -128,8 +129,6 @@ The request body matches standard OpenAI `chat/completions`, with optional busin
 
 **Experience foundation (near term)**
 - 🐳 Docker one-click deployment (lower the self-host barrier)
-- 📡 SSE mid-stream status push (no more manual polling)
-- 🛠️ tools / function calling (agent calls "human-provided functions")
 - 📱 Mobile / PWA + on-call duty + timeout escalation sequence
 
 **Enterprise ready (mid term)**

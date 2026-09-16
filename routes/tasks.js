@@ -127,8 +127,12 @@ router.post('/:id/complete', authenticate, async (req, res) => {
     const { error } = await assertTaskAccess(req, res, id, { ownerOnly: true });
     if (error) return error;
     const content = (req.body.content || '').toString();
-    if (!content.trim()) return res.status(400).json({ success: false, message: '提交内容不能为空' });
-    const r = await queue.completeTask(id, content, { id: req.user.id, name: req.user.name || req.user.username }, { completion_note: req.body.completion_note });
+    const toolCall = req.body.tool_call !== undefined ? req.body.tool_call : req.body.tool_calls;
+    const hasToolCall = toolCall !== undefined && toolCall !== null && (!Array.isArray(toolCall) || toolCall.length > 0);
+    // 函数调用产出：允许 content 为空（OpenAI 语义 content=null，结果在 tool_calls）
+    if (!content.trim() && !hasToolCall) return res.status(400).json({ success: false, message: '提交内容不能为空' });
+    const r = await queue.completeTask(id, content, { id: req.user.id, name: req.user.name || req.user.username },
+      { completion_note: req.body.completion_note, tool_call: toolCall });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
     res.json({ success: true, data: r.task });
   } catch (err) {

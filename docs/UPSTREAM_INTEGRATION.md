@@ -36,6 +36,27 @@
 | `returned` | 转达驳回原因，补充上下文后可重新派单 |
 | `pending/processing/paused` | 如实反馈状态，**继续轮候** |
 
+### 4. 免轮询（推荐，二选一）
+
+**完成回调**：请求体带 `callback_url`，任务终态（完成/驳回/取消）主动 POST 结果到你的地址，不用再轮询。
+```json
+{ "model": "human-llm", "messages": [...], "callback_url": "https://your-agent/hook" }
+```
+回调体：`{ "event": "task.completed" | "task.returned" | "task.cancelled", "task_id": 42, "content": "…", ... }`
+
+**SSE 中途状态推送**：`stream: true` + `stream_events: true`，连接保持打开，接单/完成实时到达。
+```json
+{ "model": "human-llm", "stream": true, "stream_events": true, "messages": [...] }
+```
+事件：`task.accepted` → `task.processing` → `task.completed` → `data: [DONE]`（每帧含 `task_id`/`status`/`content`）
+
+### 5. 函数调用（让人类执行你声明的函数）
+请求体声明 `tools`（OpenAI 函数定义），人工执行后回填 `tool_calls`，你按原生结构直接调用：
+```json
+{ "status": "completed", "content": null, "finish_reason": "tool_calls",
+  "tool_calls": [{ "type": "function", "function": { "name": "restart_service", "arguments": "{\"name\":\"nginx\"}" } }] }
+```
+
 ---
 
 ## 二、治理协议（上游可感知的「人的权威节点」）

@@ -42,7 +42,12 @@
   "priority": "high",                       // 业务扩展：high|medium|low
   "category": "confidential",               // 业务扩展：general|confidential|ops（涉密/运维类禁 AI 兜底）
   "meta_tags": { "source": "scheduler" },   // 业务扩展：元标签
-  "callback_url": "https://agent.example.com/hook"  // 业务扩展：完成回调地址（可选，http/https）
+  "callback_url": "https://agent.example.com/hook",  // 业务扩展：完成回调地址（可选，http/https）
+  "stream_events": true,                    // 业务扩展：SSE 中途状态推送（需同时 stream:true，可选）
+  "tools": [                                // 函数调用：声明人类可执行的函数（可选，OpenAI 格式）
+    { "type": "function", "function": { "name": "restart_service", "description": "重启指定服务",
+      "parameters": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] } } }
+  ]
 }
 ```
 
@@ -55,7 +60,23 @@
   "task_id": 12, "status": "pending" }
 ```
 
-`stream:true` 同样立即返回受理信息（SSE `data:` 行 + `[DONE]`），不会等人工完成再流式输出。
+`stream:true` 默认同样立即返回受理信息（SSE `data:` 行 + `[DONE]`），不会等人工完成再流式输出。**若需中途状态推送，见下「中途状态推送」。**
+
+**中途状态推送（opt-in，免轮询）**：`stream:true` **且** `stream_events:true` 时，连接保持打开，任务每次状态流转实时推送一帧，终态推 `data: [DONE]` 关闭：
+```
+data: {"object":"chat.completion.chunk","task_id":12,"status":"pending","event":"task.accepted", ...}
+
+data: {"object":"task.event","event":"task.processing","task_id":12,"status":"processing", ...}
+
+data: {"object":"task.event","event":"task.completed","task_id":12,"status":"completed","content":"<人工产出>", ...}
+
+data: [DONE]
+```
+- 事件名 = `task.` + 状态：`task.accepted`（受理）｜`task.processing`（接单）｜`task.completed`｜`task.returned`｜`task.cancelled`｜`task.paused`（非终态，流继续）
+- 每帧 = `{ object:'task.event', event, ...任务视图 }`（与回查字段一致，含 `tool_calls`/`finish_reason`）
+- 保活：每 `SSE_HEARTBEAT_MS`（默认 15s）发一行 `: keep-alive` 注释，防代理超时断连
+- 最长保持 `SSE_EVENTS_MAX_MIN`（默认 60 分钟），到点推 `task.stream_timeout` 后关闭，上游可继续凭 `task_id` 回查
+- 不传 `stream_events` 时行为完全不变（对既有上游零破坏）
 
 **回查结果**：人工完成后，上游凭 `task_id` 取回产出（见下节）。AI 中继模型（命中 `AI_RELAY_MODELS`）不受影响，仍同步返回真实 LLM 内容。
 
@@ -71,11 +92,20 @@
 - 降级安全：投递失败只记服务端日志，不阻塞任务流转；地址非法（非 http/https）在建单时丢弃
 - 开关：`CALLBACK_ENABLED`（默认 `true`）、超时 `CALLBACK_TIMEOUT_MS`（默认 `5000`）
 - 注：`reopen`（打回重做）也回到 `returned` 终态，会再次回调
+- 回调体与回查字段完全一致（同一视图），函数调用产出同样含 `tool_calls`/`finish_reason`
+
+### 函数调用（tools / function calling）
+上游在请求体声明 `tools`（OpenAI 函数定义），人类工程师在工作台选择函数并填参数提交，产出按 **OpenAI 原生 `tool_calls`** 返回，agent 直接执行即可。
+
+- 人类可调用的函数**仅限本任务声明过的**，未声明一律 400 拒绝（防误填/越权）；`arguments` 必须是合法 JSON
+- 有函数调用时 `content` 为 `null`、`finish_reason` 为 `tool_calls`（OpenAI 语义）
+- 回查与完成回调**都**返回 `tool_calls`，`/v1` 侧无需额外解析
 
 ### GET /v1/tasks/:id
 上游凭 `task_id` 查询人工任务处理结果（异步受理后轮询取回；配了 `callback_url` 则不必轮询）。
 ```json
 { "task_id": 12, "status": "completed", "content": "<人工产出>",
+  "tool_calls": null, "finish_reason": "stop",
   "model": "human-llm", "priority": "low", "category": "general",
   "rule_id": 1, "rule_name": "合规备案安全",
   "category_source": "rule", "assignee": "工程师-张",
@@ -84,7 +114,13 @@
   "audit": { "valid": true },
   "created_at": "…", "completed_at": "…" }
 ```
-- `status: completed` → `content` 为人工产出；`returned` → 驳回原因；`cancelled` → 已取消；`pending|processing|paused` → 处理中
+函数调用产出时（`content: null`）：
+```json
+{ "status": "completed", "content": null, "finish_reason": "tool_calls",
+  "tool_calls": [ { "id": "call_56b0017c1b34dcc9", "type": "function",
+    "function": { "name": "restart_service", "arguments": "{\"name\":\"nginx\"}" } } ] }
+```
+- `status: completed` → `content` 为人工产出（或 `tool_calls`）；`returned` → 驳回原因；`cancelled` → 已取消；`pending|processing|paused` → 处理中
 - **进度**：`priority` 优先级、`assignee` 当前处理人、`timeout_at` SLA 截止、`sla_remaining_sec` 剩余秒数（无 SLA 或已终态为 `null`）
 - **治理决策**（阶段三）：`rule_id`/`rule_name` 分级规则、`category_source`（rule=规则锁定 / manual=人工或默认）、`quality.completion_note` 质量验收说明、`audit.valid` 审计哈希链健康
 

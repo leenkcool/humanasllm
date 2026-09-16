@@ -30,13 +30,15 @@ function parseChatRequest(body = {}) {
     top_p: body.top_p ?? null,
     stop: body.stop ?? null,
     user: body.user ?? null,
+    tools: Array.isArray(body.tools) ? body.tools : null,   // 函数调用：人类可执行并回填 tool_calls
+    tool_choice: body.tool_choice ?? null,
     extra,      // 元标签/项目编号/优先级/场景分类/文件描述等
   };
 }
 
 /** 提取业务扩展字段（全透传，工作台展示用） */
 function pickExtra(body) {
-  const keys = ['skills', 'category', 'project_code', 'project', 'meta_tags', 'meta', 'priority', 'files', 'attachments', 'metadata', 'callback_url'];
+  const keys = ['skills', 'category', 'project_code', 'project', 'meta_tags', 'meta', 'priority', 'files', 'attachments', 'metadata', 'callback_url', 'stream_events'];
   const out = {};
   for (const k of keys) {
     if (body[k] !== undefined) out[k] = body[k];

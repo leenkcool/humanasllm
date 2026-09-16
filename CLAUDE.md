@@ -46,6 +46,9 @@ services/
   notifier.js / mailer.js  # 通知（邮件 + Webhook），可降级
   callback.js          # 上游完成回调（终态主动推送，免轮询；可降级）
   taskView.js          # 上游任务视图（/v1 回查与完成回调共用字段）
+  taskEvents.js        # 任务事件总线（供 /v1 SSE 中途推送订阅）
+  sseStream.js         # /v1 SSE 中途状态推送（opt-in stream_events:true）
+  toolCalls.js         # tools/function calling（声明校验 + tool_calls 归一化）
   waiters.js           # 等待者单例（审批挂起等待）
   i18n.js / csv.js     # 消息翻译 / CSV 导出
   websocket.js         # Socket.IO 推送（task:new/update/timeout）
@@ -58,6 +61,8 @@ scripts/seed.js        # 种子账户
 - `GET  /v1/models` → `human-llm` + AI 中继模型列表
 - `POST /v1/chat/completions` → 支持 `stream:false` 一次性返回 与 `stream:true` SSE 流式
 - **完成回调**：请求体带 `callback_url`（http/https）→ 任务终态主动 POST 结果（`task.completed|returned|cancelled`），上游免轮询；失败仅记日志
+- **中途状态推送**：`stream:true` + `stream_events:true` → SSE 保持连接，实时推 `task.accepted|processing|completed|returned|cancelled|paused`，终态推 `[DONE]`；不传该字段行为不变（零破坏）
+- **函数调用**：请求声明 `tools` → 人工可回填 `tool_calls`（仅限本任务声明的函数，未声明拒绝）→ 回查/回调按 OpenAI 原生结构返回，`content=null`、`finish_reason=tool_calls`
 - **AI 降级路由**：model 匹配 `AI_RELAY_MODELS`（如 `deepseek-v4-flash`）→ 中继转发到真实 LLM（DeepSeek）；否则走人工
 - **AI 提审批** `POST /v1/approvals` → 申请服务器/环境/权限等资源，挂起等待人类批准/驳回，返回审批结果（`status: approved|rejected` + 人类提供说明）
 - 可选 `UPSTREAM_API_KEY` 校验（配置后需 `Authorization: Bearer <key>`）
@@ -90,6 +95,7 @@ scripts/seed.js        # 种子账户
 `TASK_PENDING_TIMEOUT_MIN`、`TASK_PROCESSING_TIMEOUT_MIN`、`UPSTREAM_API_KEY`(可选)、
 `AI_RELAY_ENABLED`、`AI_RELAY_BASE_URL`、`AI_RELAY_API_KEY`、`AI_RELAY_MODELS`、
 `CALLBACK_ENABLED`(默认 true)、`CALLBACK_TIMEOUT_MS`(默认 5000，上游完成回调)、
+`SSE_HEARTBEAT_MS`(默认 15000)、`SSE_EVENTS_MAX_MIN`(默认 60，中途状态推送保活/最长保持)、
 `USER_REGISTER_MODE`(open/audit)、`SMTP_HOST/PORT/SECURE/USER/PASS/FROM`(邮件，可选)、
 `NOTIFY_EMAIL_TO`、`NOTIFY_WEBHOOK_URL`(通知渠道：邮件收件人/企微钉钉webhook，可选)、
 `GATEWAY_INSTALL_ROOT`(服务器端安装根，可选；默认 data/installed)

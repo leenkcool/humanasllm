@@ -13,6 +13,7 @@ const queue = require('../services/queueService');
 const aiRelay = require('../services/aiRelay');
 const aiShift = require('../services/aiShift');
 const taskView = require('../services/taskView');
+const sseStream = require('../services/sseStream');
 const { getTenantByUpstreamKey, resolveCallerTenantId } = require('../middleware/auth');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
@@ -106,7 +107,10 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
   const content = `任务已受理，task_id=${taskId}，待人工处理；可通过 GET /v1/tasks/${taskId} 查询结果`;
 
   if (parsed.stream) {
-    // SSE 兼容：受理信息按流式块输出，上游按标准 SSE 解析正常结束
+    // opt-in 中途状态推送：上游传 stream_events:true，保持连接实时推送到终态（免轮询）
+    if (parsed.extra.stream_events) {
+      return sseStream.streamTaskEvents(req, res, { taskId, model: parsed.model, created });
+    }
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');

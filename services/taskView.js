@@ -36,6 +36,7 @@ async function buildTaskView(task) {
     ? (await getDb().exec('SELECT name FROM task_rules WHERE id = ?', [task.rule_id]))[0]
     : null;
   const rp = task.result_payload || {};
+  const toolCallsOut = rp.tool_calls || null;
   let assignee = null;
   if (task.assignee_id) {
     const u = rows(await getDb().exec('SELECT name, username FROM users WHERE id = ?', [task.assignee_id]))[0];
@@ -44,7 +45,10 @@ async function buildTaskView(task) {
   return {
     task_id: task.id,
     status: task.status,
-    content: statusContent(task),
+    // 函数调用产出：content 为 null（OpenAI 语义），结果在 tool_calls
+    content: toolCallsOut ? null : statusContent(task),
+    tool_calls: toolCallsOut,
+    finish_reason: task.status === 'completed' ? (toolCallsOut ? 'tool_calls' : 'stop') : null,
     model: task.model,
     priority: task.priority || 'medium',
     category: task.category || 'general',

@@ -14,6 +14,8 @@ const { TASK_TRANSITIONS } = require('./stateMachine');
 const { classify } = require('./categoryEngine');
 const notifier = require('./notifier');
 const callback = require('./callback');
+const taskEvents = require('./taskEvents');
+const toolCalls = require('./toolCalls');
 
 const STATUS = {
   PENDING: 'pending',
@@ -181,6 +183,8 @@ async function transition(taskId, to, actor, remark, updates = {}) {
   await getDb().run(sql, params);
   const updated = await getTask(taskId);
   ws.broadcast('task:update', { id: taskId, status: to });
+  // /v1 SSE 中途推送：订阅者（若有）实时收到状态流转
+  taskEvents.publish(taskId, { status: to, task: updated });
   // 上游回调：进入终态（完成/驳回/取消）主动推送，上游无需轮询；失败只记日志
   if (callback.TERMINAL_EVENTS[to]) {
     callback.notify(updated).catch(e => console.error('[上游回调异常]', e.message));
@@ -202,26 +206,39 @@ async function claimTask(taskId, engineerId, engineerName) {
   });
 }
 
-/** 提交结果：processing → completed（先过质量校验；运维/涉密类需人工验收单） */
+/** 提交结果：processing → completed（先过质量校验；运维/涉密类需人工验收单；支持函数调用产出） */
 async function completeTask(taskId, content, actor, opts = {}) {
   const task = await getTask(taskId);
   const category = (task && task.category) || 'general';
-  const bad = qualityCheck(content, category);
-  if (bad) return { ok: false, message: bad };
+  // 函数调用：人工回填 tool_calls（须为本任务声明过的函数）；此时允许 content 为空（OpenAI 语义）
+  const calls = toolCalls.normalize(task, opts.tool_call !== undefined ? opts.tool_call : opts.tool_calls);
+  if (!calls.ok) return { ok: false, message: calls.message };
+  const outCalls = calls.tool_calls;
+  if (!outCalls.length) {
+    const bad = qualityCheck(content, category);
+    if (bad) return { ok: false, message: bad };
+  }
   // 治理层「质量是人的标准」：运维/涉密类提交需附验收说明（做了什么 + 自检结果），允许简短产出但拦截占位
   if (category !== 'general') {
     const note = String(opts.completion_note || '').trim();
     if (!note) return { ok: false, message: '运维/涉密任务需附验收说明（做了什么、自检结果）' };
     if (PLACEHOLDER_RE.test(note)) return { ok: false, message: '验收说明疑似占位，请填写实际完成情况' };
   }
-  const t = await transition(taskId, STATUS.COMPLETED, actor, '提交结果', {
-    result_text: content,
-    result_payload: JSON.stringify({ content, completion_note: opts.completion_note || null }),
+  const resultText = content || '';
+  const t = await transition(taskId, STATUS.COMPLETED, actor, outCalls.length ? '提交函数调用' : '提交结果', {
+    result_text: resultText,
+    result_payload: JSON.stringify({
+      content: resultText,
+      completion_note: opts.completion_note || null,
+      ...(outCalls.length ? { tool_calls: outCalls } : {}),
+    }),
     completed_at: now(),
     timeout_at: null,
   });
   if (t.ok) {
-    await logRequest(taskId, 'out', { content, model: t.task.model }, t.task.model, t.task.tenant_id);
+    await logRequest(taskId, 'out',
+      { content: resultText, ...(outCalls.length ? { tool_calls: outCalls } : {}), model: t.task.model },
+      t.task.model, t.task.tenant_id);
   }
   return t;
 }
