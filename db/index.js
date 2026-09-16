@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   category VARCHAR(20) NOT NULL DEFAULT 'general',
   rule_id INTEGER,
   project_code TEXT,
+  callback_url VARCHAR(512),
   meta_tags JSONB,
   request_payload JSONB NOT NULL DEFAULT '{}',
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -169,6 +170,7 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'resource'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'general'`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS rule_id INTEGER`);
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS callback_url VARCHAR(512)`);
   await db.exec(`ALTER TABLE task_logs ADD COLUMN IF NOT EXISTS prev_hash TEXT`);
   await db.exec(`ALTER TABLE task_logs ADD COLUMN IF NOT EXISTS hash TEXT`);
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(128)`);

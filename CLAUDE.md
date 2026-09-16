@@ -44,6 +44,8 @@ services/
   openaiEncoder.js     # OpenAI 请求解析 + 响应/SSE chunk 封装
   projectService.js    # 项目 CRUD + 审批批准回调
   notifier.js / mailer.js  # 通知（邮件 + Webhook），可降级
+  callback.js          # 上游完成回调（终态主动推送，免轮询；可降级）
+  taskView.js          # 上游任务视图（/v1 回查与完成回调共用字段）
   waiters.js           # 等待者单例（审批挂起等待）
   i18n.js / csv.js     # 消息翻译 / CSV 导出
   websocket.js         # Socket.IO 推送（task:new/update/timeout）
@@ -55,6 +57,7 @@ scripts/seed.js        # 种子账户
 ### OpenAI 兼容（上游直连）
 - `GET  /v1/models` → `human-llm` + AI 中继模型列表
 - `POST /v1/chat/completions` → 支持 `stream:false` 一次性返回 与 `stream:true` SSE 流式
+- **完成回调**：请求体带 `callback_url`（http/https）→ 任务终态主动 POST 结果（`task.completed|returned|cancelled`），上游免轮询；失败仅记日志
 - **AI 降级路由**：model 匹配 `AI_RELAY_MODELS`（如 `deepseek-v4-flash`）→ 中继转发到真实 LLM（DeepSeek）；否则走人工
 - **AI 提审批** `POST /v1/approvals` → 申请服务器/环境/权限等资源，挂起等待人类批准/驳回，返回审批结果（`status: approved|rejected` + 人类提供说明）
 - 可选 `UPSTREAM_API_KEY` 校验（配置后需 `Authorization: Bearer <key>`）
@@ -86,6 +89,7 @@ scripts/seed.js        # 种子账户
 `PORT=39000`、`DB_TYPE=pg`、`PG_DATABASE=p390`、`JWT_SECRET`、`HUMAN_LLM_MODEL=human-llm`、
 `TASK_PENDING_TIMEOUT_MIN`、`TASK_PROCESSING_TIMEOUT_MIN`、`UPSTREAM_API_KEY`(可选)、
 `AI_RELAY_ENABLED`、`AI_RELAY_BASE_URL`、`AI_RELAY_API_KEY`、`AI_RELAY_MODELS`、
+`CALLBACK_ENABLED`(默认 true)、`CALLBACK_TIMEOUT_MS`(默认 5000，上游完成回调)、
 `USER_REGISTER_MODE`(open/audit)、`SMTP_HOST/PORT/SECURE/USER/PASS/FROM`(邮件，可选)、
 `NOTIFY_EMAIL_TO`、`NOTIFY_WEBHOOK_URL`(通知渠道：邮件收件人/企微钉钉webhook，可选)、
 `GATEWAY_INSTALL_ROOT`(服务器端安装根，可选；默认 data/installed)

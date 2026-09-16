@@ -13,6 +13,7 @@ const aiRelay = require('./aiRelay');
 const { TASK_TRANSITIONS } = require('./stateMachine');
 const { classify } = require('./categoryEngine');
 const notifier = require('./notifier');
+const callback = require('./callback');
 
 const STATUS = {
   PENDING: 'pending',
@@ -126,15 +127,18 @@ async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenant
   const category = cat.category;
   const ruleId = cat.rule_id;
   const projectCode = parsed.extra.project_code || null;
+  // 上游完成回调地址（仅接受 http/https，非法值丢弃不影响建单）
+  const rawCallback = parsed.extra.callback_url;
+  const callbackUrl = (typeof rawCallback === 'string' && callback.isAllowedUrl(rawCallback)) ? rawCallback : null;
   const metaTags = parsed.extra.meta_tags || parsed.extra.meta || null;
   const skills = parsed.extra.skills || null;
   const payload = { ...parsed, created };
 
   const { lastId } = await db.run(
     `INSERT INTO tasks
-       (upstream_request_id, model, stream, priority, category, rule_id, project_code, meta_tags, request_payload, status, timeout_at, tenant_id, skills)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?, ?)`,
-    [chatId, parsed.model, parsed.stream, priority, category, ruleId, projectCode,
+       (upstream_request_id, model, stream, priority, category, rule_id, project_code, callback_url, meta_tags, request_payload, status, timeout_at, tenant_id, skills)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?, ?)`,
+    [chatId, parsed.model, parsed.stream, priority, category, ruleId, projectCode, callbackUrl,
       metaTags ? JSON.stringify(metaTags) : null,
       JSON.stringify(payload),
       timeoutMinutes('pending', priority), tenantId, skills]
@@ -175,8 +179,13 @@ async function transition(taskId, to, actor, remark, updates = {}) {
   params.push(taskId);
   const sql = `UPDATE tasks SET ${pieces.join(', ')} WHERE id = $${pi}`;
   await getDb().run(sql, params);
+  const updated = await getTask(taskId);
   ws.broadcast('task:update', { id: taskId, status: to });
-  return { ok: true, task: await getTask(taskId) };
+  // 上游回调：进入终态（完成/驳回/取消）主动推送，上游无需轮询；失败只记日志
+  if (callback.TERMINAL_EVENTS[to]) {
+    callback.notify(updated).catch(e => console.error('[上游回调异常]', e.message));
+  }
+  return { ok: true, task: updated };
 }
 
 /** 工程师接单：pending/returned → processing（按优先级差异化 SLA 超时） */

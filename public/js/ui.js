@@ -124,12 +124,55 @@ window.HLM = window.HLM || {};
         <div class="ctx" style="display:flex;gap:8px;flex-wrap:wrap;">${metaHtml || `<span class="k">${t('task.noTags')}</span>`} ${params ? `<span style="color:var(--muted);font-size:12px;align-self:center;">${params}</span>` : ''}</div>
         <div class="ctx"><div class="k">${t('task.context', { n: messages.length })}</div>${msgsHtml}</div>
         ${resultHtml}
-        <div class="ctx"><div class="k">${t('task.audit')}</div><pre style="font-size:11px;">${(task.logs || []).map(l => `[${fmt(l.created_at)}] ${esc(l.action)} — ${esc(l.actor_name || t('task.system'))}${l.remark ? ' · ' + esc(l.remark) : ''}`).join('\n') || t('task.none')}</pre></div>
+        <div class="ctx"><div class="k">${t('task.audit')} <button class="btn sm" onclick="window.HLM.UI.verifyChain(${task.id})">${t('task.verifyChain')}</button></div><pre style="font-size:11px;">${(task.logs || []).map(l => `[${fmt(l.created_at)}] ${esc(l.action)} — ${esc(l.actor_name || t('task.system'))}${l.remark ? ' · ' + esc(l.remark) : ''}`).join('\n') || t('task.none')}</pre><div id="chainBox"></div></div>
       `;
 
       const foot = actionButtons(task);
       openModal(t('task.detailTitle', { id: task.id }), body, foot, 'lg');
     } catch (e) {
+      toast(e.message, 'error');
+    }
+  }
+
+  // 哈希链可视化：服务端校验结论 + 客户端逐条复核 prev_hash 链（双重复核，改一条即断裂）
+  async function verifyChain(taskId) {
+    const box = document.getElementById('chainBox');
+    if (!box) return;
+    box.innerHTML = `<div class="ctx"><span style="color:var(--muted);font-size:12px;">…</span></div>`;
+    try {
+      const [aRes, tRes] = await Promise.all([
+        API.get('/logs/tasks/' + taskId + '/audit'),
+        API.get('/tasks/' + taskId),
+      ]);
+      const a = aRes.data || {};
+      const logs = (tRes.data && tRes.data.logs) || [];
+      // 客户端独立复核：第 i 条的 prev_hash 应等于第 i-1 条的 hash
+      let clientBroken = null;
+      for (let i = 1; i < logs.length; i++) {
+        if ((logs[i].prev_hash || null) !== (logs[i - 1].hash || null)) { clientBroken = logs[i].id; break; }
+      }
+      const ok = !!a.valid && !clientBroken;
+      const brokenAt = a.broken_at || clientBroken;
+      const badge = ok
+        ? `<span class="tag completed">${t('task.chainValid')}</span>`
+        : `<span class="tag returned">${t('task.chainBroken', { id: brokenAt || '-' })}</span>`;
+      const rows = logs.map((l, i) => {
+        const linkage = i === 0
+          ? '<span style="color:var(--muted)">·</span>'
+          : (((l.prev_hash || null) === (logs[i - 1].hash || null))
+            ? '<span style="color:var(--success)">✓</span>'
+            : '<span style="color:var(--danger)">✗</span>');
+        return `<div style="margin-bottom:6px;">#${l.id} ${esc(l.action)} ${linkage}` +
+          `<br><span style="color:var(--muted)">hash ${esc(String(l.hash || '-').slice(0, 16))}…</span>` +
+          `<br><span style="color:var(--muted)">prev ${esc(String(l.prev_hash || '-').slice(0, 16))}…</span></div>`;
+      }).join('');
+      box.innerHTML = `<div class="ctx"><div class="k">${t('task.chainVerdict')}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">${badge}
+          <span class="chip">${t('task.chainEntries', { n: a.log_count || logs.length })}</span></div>
+        <div class="mono" style="font-size:11px;line-height:1.6;">${rows || t('task.none')}</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:8px;">${t('task.chainHint')}</div></div>`;
+    } catch (e) {
+      box.innerHTML = '';
       toast(e.message, 'error');
     }
   }
@@ -734,6 +777,7 @@ window.HLM = window.HLM || {};
     renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,
     promptEditProject, submitEditProject, doArchiveProject,
     promptTaskProject, submitTaskProject, exportCSV,
+    verifyChain,
     startCountdown,
     closeModal,
   };

@@ -36,7 +36,7 @@ function parseChatRequest(body = {}) {
 
 /** 提取业务扩展字段（全透传，工作台展示用） */
 function pickExtra(body) {
-  const keys = ['skills', 'category', 'project_code', 'project', 'meta_tags', 'meta', 'priority', 'files', 'attachments', 'metadata'];
+  const keys = ['skills', 'category', 'project_code', 'project', 'meta_tags', 'meta', 'priority', 'files', 'attachments', 'metadata', 'callback_url'];
   const out = {};
   for (const k of keys) {
     if (body[k] !== undefined) out[k] = body[k];

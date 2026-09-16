@@ -41,7 +41,8 @@
   "project_code": "internal-settlement",   // 业务扩展：项目编码（关联 projects）
   "priority": "high",                       // 业务扩展：high|medium|low
   "category": "confidential",               // 业务扩展：general|confidential|ops（涉密/运维类禁 AI 兜底）
-  "meta_tags": { "source": "scheduler" }    // 业务扩展：元标签
+  "meta_tags": { "source": "scheduler" },   // 业务扩展：元标签
+  "callback_url": "https://agent.example.com/hook"  // 业务扩展：完成回调地址（可选，http/https）
 }
 ```
 
@@ -58,15 +59,33 @@
 
 **回查结果**：人工完成后，上游凭 `task_id` 取回产出（见下节）。AI 中继模型（命中 `AI_RELAY_MODELS`）不受影响，仍同步返回真实 LLM 内容。
 
+**完成回调（推荐，免轮询）**：请求体带 `callback_url`（仅接受 `http`/`https`），任务进入终态后主动 POST 结果到该地址，上游无需轮询 `GET /v1/tasks/:id`。
+回调体 = `{ event, ...任务视图 }`，`event` ∈ `task.completed`｜`task.returned`｜`task.cancelled`：
+```json
+{ "event": "task.completed", "task_id": 12, "status": "completed", "content": "<人工产出>",
+  "model": "human-llm", "priority": "low", "category": "general",
+  "rule_id": 1, "rule_name": "合规备案安全", "category_source": "rule", "assignee": "工程师-张",
+  "quality": { "completion_note": null }, "sla_remaining_sec": null,
+  "timeout_at": null, "created_at": "…", "completed_at": "…" }
+```
+- 降级安全：投递失败只记服务端日志，不阻塞任务流转；地址非法（非 http/https）在建单时丢弃
+- 开关：`CALLBACK_ENABLED`（默认 `true`）、超时 `CALLBACK_TIMEOUT_MS`（默认 `5000`）
+- 注：`reopen`（打回重做）也回到 `returned` 终态，会再次回调
+
 ### GET /v1/tasks/:id
-上游凭 `task_id` 查询人工任务处理结果（异步受理后轮询取回）。
+上游凭 `task_id` 查询人工任务处理结果（异步受理后轮询取回；配了 `callback_url` 则不必轮询）。
 ```json
 { "task_id": 12, "status": "completed", "content": "<人工产出>",
-  "model": "human-llm", "category": "general", "rule_id": 1, "rule_name": "合规备案安全",
-  "category_source": "rule", "quality": { "completion_note": null }, "audit": { "valid": true },
+  "model": "human-llm", "priority": "low", "category": "general",
+  "rule_id": 1, "rule_name": "合规备案安全",
+  "category_source": "rule", "assignee": "工程师-张",
+  "quality": { "completion_note": null },
+  "sla_remaining_sec": 3480, "timeout_at": "…",
+  "audit": { "valid": true },
   "created_at": "…", "completed_at": "…" }
 ```
-- `status: completed` → `content` 为人工产出；`returned` → 驳回原因；`pending|processing|paused` → 处理中
+- `status: completed` → `content` 为人工产出；`returned` → 驳回原因；`cancelled` → 已取消；`pending|processing|paused` → 处理中
+- **进度**：`priority` 优先级、`assignee` 当前处理人、`timeout_at` SLA 截止、`sla_remaining_sec` 剩余秒数（无 SLA 或已终态为 `null`）
 - **治理决策**（阶段三）：`rule_id`/`rule_name` 分级规则、`category_source`（rule=规则锁定 / manual=人工或默认）、`quality.completion_note` 质量验收说明、`audit.valid` 审计哈希链健康
 
 ### GET /v1/governance/rules

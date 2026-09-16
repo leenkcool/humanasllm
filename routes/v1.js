@@ -12,6 +12,7 @@ const encoder = require('../services/openaiEncoder');
 const queue = require('../services/queueService');
 const aiRelay = require('../services/aiRelay');
 const aiShift = require('../services/aiShift');
+const taskView = require('../services/taskView');
 const { getTenantByUpstreamKey, resolveCallerTenantId } = require('../middleware/auth');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
@@ -155,30 +156,10 @@ router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
     if (callerTenant && taskTenant && callerTenant !== taskTenant) {
       return res.status(404).json(encoder.makeError(404, 'Task not found', 'invalid_request_error'));
     }
-    let content = '任务处理中，请稍后查询';
-    if (task.status === 'completed') content = task.result_text || '';
-    else if (task.status === 'returned') content = `任务被驳回: ${task.reject_reason || '未填写原因'}`;
-    // 治理决策（阶段三：上游可查分级理由/质量验收/审计健康）
-    const ruleRow = task.rule_id
-      ? (await getDb().exec('SELECT name FROM task_rules WHERE id = ?', [task.rule_id]))[0]
-      : null;
-    const ruleName = ruleRow && ruleRow.values[0] ? ruleRow.values[0][0] : null;
-    const rp = task.result_payload;
+    // 上游视图（含进度：SLA 剩余/处理人/优先级）+ 治理决策（分级理由/质量验收/审计健康）
     const audit = await queue.verifyAuditChain(task.id);
-    res.json({
-      task_id: task.id,
-      status: task.status,
-      content,
-      model: task.model,
-      category: task.category || 'general',
-      rule_id: task.rule_id || null,
-      rule_name: ruleName,
-      category_source: task.rule_id ? 'rule' : 'manual',
-      quality: { completion_note: (rp && rp.completion_note) || null },
-      audit: { valid: audit.valid },
-      created_at: task.created_at,
-      completed_at: task.completed_at,
-    });
+    const view = await taskView.buildTaskView(task);
+    res.json({ ...view, audit: { valid: audit.valid } });
   } catch (e) {
     console.error('[任务回查失败]', e.message);
     res.status(500).json(encoder.makeError(500, '查询失败', 'server_error'));
