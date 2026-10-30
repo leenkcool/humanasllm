@@ -121,8 +121,46 @@ async function logRequest(taskId, direction, payload, model, tenantId) {
   );
 }
 
-/** 上游请求接入 → 创建 pending 任务（多租户：上游 API key 路由租户，无则默认租户） */
-async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenantIdParam, templateId, origin }) {
+/** 技能归一化：逗号分隔 → 小写去重数组（与派遣/模板同一口径） */
+function skillSet(v) {
+  if (!v) return [];
+  const list = Array.isArray(v) ? v : String(v).split(',');
+  const out = [];
+  for (const s of list) {
+    const k = String(s).trim().toLowerCase();
+    if (k && !out.includes(k)) out.push(k);
+  }
+  return out;
+}
+
+/**
+ * 定向推送：找出技能与任务需求有交集的工程师，单独响铃
+ * 任务无技能要求时不定向（避免全员打扰），只走全站广播。
+ */
+async function notifyMatchedEngineers(taskId, skillsRaw, tenantId) {
+  const need = skillSet(skillsRaw);
+  if (!need.length) {
+    try {
+      const t = await getTask(taskId);
+      if (t) ws.pushTaskLoad(t, []);
+    } catch (e) { /* 推送失败不影响建单 */ }
+    return;
+  }
+  try {
+    const list = rows(await getDb().exec(
+      `SELECT id, skills FROM users
+        WHERE role = 'engineer' AND is_active = true AND tenant_id = ?`, [tenantId || null]));
+    const matched = list
+      .filter(u => skillSet(u.skills).some(s => need.includes(s)))
+      .map(u => u.id);
+    const t = await getTask(taskId);
+    if (t) ws.pushTaskLoad(t, matched);
+  } catch (e) {
+    console.error('[定向推送失败]', taskId, e.message);
+  }
+}
+
+/** 上游请求接入 → 创建 pending 任务（多租户：上游 API key 路由租户，无则默认租户） */async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenantIdParam, templateId, origin }) {
   const db = getDb();
   const priority = parsed.extra.priority || 'medium';
   let tenantId = tenantIdParam;
@@ -152,6 +190,8 @@ async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenant
     templateId ? { status: 'pending', template_id: templateId } : { status: 'pending' },
     null, origin || '上游请求接入');
   ws.broadcast('task:new', { id: lastId });
+  // 定向负载推送：广播全站 + 只给技能匹配的工程师单独响铃（避免全员被打扰）
+  await notifyMatchedEngineers(lastId, skills, tenantId);
   const firstUser = parsed.messages.find(m => m.role === 'user');
   const summary = firstUser && typeof firstUser.content === 'string' ? firstUser.content.slice(0, 60) : '';
   notifier.send({

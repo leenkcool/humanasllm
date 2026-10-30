@@ -99,6 +99,7 @@ test('完成回调：终态 POST 上游 callback_url，非法地址丢弃、非�
     await new Promise(r => server.close(r));
     await db.run('DELETE FROM task_logs WHERE task_id IN (?, ?)', taskIds);
     await db.run('DELETE FROM request_logs WHERE task_id IN (?, ?)', taskIds);
+    await db.run('DELETE FROM billing_ledger WHERE task_id = ANY(?)', [taskIds]);
     await db.run('DELETE FROM tasks WHERE id IN (?, ?)', taskIds);
     await db.run('DELETE FROM users WHERE id = ?', [engineerId]);
     await db.run('DELETE FROM tenants WHERE id = ?', [tenantId]);

@@ -89,6 +89,7 @@ test('日志接口按租户隔离：B 不可列举/审计 A 的日志（Issue #3
     await db.run('DELETE FROM task_logs WHERE task_id IN (?, ?)', taskIds);
     await db.run('DELETE FROM request_logs WHERE task_id IN (?, ?)', taskIds);
     await db.run('DELETE FROM request_logs WHERE tenant_id IN (?, ?)', [ta, tb]);
+    await db.run('DELETE FROM billing_ledger WHERE task_id = ANY(?)', [taskIds]);
     await db.run('DELETE FROM tasks WHERE id IN (?, ?)', taskIds);
     await db.run('DELETE FROM tenants WHERE id IN (?, ?)', [ta, tb]);
   }

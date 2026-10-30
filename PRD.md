@@ -2,6 +2,16 @@
 
 > 本项目所有验证过的功能需求在此记录。任何二次开发（AI Agent 或人）完成并验证后，**必须**在此追加条目（日期 + 功能描述），并 git commit + push。
 
+## 2026-10-30 - 工程师终端（移动优先）+ AI 起草留痕
+- 描述：新增 `public/mobile.html` + `public/js/mobile.js` + `public/css/mobile.css`——面向工程师的轻量刷任务终端（与管理工作台分开优化）。卡片流一屏一单、技能匹配度排序、SLA 倒计时红色预警、接单/答复无需跳页、详情抽屉内联写作。登录页支持 `?next=` 回跳（仅站内相对路径，防开放重定向）。
+- 描述：**定向推送**——`ws.pushTaskLoad()` 建单时广播 `task:load`（全站负载）+ 只给「技能与任务需求有交集」的工程师单独发 `task:matched`（避免全员被无关任务刷屏）。任务无技能要求时只广播不定向。
+- 描述：**AI 起草（可留痕）**——`services/draftService.js` + `POST /api/tasks/:id/draft`。把「专业人员借用大模型起草、再人工审核定稿」落成可证明的机制：`general` 类可起草，`confidential`/`ops` **硬性拒绝**（上下文不得出网关）；提交时带 `drafted_by_ai` 则写入 `draft` 审计日志，哈希链可追溯。
+- 修复：`assertTaskAccess` 增加 `requireStatus` 且状态先于归属判定——未接单任务原本给「无权限」，现在给「请先接单」（工程师侧可执行提示）。
+- 修复：`aiRelay` 的 API Key 改为运行时动态读取（原先模块加载即固化，无法测试也无法热更新）。
+- 修复：登录页 `nextUrl()` 的转义 bug（heredoc 生成的内联脚本出现未闭合字符串，导致整页 JS 报错）。
+- 测试：单测 7（起草）+ 集成 4（定向推送/起草守卫/留痕）通过；`npm run ui:check` 增加工程师终端检查段落（匿名跳转、登录回跳、卡片渲染、抽屉、横向溢出）
+- 同时修复：9 个旧集成测试清理时缺 `billing_ledger` 外键前置删除（开发服务器的计费扫描会并发写入，导致删 `tasks` 失败）
+
 ## 2026-10-30 - 智能派单（技能匹配 + 负载均衡）
 - 描述：新增 `services/dispatchService.js` + `routes/dispatch.js`：候选人打分 `100 × (0.5 技能匹配 + 0.3 空闲负载 + 0.2 一次通过率)`；任务无技能要求时技能维度取中性 0.5，无历史时质量分按 0.7 兜底（不埋没新人）；`DISPATCH_LOAD_CAP` 可调（默认 5）。接口：`GET /api/dispatch/tasks/:id/suggest`（只读建议）、`POST .../assign`（admin，支持 `dry_run`）、`GET /api/dispatch/workload`。
 - 设计：派单复用 `queueService.claimTask`，走同一状态机与审计哈希链，并额外写一条 `dispatch` 日志留痕打分依据；**不改变默认人工 claim 语义**（无任何自动触发，`DISPATCH_ENABLED=false` 可整体关闭）。

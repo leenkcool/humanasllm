@@ -83,8 +83,31 @@ function pushImportProgress(userId, progress) {
   });
 }
 
+/**
+ * 业务负载推送：广播给全站（工作台据此刷新），同时按匹配度定向告知候选工程师。
+ * 定向推送的意义：工程师终端只为「可能该我做的」任务响铃，避免全员被无关任务刷屏。
+ * @param {Object} task 任务行（含 id/category/priority/timeout_at/skills）
+ * @param {Array<number>} matchedUserIds 技能匹配到的工程师 id 列表（可空）
+ */
+function pushTaskLoad(task, matchedUserIds) {
+  const payload = {
+    id: task.id,
+    category: task.category,
+    priority: task.priority,
+    skills: task.skills || null,
+    timeout_at: task.timeout_at || null,
+    timestamp: new Date().toISOString(),
+  };
+  // 全站负载（工作台、队列页据此刷新计数）
+  broadcast('task:load', payload);
+  // 定向铃（只发技能匹配者；无匹配时不发，避免全员打扰）
+  for (const uid of (matchedUserIds || [])) {
+    notifyUser(uid, 'task:matched', payload);
+  }
+}
+
 module.exports = {
   setIO, notifyUser, notifyAdmins, broadcast,
   pushNotification, pushTaskEvent, pushSystemAlert,
-  pushBackupProgress, pushImportProgress
+  pushBackupProgress, pushImportProgress, pushTaskLoad
 };

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="i18n-title" content="meta.title.mobile">
+  <title>工程师终端 · Human as Agent</title>
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="P390 终端">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%232563eb'/><path d='M10 22l6-6 4 4 8-9v5h-2v4H26l2-2 2 2z' fill='white'/></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/mobile.css">
+</head>
+<body class="m-body">
+  <header class="m-head">
+    <div class="m-title">
+      <div class="t" data-i18n="mobile.title">工程师终端</div>
+      <div class="s" id="mUser"></div>
+    </div>
+    <button class="btn sm" id="mNotifyBtn" type="button">通知</button>
+  </header>
+
+  <nav class="m-tabs">
+    <button class="m-tab active" data-mtab="queue" onclick="window.HLM.Mobile.switchTab('queue')">
+      <span data-i18n="mobile.tabQueue">待接单</span><span class="m-count" data-tab-count="queue"></span>
+    </button>
+    <button class="m-tab" data-mtab="mine" onclick="window.HLM.Mobile.switchTab('mine')">
+      <span data-i18n="mobile.tabMine">处理中</span><span class="m-count" data-tab-count="mine"></span>
+    </button>
+  </nav>
+
+  <main class="m-main">
+    <div id="mList"></div>
+  </main>
+
+  <div id="mDrawer" class="m-drawer"></div>
+  <div id="toastBox"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/ws.js"></script>
+  <script src="/js/pwa.js"></script>
+  <script src="/js/mobile.js"></script>
+  <script>
+    (function () {
+      // 鉴权：无 token 跳登录（登录后回跳本页）
+      var token = localStorage.getItem('hlm_token');
+      if (!token) { location.href = '/login.html?next=' + encodeURIComponent('/mobile.html'); return; }
+      try { window.HLM.currentUser = JSON.parse(localStorage.getItem('hlm_user') || '{}'); } catch (e) { window.HLM.currentUser = {}; }
+      window.HLM.I18n.applyStatic();
+      var u = window.HLM.currentUser || {};
+      var el = document.getElementById('mUser');
+      if (el) el.textContent = (u.tenant_name ? u.tenant_name + ' · ' : '') + (u.name || u.username || '');
+      var n = localStorage.getItem('hlm_notify');
+      if (n === '1') { /* 已开启，按钮状态由 mobile.js 刷新 */ }
+      window.HLM.WS.init();
+      window.HLM.Mobile.init();
+    })();
+  </script>
+</body>
+</html>

@@ -10,6 +10,7 @@ const queue = require('../services/queueService');
 const project = require('../services/projectService');
 const { toCSV } = require('../services/csv');
 const { assertTaskAccess } = require('../middleware/taskAccess');
+const draft = require('../services/draftService');
 
 const VALID_STATUS = ['pending', 'processing', 'completed', 'returned', 'paused', 'cancelled'];
 
@@ -118,6 +119,11 @@ router.post('/:id/complete', authenticate, async (req, res) => {
     const r = await queue.completeTask(id, content, { id: req.user.id, name: req.user.name || req.user.username },
       { completion_note: req.body.completion_note, tool_call: toolCall });
     if (!r.ok) return res.status(400).json({ success: false, message: r.message });
+    // AI 起草留痕：人类工程师在草稿基础上修改后提交，审计链可追溯「AI 起草 + 人工定稿」
+    if (req.body.drafted_by_ai) {
+      await draft.markDrafted(id, { id: req.user.id, name: req.user.name || req.user.username },
+        { model: req.body.draft_model, edited: req.body.draft_edited !== false });
+    }
     res.json({ success: true, data: r.task });
   } catch (err) {
     console.error('[提交失败]', err.message);
@@ -240,6 +246,25 @@ router.post('/:id/project', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[任务归属项目失败]', err.message);
     res.status(500).json({ success: false, message: '设置归属项目失败' });
+  }
+});
+
+// AI 起草答复（仅 general 类；confidential/ops 禁止，上下文不得出网关）
+// 返回草稿文本，不落库——人类工程师修改后走 /complete 提交，并带 drafted_by_ai 留痕
+router.post('/:id/draft', authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    // 先判状态（未接单时给「请先接单」而不是「无权限」），再判归属
+    const { error, task } = await assertTaskAccess(req, res, id, {
+      ownerOnly: true, requireStatus: ['processing', 'paused'],
+    });
+    if (error) return error;
+    const r = await draft.draft(task);
+    if (!r.ok) return res.status(400).json({ success: false, message: r.message });
+    res.json({ success: true, data: { draft: r.draft, category: task.category || 'general' } });
+  } catch (err) {
+    console.error('[起草失败]', err.message);
+    res.status(500).json({ success: false, message: 'AI 起草失败' });
   }
 });
 

@@ -67,6 +67,7 @@ async function cleanup(s) {
     await db.run('DELETE FROM alerts WHERE task_id = ?', [id]);
     await db.run('DELETE FROM task_logs WHERE task_id = ?', [id]);
     await db.run('DELETE FROM request_logs WHERE task_id = ?', [id]);
+    await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [id]);
   }
   for (const id of taskIds) await db.run('DELETE FROM tasks WHERE id = ?', [id]);
   await db.run('DELETE FROM approvals WHERE tenant_id IN (?, ?)', [tA, tB]);

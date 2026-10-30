@@ -1,0 +1,150 @@
+/* mobile.css — 工程师终端专用样式（移动优先，复用 style.css 的主题变量） */
+
+.m-body {
+  min-height: 100dvh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior-y: contain;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ===== 顶栏 ===== */
+.m-head {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.m-head .m-title { flex: 1; min-width: 0; }
+.m-head .m-title .t { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.m-head .m-title .s { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-head .btn { min-height: 36px; flex-shrink: 0; }
+
+/* ===== 标签页 ===== */
+.m-tabs {
+  position: sticky;
+  top: calc(56px + env(safe-area-inset-top));
+  z-index: 29;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.m-tab {
+  flex: 1;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.m-tab.active { background: var(--primary-weak); color: var(--primary); border-color: var(--primary); font-weight: 600; }
+.m-count {
+  min-width: 18px; height: 18px; padding: 0 5px;
+  background: var(--danger); color: #fff; border-radius: 9px;
+  font-size: 11px; line-height: 18px; text-align: center;
+}
+
+/* ===== 列表 ===== */
+.m-main { flex: 1; padding: 12px; }
+#mList { display: flex; flex-direction: column; gap: 10px; }
+
+.m-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+.m-card-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.m-card-head .mono { font-family: Consolas, monospace; font-size: 12px; color: var(--muted); }
+.m-sla { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted); }
+.m-sla.danger { color: var(--danger); font-weight: 600; }
+.m-card-summary {
+  margin: 8px 0 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  word-break: break-word;
+}
+.m-card-foot { display: flex; align-items: center; gap: 8px; }
+.m-card-foot .m-meta { flex: 1; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-card-foot .btn { min-height: 42px; padding: 0 16px; font-size: 14px; }
+
+.m-empty { text-align: center; padding: 48px 16px; color: var(--muted); font-size: 14px; }
+
+/* ===== 详情抽屉 ===== */
+.m-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--bg);
+  transform: translateX(100%);
+  transition: transform .22s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.m-drawer.show { transform: translateX(0); }
+.m-drawer-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+}
+.m-drawer-head { display: flex; align-items: flex-start; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.m-drawer-head > div:first-child { flex: 1; min-width: 0; }
+.m-drawer-head .icon-btn { flex-shrink: 0; }
+
+.m-msgs { flex: 1; overflow-y: auto; padding: 10px 0; -webkit-overflow-scrolling: touch; }
+.m-msg {
+  padding: 8px 10px;
+  border-left: 3px solid var(--border);
+  background: var(--surface);
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.m-msg.system { border-color: var(--warning); }
+.m-msg.user { border-color: var(--primary); }
+.m-msg.assistant { border-color: var(--success); }
+.m-msg .role { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+
+.m-compose {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.m-compose .form-textarea {
+  min-height: 110px;
+  font-size: 16px; /* 防 iOS 聚焦放大 */
+  font-family: inherit;
+  resize: vertical;
+}
+.m-compose .btn { min-height: 46px; justify-content: center; font-size: 15px; }
+
+/* ===== 平板/桌面：限制宽度居中，避免卡片拉满 ===== */
+@media (min-width: 769px) {
+  .m-head, .m-tabs, .m-main { max-width: 720px; width: 100%; margin-left: auto; margin-right: auto; }
+  .m-drawer-body { max-width: 720px; width: 100%; margin: 0 auto; }
+}

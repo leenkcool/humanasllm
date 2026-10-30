@@ -43,6 +43,15 @@
     </div>
   </div>
   <a id="langSwitch" href="javascript:void(0)" style="position:fixed;top:16px;right:20px;font-size:13px;color:var(--primary);text-decoration:none;z-index:10;">English</a>
+  <script>
+    // 登录后回跳：?next= 只接受站内相对路径（防开放重定向）
+    function nextUrl() {
+      var n = new URLSearchParams(location.search).get('next');
+      if (!n) return '/workbench.html';
+      if (n.charAt(0) !== '/' || n.charAt(1) === '/' || n.indexOf(String.fromCharCode(92)) !== -1) return '/workbench.html';
+      return n;
+    }
+  </script>
   <script src="/js/i18n.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/pwa.js"></script>
@@ -87,7 +96,7 @@
           if (!res.ok || !data.success) { throw new Error(data.message || t('login.fail')); }
           localStorage.setItem('hlm_token', data.data.token);
           localStorage.setItem('hlm_user', JSON.stringify(data.data.user));
-          window.location.href = '/workbench.html';
+          window.location.href = nextUrl();
         } catch (ex) {
           err.textContent = ex.message;
         } finally {
@@ -125,7 +134,7 @@
           if (data.data && data.data.token) {
             localStorage.setItem('hlm_token', data.data.token);
             localStorage.setItem('hlm_user', JSON.stringify(data.data.user));
-            window.location.href = '/workbench.html';
+            window.location.href = nextUrl();
           } else {
             err.textContent = (data.data && data.data.message) || t('reg.success');
           }

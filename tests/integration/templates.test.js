@@ -51,6 +51,7 @@ async function cleanup(db, tenantId, tenantB, adminId, engId, tplId) {
   }
   const alerts = (await db.exec('SELECT id FROM alerts WHERE tenant_id IN (?, ?)', [tenantId, tenantB]))[0];
   if (alerts) for (const v of alerts.values) await db.run('DELETE FROM alerts WHERE id = ?', [v[0]]);
+  for (const id of ids) await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [id]);
   for (const id of ids) await db.run('DELETE FROM tasks WHERE id = ?', [id]);
   await db.run('DELETE FROM task_templates WHERE id = ?', [tplId]);
   await db.run('DELETE FROM users WHERE id IN (?, ?)', [adminId, engId]);

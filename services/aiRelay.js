@@ -10,15 +10,19 @@ require('dotenv').config();
 
 const AI_RELAY_ENABLED = process.env.AI_RELAY_ENABLED !== 'false';
 const AI_BASE = process.env.AI_RELAY_BASE_URL || 'https://api.deepseek.com';
-const AI_KEY = process.env.AI_RELAY_API_KEY || '';
 const AI_MODELS = (process.env.AI_RELAY_MODELS || 'deepseek-v4-flash')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
 
+/** API Key 动态读取（不在模块加载时固化，便于测试与运行时配置变更） */
+function apiKey() {
+  return process.env.AI_RELAY_API_KEY || '';
+}
+
 /** 中继是否可用（启用 + 已配 key） */
 function enabled() {
-  return AI_RELAY_ENABLED && !!AI_KEY;
+  return AI_RELAY_ENABLED && !!apiKey();
 }
 
 /** 该 model 是否走 AI 中继路由 */
@@ -37,13 +41,13 @@ function getModels() {
  * @param {number} timeoutMs
  */
 async function chat(body, timeoutMs = 120000) {
-  if (!AI_KEY) throw new Error('未配置 AI_RELAY_API_KEY');
+  if (!apiKey()) throw new Error('未配置 AI_RELAY_API_KEY');
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const resp = await fetch(`${AI_BASE}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${AI_KEY}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey()}` },
       body: JSON.stringify({ ...body, stream: false, model: body.model || AI_MODELS[0] }),
       signal: ctrl.signal,
     });
@@ -60,10 +64,10 @@ async function chat(body, timeoutMs = 120000) {
  * 调用方需处理上游 fetch 失败的异常
  */
 async function relayStream(req, res) {
-  if (!AI_KEY) throw new Error('未配置 AI_RELAY_API_KEY');
+  if (!apiKey()) throw new Error('未配置 AI_RELAY_API_KEY');
   const upstream = await fetch(`${AI_BASE}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${AI_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey()}` },
     body: JSON.stringify(req.body),
   });
   res.status(upstream.status);

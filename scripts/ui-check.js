@@ -121,17 +121,21 @@ const PAGES = ['dashboard', 'queue', 'mine', 'logs', 'approvals', 'alerts',
   await sleep(1500);
   const detail = {};
   try {
+    // 必须挑「待接单」任务：智能派单面板只对 pending/returned 显示
     const pendingId = await p.evaluate(() => {
       for (const tr of document.querySelectorAll('#content table.data tbody tr')) {
+        if (!tr.querySelector('button[onclick*="\'claim\'"]') && !tr.querySelector('button[onclick*="claim("]')) continue;
         const btn = tr.querySelector('button[onclick*="openDetail("]');
-        if (btn) {
-          const m = btn.getAttribute('onclick').match(/openDetail\((\d+)\)/);
-          if (m) return m[1];
-        }
+        if (!btn) continue;
+        const m = btn.getAttribute('onclick').match(/openDetail\((\d+)\)/);
+        if (m) return m[1];
       }
       return null;
     });
     detail.pendingId = pendingId;
+    if (!pendingId) {
+      detail.note = '队列无待接单任务，跳过派单面板检查';
+    }
     if (pendingId) {
       await p.evaluate((id) => window.HLM.UI.openDetail(parseInt(id, 10)), pendingId);
       await sleep(2500);
@@ -144,8 +148,6 @@ const PAGES = ['dashboard', 'queue', 'mine', 'logs', 'approvals', 'alerts',
       if (!detail.dispatch.panel) report.problems.push('任务详情缺少智能派单面板');
       else if (detail.dispatch.rows === 0) report.problems.push('智能派单面板无候选人');
       await p.evaluate(() => window.HLM.U.closeModal());
-    } else {
-      detail.note = '队列无待接单任务，跳过详情检查';
     }
   } catch (e) {
     detail.fatal = String(e.message);
@@ -297,6 +299,89 @@ const PAGES = ['dashboard', 'queue', 'mine', 'logs', 'approvals', 'alerts',
   pwa.errors = pwErr;
   report.pwa = pwa;
   await pw.close();
+
+  // ---------- 8. 工程师终端（移动优先） ----------
+  const mt = await browser.newPage();
+  const mtErr = [];
+  attach(mt, mtErr);
+  const terminal = {};
+  try {
+    await mt.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    // 未登录访问应跳登录页并带 next 回跳参数。
+    // 同一浏览器上下文可能已带 token（前面的页面登录过），此时不会跳转属正常，跳过该断言。
+    await mt.goto(BASE + '/mobile.html', { waitUntil: 'networkidle2', timeout: 20000 });
+    await sleep(800);
+    const hadToken = await mt.evaluate(() => !!localStorage.getItem('hlm_token'));
+    terminal.redirectWhenAnonymous = hadToken
+      ? '已有 token，跳过匿名跳转检查'
+      : await mt.evaluate(() => location.pathname + location.search);
+
+    // 清掉 token 后重新走匿名流程，确保真正覆盖未登录跳转
+    if (hadToken) {
+      await mt.evaluate(() => localStorage.clear());
+      await mt.goto(BASE + '/mobile.html', { waitUntil: 'networkidle2', timeout: 20000 });
+      await sleep(800);
+      terminal.redirectWhenAnonymous = await mt.evaluate(() => location.pathname + location.search);
+    }
+
+    // 登录（复用当前会话的 token 更稳；直接走页面登录）
+    await mt.goto(BASE + '/login.html?next=' + encodeURIComponent('/mobile.html'), { waitUntil: 'networkidle2', timeout: 20000 });
+    await sleep(500);
+    await mt.type('input[name=username], #username, input[type=text]', USER, { delay: 15 });
+    await mt.type('input[type=password], #password', PASS, { delay: 15 });
+    await Promise.all([
+      mt.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => null),
+      mt.click('button[type=submit], .btn.primary, #loginBtn'),
+    ]);
+    await sleep(1800);
+    terminal.afterLoginPath = await mt.evaluate(() => location.pathname);
+
+    terminal.cards = await mt.evaluate(() => document.querySelectorAll('.m-card').length);
+    terminal.emptyText = await mt.evaluate(() => {
+      const e = document.querySelector('.m-empty');
+      return e ? e.innerText.trim() : null;
+    });
+    terminal.tabs = await mt.evaluate(() => Array.from(document.querySelectorAll('[data-mtab]')).map(b => b.dataset.mtab));
+    terminal.overflow = await mt.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth, innerW: window.innerWidth,
+    }));
+    await mt.screenshot({ path: path.join(OUT, 'mobile-terminal.png') });
+
+    // 有任务时点开第一张卡，确认抽屉与答复区渲染
+    if (terminal.cards > 0) {
+      await mt.evaluate(() => {
+        const b = document.querySelector('.m-card .btn');
+        if (b) b.click();
+      });
+      await sleep(1500);
+      terminal.drawerOpen = await mt.evaluate(() => {
+        const d = document.getElementById('mDrawer');
+        return d ? d.classList.contains('show') : false;
+      });
+      await mt.screenshot({ path: path.join(OUT, 'mobile-terminal-detail.png') });
+    } else {
+      terminal.drawerOpen = 'no-tasks';
+    }
+    terminal.errors = mtErr;
+
+    if (!String(terminal.redirectWhenAnonymous).startsWith('/login.html')) {
+      report.problems.push('终端页未登录时未跳转登录页');
+    }
+    if (terminal.afterLoginPath !== '/mobile.html') {
+      report.problems.push(`终端登录后未回跳（停留在 ${terminal.afterLoginPath}）`);
+    }
+    if (terminal.overflow.scrollW > terminal.overflow.innerW + 1) {
+      report.problems.push(`终端页横向溢出 ${terminal.overflow.scrollW} > ${terminal.overflow.innerW}`);
+    }
+    if (!terminal.tabs || terminal.tabs.length < 2) report.problems.push('终端页缺少标签切换');
+    const mtReal = mtErr.filter(e => !/http401/.test(e.type));
+    if (mtReal.length) report.problems.push('终端页控制台报错：' + mtReal.map(e => e.text).join(' | ').slice(0, 200));
+  } catch (e) {
+    terminal.fatal = String(e.message);
+    report.problems.push('工程师终端检查异常：' + e.message);
+  }
+  report.terminal = terminal;
+  await mt.close();
 
   await browser.close();
   report.finishedAt = new Date().toISOString();
