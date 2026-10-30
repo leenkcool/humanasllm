@@ -78,7 +78,7 @@ router.post('/approvals', requireUpstreamKey, async (req, res) => {
 // 导出审批 CSV（utf-8 BOM，Excel 兼容）
 router.get('/export', authenticate, async (req, res) => {
   try {
-    const { data } = await approval.listApprovals({ status: req.query.status });
+    const { data } = await approval.listApprovals({ status: req.query.status, tenantId: req.tenant_id });
     const cols = ['id', 'approval_no', 'type', 'resource', 'amount', 'purpose', 'requester', 'project_code', 'status', 'provider_name', 'provided', 'reject_reason', 'created_at', 'decided_at'];
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=approvals.csv');

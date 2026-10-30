@@ -2,6 +2,12 @@
 
 > 本项目所有验证过的功能需求在此记录。任何二次开发（AI Agent 或人）完成并验证后，**必须**在此追加条目（日期 + 功能描述），并 git commit + push。
 
+## 2026-10-30 - 合规报告 PDF 导出（HTML 自包含 + 浏览器打印）
+- 描述：**合规报告导出**——新增 `services/reportService.js`：`collectReportData`（唯一数据出口）+ `renderHtml`（自包含单文件 HTML，内嵌 CSS 与 `@media print` / `@page A4`，零外部资源零脚本）。`GET /api/audit/report?format=html&lang=zh|en` 返回报告页，浏览器「打印 → 另存为 PDF」即得交付件；缺省仍返回 JSON（向后兼容）。工作台「合规报告」弹窗新增「导出 PDF 报告」按钮（同步开窗 + Bearer 拉取，token 不进 URL）。
+- 描述：报告新增 `scope`（租户）、`categories`/`status` 分布、`human_ratio`（人工产出占比）、`approvals.pending`/`avg_decide_min`、`quality.pass_rate`、`compliance_pass`、`audit_chains.checked/broken`。
+- **安全修复**：`audit/report` 原为全表聚合（跨租户越权，与 `audit/dataset` 口径不一致）→ 全部指标按 `tenant_id` 过滤；顺带修掉同类越权：`workbench/governance` 的审批统计、`approvals/export` 未传租户。哈希链校验由 N+1 改为一次 join + 内存复算（上限 500 条抽样）。
+- 验证：单测 5（含 XSS 转义 / 打印样式 / 中英分离）+ 集成 3（含跨租户隔离回归 / 篡改检测）通过；冒烟 37 → 41 项全过
+
 ## 2026-10-30 - 工单模板库
 - 描述：**工单模板**——常用任务模板化。新增 `task_templates` 表 + `services/templateService.js` + `routes/templates.js` + 工作台「工单模板」页（列表/新建/编辑/停用/一键建单）。模板提供默认值（messages / priority / category / skills / project / meta_tags / system_prompt / tools），上游显式值优先；`/v1/chat/completions` 新增 `template_id` 字段（不传行为完全不变），非法/跨租户/停用模板一律 400 不建单。任务详情显示模板溯源 chip（`tasks.template_id`）。开箱播种 3 条全局示例模板（代码审查 / 数据库迁移 / 安全巡检）。
 - 安全：模板的 `category` 只作为「上游显式声明」交给 `categoryEngine.classify`，**规则命中仍白名单锁死**——模板无法把涉密任务降级为可 AI 兜底的 general（有集成测试覆盖）。

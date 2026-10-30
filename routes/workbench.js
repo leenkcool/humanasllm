@@ -61,7 +61,8 @@ router.get('/governance', authenticate, async (req, res) => {
       `SELECT COUNT(*) AS total,
               COUNT(*) FILTER (WHERE decided_at IS NOT NULL) AS decided,
               AVG(EXTRACT(EPOCH FROM (decided_at - created_at)) / 60) AS avg_min
-         FROM approvals`
+         FROM approvals WHERE tenant_id = ?`,
+      [req.tenant_id]
     ))[0] || {};
     const tz = queue.rows(await db.exec(
       `SELECT (SELECT COUNT(*) FROM tasks WHERE tenant_id = ?) AS total,

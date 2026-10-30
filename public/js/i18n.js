@@ -185,6 +185,9 @@ window.HLM = window.HLM || {};
     'audit.approved': '批准',
     'audit.rejected': '驳回',
     'audit.generatedAt': '生成时间',
+    'audit.exportPdf': '导出 PDF 报告',
+    'audit.printHint': '在新窗口点击「打印 / 导出 PDF」，选择「另存为 PDF」',
+    'audit.popupBlocked': '浏览器拦截了新窗口，请允许弹出窗口后重试',
     'audit.dataset': '导出数据集(general)',
     'audit.datasetOk': '数据集已导出',
 
@@ -647,6 +650,9 @@ window.HLM = window.HLM || {};
     'audit.approved': 'approved',
     'audit.rejected': 'rejected',
     'audit.generatedAt': 'Generated at',
+    'audit.exportPdf': 'Export PDF report',
+    'audit.printHint': 'In the new window click "Print / Export PDF" and choose "Save as PDF"',
+    'audit.popupBlocked': 'The browser blocked the new window — allow pop-ups and retry',
     'audit.dataset': 'Export dataset (general)',
     'audit.datasetOk': 'Dataset exported',
 

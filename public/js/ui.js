@@ -739,9 +739,33 @@ window.HLM = window.HLM || {};
       ];
       const html = rows.map(([k, v]) => `<div class="ctx"><div class="k">${esc(k)}</div><div>${esc(String(v))}</div></div>`).join('');
       openModal(t('page.audit.report'), html,
-        `<button class="btn" onclick="window.HLM.UI.downloadDataset()">${t('audit.dataset')}</button>
+        `<button class="btn primary" onclick="window.HLM.UI.openReportHtml()">${Icons.print}${t('audit.exportPdf')}</button>
+         <button class="btn" onclick="window.HLM.UI.downloadDataset()">${t('audit.dataset')}</button>
          <button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.close')}</button>`);
     } catch (e) { toast(e.message, 'error'); }
+  }
+
+  /**
+   * 打开自包含合规报告页（浏览器「打印 → 另存为 PDF」即导出）
+   * 先同步开窗规避弹窗拦截，再带 Bearer 拉 HTML 写入（token 不进 URL/历史）
+   */
+  async function openReportHtml() {
+    const w = window.open('', '_blank');
+    if (!w) return toast(t('audit.popupBlocked'), 'error');
+    try {
+      const token = localStorage.getItem('hlm_token');
+      const res = await fetch(window.location.origin + '/api/audit/report?format=html&lang=' + (window.HLM.I18n.lang() === 'en' ? 'en' : 'zh'), {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (!res.ok) throw new Error(t('api.requestFail'));
+      const html = await res.text();
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    } catch (e) {
+      try { w.close(); } catch (_) { /* ignore */ }
+      toast(e.message, 'error');
+    }
   }
 
   // 数据资产导出（JSONL，默认 general 类，合规）
@@ -841,7 +865,7 @@ window.HLM = window.HLM || {};
     renderTasks, openDetail, doAction, promptComplete, submitComplete,
     promptToolCall, submitToolCall, syncToolArgs,
     promptReject, submitReject, promptRequeue, submitRequeue, promptCancel,
-    promptReopen, submitReopen, showAuditReport, downloadDataset, showRules, ruleForm, saveRule, toggleRule, delRule,
+    promptReopen, submitReopen, showAuditReport, openReportHtml, downloadDataset, showRules, ruleForm, saveRule, toggleRule, delRule,
     renderUsers, showUserForm, saveUser, delUser, showUserDetail, showTenants, tenantForm, saveTenant, renderLogs,
     renderApprovals, openApproval, promptApprove, submitApprove, promptApproveReject, submitApproveReject,
     renderProjects, promptCreateProject, submitCreateProject, promptApplyProject, submitApplyProject,

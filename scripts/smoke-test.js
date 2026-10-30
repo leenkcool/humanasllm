@@ -121,6 +121,17 @@ async function poll(fn, max = 20) {
   ok('治理概览', gov.status === 200 && gov.data.data.qa && Array.isArray(gov.data.data.engineers) && 'ai_shift' in gov.data.data);
   const report = await api('GET', '/api/audit/report', null, token);
   ok('合规报告', report.status === 200 && !!report.data.data.compliance);
+  ok('合规报告按租户口径(含 scope)', report.status === 200 && !!report.data.data.scope);
+  const reportHtmlRes = await fetch(BASE + '/api/audit/report?format=html', { headers: { Authorization: 'Bearer ' + token } });
+  const reportHtml = await reportHtmlRes.text();
+  ok('合规报告 HTML 自包含可打印',
+    reportHtmlRes.status === 200 &&
+    (reportHtmlRes.headers.get('content-type') || '').includes('text/html') &&
+    reportHtml.includes('window.print()') && reportHtml.includes('@media print'));
+  const reportHtmlEn = await (await fetch(BASE + '/api/audit/report?format=html&lang=en', { headers: { Authorization: 'Bearer ' + token } })).text();
+  ok('合规报告英文版', reportHtmlEn.includes('Compliance Report') && !reportHtmlEn.includes('合规报告'));
+  const reportNoAuth = await fetch(BASE + '/api/audit/report?format=html');
+  ok('合规报告 HTML 未授权 401', reportNoAuth.status === 401);
   const ds = await api('GET', '/api/audit/dataset', null, token);
   ok('数据资产导出', ds.status === 200);
   const install = await api('GET', '/api/gateway/install?tool=agents');
