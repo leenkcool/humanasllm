@@ -109,7 +109,10 @@ test('shouldReopen：未解决 + 已完成 + 7 天内 → true；已解决或超
 
     // 超过 7 天
     await s.db.run(`UPDATE tasks SET completed_at = NOW() - interval '10 days' WHERE id = ?`, [id]);
-    assert.strictEqual(await fb.shouldReopen(await q.getTask(id)), false, '超期不重开');
+    const expiredTask = await q.getTask(id);
+    const expiredFb = await fb.getByTask(id);
+    assert.strictEqual(await fb.shouldReopen(expiredTask), false,
+      `超期不重开：completed_at=${expiredTask.completed_at} status=${expiredTask.status} resolved=${expiredFb && expiredFb.resolved}`);
   } finally {
     await cleanup(s, ids);
   }

@@ -107,20 +107,26 @@ async function start() {
     await initDatabase();
     console.log('[数据库] 初始化完成');
 
-    queue.startTimeoutScanner();
-    console.log('[队列] 超时扫描已启动');
+    // 后台扫描器会周期性地扫全库；若在同一库上并发跑集成测试会互相干扰
+    // （典型症状：计费/告警/超时用例偶发断言失败）。SCANNERS_ENABLED=false 全部关闭。
+    if (process.env.SCANNERS_ENABLED !== 'false') {
+      queue.startTimeoutScanner();
+      console.log('[队列] 超时扫描已启动');
 
-    approval.startApprovalScanner();
-    console.log('[审批] 超时提醒已启动');
+      approval.startApprovalScanner();
+      console.log('[审批] 超时提醒已启动');
 
-    alertService.startEscalationScanner();
-    console.log('[告警] 升级序列扫描已启动');
+      alertService.startEscalationScanner();
+      console.log('[告警] 升级序列扫描已启动');
+
+      billing.startBillingScanner();
+      console.log('[计费] 补结算扫描已启动（60s）');
+    } else {
+      console.log('[扫描器] SCANNERS_ENABLED=false，已跳过全部后台扫描');
+    }
 
     await billing.seedRates();            // 幂等：全局默认费率
     console.log('[计费] 默认费率就绪');
-
-    billing.startBillingScanner();
-    console.log('[计费] 补结算扫描已启动（60s）');
 
     metrics.startGaugeRefresher();
     if (metrics.isEnabled()) console.log('[监控] 业务指标刷新已启动（15s）');

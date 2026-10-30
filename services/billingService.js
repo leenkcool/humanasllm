@@ -362,6 +362,9 @@ let scannerTimer = null;
 /** 计费扫描器：每 60s 补结算一次（幂等，可安全重复调用） */
 function startBillingScanner() {
   if (scannerTimer) return scannerTimer;
+  // 补结算会扫全库：若在同一库上跑集成测试，后台扫描会与测试争抢（偶发断言失败）。
+  // BILLING_SCAN_ENABLED=false 可关闭，测试环境建议关掉。
+  if (process.env.BILLING_SCAN_ENABLED === 'false') return null;
   scannerTimer = setInterval(async () => {
     try {
       const r = await settlePendingTasks({ limit: 200 });

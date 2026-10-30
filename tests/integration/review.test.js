@@ -72,7 +72,7 @@ test('general 免审：完成后直接 delivered，上游可立即拿到内容',
     const id = await mkTask(s.tenantId, 'general');
     ids.push(id);
     await complete(id, s.eng, '这是通用类任务的完整答复内容，长度足够通过质量校验。');
-    await new Promise(r => setTimeout(r, 200)); // 审核记录异步创建
+    // 审核记录由 completeTask 同步创建（不再需要等待
     const rev = await review.getByTask(id);
     assert.ok(rev, '应创建审核记录');
     assert.strictEqual(rev.status, 'delivered', 'general 免审直接放行');
@@ -91,7 +91,7 @@ test('ops 需审：审核前上游拿 reviewing 不带内容，审核后放行',
     const id = await mkTask(s.tenantId, 'ops');
     ids.push(id);
     await complete(id, s.eng, '已完成磁盘清理：删除 /var/log 下 7 天前日志，释放 12GB。');
-    await new Promise(r => setTimeout(r, 200));
+
 
     const rev = await review.getByTask(id);
     assert.strictEqual(rev.status, 'draft', 'ops 类应进入待审');
@@ -127,7 +127,7 @@ test('退回修改 → needs_revision；重新提交 → draft', async () => {
     const id = await mkTask(s.tenantId, 'ops');
     ids.push(id);
     await complete(id, s.eng, '已处理磁盘告警，具体细节待补充。');
-    await new Promise(r => setTimeout(r, 200));
+
 
     const rv = await review.requestRevision({
       taskId: id, actor: { id: s.admin, name: '审核 admin' }, reason: '缺少清理后的磁盘占用截图与验证结果',
@@ -156,7 +156,7 @@ test('不能审核自己提交的答复', async () => {
     const id = await mkTask(s.tenantId, 'ops');
     ids.push(id);
     await complete(id, s.eng, '已完成磁盘清理并验证，占用从 96% 降到 68%。');
-    await new Promise(r => setTimeout(r, 200));
+
     // 先让 eng 成为审核人（模拟自审）
     await s.db.run('UPDATE task_reviews SET reviewer_id = ? WHERE task_id = ?', [s.eng, id]);
     const r = await review.approve({ taskId: id, actor: { id: s.eng, name: '审核 eng' }, scores: {} });
@@ -174,7 +174,7 @@ test('抽检：仅 confidential 已放行的答复可抽检', async () => {
     const id = await mkTask(s.tenantId, 'confidential');
     ids.push(id);
     await complete(id, s.eng, '涉密整改方案已完成，含权限矩阵与访问审计配置说明。');
-    await new Promise(r => setTimeout(r, 200));
+
     await review.approve({ taskId: id, actor: { id: s.admin, name: '审核 admin' }, scores: { completeness: 5 } });
 
     const pending = await review.listSpotCheck({ tenantId: s.tenantId });
@@ -188,7 +188,7 @@ test('抽检：仅 confidential 已放行的答复可抽检', async () => {
     const id2 = await mkTask(s.tenantId, 'ops');
     ids.push(id2);
     await complete(id2, s.eng2 || s.eng, '运维类答复内容，已完成并验证，详情见正文说明。');
-    await new Promise(r => setTimeout(r, 200));
+
     await review.approve({ taskId: id2, actor: { id: s.admin, name: '审核 admin' }, scores: {} });
     const p2 = await review.listSpotCheck({ tenantId: s.tenantId });
     assert.ok(!p2.some(x => x.task_id === id2), 'ops 不进抽检队列');
@@ -204,13 +204,13 @@ test('审核统计', async () => {
     const a = await mkTask(s.tenantId, 'ops');
     ids.push(a);
     await complete(a, s.eng, '运维答复一：已完成并自检，详见说明。');
-    await new Promise(r => setTimeout(r, 200));
+
     await review.approve({ taskId: a, actor: { id: s.admin, name: 'admin' }, scores: { completeness: 4 } });
 
     const b = await mkTask(s.tenantId, 'ops');
     ids.push(b);
     await complete(b, s.eng, '运维答复二：等待审核中，内容完整。');
-    await new Promise(r => setTimeout(r, 200));
+
 
     const st = await review.stats({ tenantId: s.tenantId });
     assert.strictEqual(st.delivered, 1);

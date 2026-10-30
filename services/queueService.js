@@ -293,7 +293,13 @@ async function completeTask(taskId, content, actor, opts = {}) {
   });
   if (t.ok) {
     // 答复审核：按分级决定免审 / 待审（general 直接放行）
-    require('./reviewService').onCreate(t.task).catch(e => console.error('[审核记录创建失败]', e.message));
+    // 答复审核：必须在 completeTask 返回前建好记录，否则调用方（含测试与上游回查）
+    // 可能读到「无审核记录」的中间态。失败只记日志，不阻断提交。
+    try {
+      await require('./reviewService').onCreate(t.task);
+    } catch (e) {
+      console.error('[审核记录创建失败]', e.message);
+    }
     await logRequest(taskId, 'out',
       { content: resultText, ...(outCalls.length ? { tool_calls: outCalls } : {}), model: t.task.model },
       t.task.model, t.task.tenant_id);

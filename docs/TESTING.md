@@ -114,6 +114,25 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.Comm
 
 `aiRelay` 等模块若在顶层读 `process.env`，测试里改环境变量不生效。**必须在函数内动态读取**（`draftService` 的测试锁定过这个行为）。
 
+### 6. 后台扫描器会干扰测试
+
+开发服务器的扫描器（超时扫描 30s / 审批 60s / 告警 60s / 计费补结算 60s）会周期性地**扫全库**，与同一库上的集成测试争抢，导致偶发断言失败（典型症状：`settlePendingTasks`、`shouldReopen` 偶尔失败且单独跑必过）。
+
+两种做法：
+
+```powershell
+# A. 跑测试时用停掉扫描器的服务（推荐）
+$env:SCANNERS_ENABLED='false'; npm start     # 另开一个终端
+# B. 不启服务，纯跑测试（集成测试自建 app，不依赖 39000）
+npm test
+```
+
+`SCANNERS_ENABLED=false` 会跳过全部后台扫描器，只保留 HTTP 服务。
+
+### 7. 异步操作必须在函数返回前完成
+
+`completeTask` 里的审核记录创建最初是 fire-and-forget，导致调用方可能读到「无审核记录」的中间态，并发下变成偶发失败。**凡是调用方紧接着要读的数据，都必须在返回前写完**（`await` 并 try/catch）。
+
 ## 七、CI
 
 `.gitea/workflows/test.yml`：起 PG16 service → `npm ci` → `npm run seed` → `npm test` → 起服务 → `npm run test:smoke`。
