@@ -59,6 +59,10 @@ async function buildTaskView(task) {
     quality: { completion_note: rp.completion_note || null },
     sla_remaining_sec: slaRemainingSec(task),
     timeout_at: task.timeout_at || null,
+    // 多轮追问：会话归属（不传 conversation_id 的旧请求这两项为 null / 0）
+    conversation_id: task.conversation_id || null,
+    turn_index: parseInt(task.turn_index, 10) || 0,
+    parent_task_id: task.parent_task_id || null,
     created_at: task.created_at,
     completed_at: task.completed_at || null,
   };

@@ -11,6 +11,7 @@ const project = require('../services/projectService');
 const { toCSV } = require('../services/csv');
 const { assertTaskAccess } = require('../middleware/taskAccess');
 const draft = require('../services/draftService');
+const conversations = require('../services/conversationService');
 
 const VALID_STATUS = ['pending', 'processing', 'completed', 'returned', 'paused', 'cancelled'];
 
@@ -83,7 +84,12 @@ router.get('/:id', authenticate, async (req, res) => {
     const logs = queue.rows(await db.exec(
       'SELECT * FROM task_logs WHERE task_id = ? ORDER BY id', [id]
     ));
-    res.json({ success: true, data: { ...task, rule_name: ruleName, logs } });
+    // 多轮追问：附上整个会话时间线，工程师看到上下文而非孤立单子
+    let conversationTurns = null;
+    if (task.conversation_id) {
+      conversationTurns = await conversations.listTurns(task.conversation_id, task.tenant_id);
+    }
+    res.json({ success: true, data: { ...task, rule_name: ruleName, logs, conversation_turns: conversationTurns } });
   } catch (err) {
     console.error('[任务详情失败]', err.message);
     res.status(500).json({ success: false, message: '获取任务详情失败' });

@@ -15,6 +15,7 @@ const aiShift = require('../services/aiShift');
 const taskView = require('../services/taskView');
 const sseStream = require('../services/sseStream');
 const templates = require('../services/templateService');
+const conversations = require('../services/conversationService');
 const { getTenantByUpstreamKey, resolveCallerTenantId } = require('../middleware/auth');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
@@ -106,11 +107,30 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
     templateId = t.id;
   }
 
+  // 多轮追问：上游带 conversation_id 时挂到同一会话；不带则新建（行为完全不变）
+  let conversation = null;
+  const rawConvId = parsed.extra && parsed.extra.conversation_id;
+  if (rawConvId !== undefined && rawConvId !== null && rawConvId !== '') {
+    const conv = await conversations.resolveConversation({
+      conversationId: String(rawConvId), tenantId: callerTenantId,
+    });
+    if (!conv.ok) {
+      return res.status(400).json(encoder.makeError(400, conv.message, 'invalid_request_error'));
+    }
+    // 继承首轮的分级/优先级/项目（受保护类不允许降级）
+    const applied = conversations.applyInheritance(parsedForTask, conv.inherit, null);
+    parsedForTask = applied.parsed;
+    conversation = { ...conv, categoryOverride: applied.categoryOverride };
+  } else {
+    // 新会话：仍生成 conversation_id 随结果返回，便于上游后续追问
+    conversation = { conversation_id: conversations.makeConversationId(), turn_index: 0, parent_task_id: null, categoryOverride: null };
+  }
+
   // 接入 → 创建人工任务（pending）→ 推送工作台（上游 API key 路由租户）
   let taskId;
   try {
     const createdRes = await queue.createTaskFromRequest({
-      parsed: parsedForTask, chatId, created, tenantId: callerTenantId, templateId,
+      parsed: parsedForTask, chatId, created, tenantId: callerTenantId, templateId, conversation,
     });
     taskId = createdRes.taskId;
   } catch (e) {
@@ -124,7 +144,8 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
 
   // 异步受理：人工接单为小时级，/v1 不阻塞等待（分钟级挂起与人工节奏不匹配）
   // 创建任务后立即返回 task_id，上游凭 GET /v1/tasks/:id 轮询取回人工处理结果
-  const content = `任务已受理，task_id=${taskId}，待人工处理；可通过 GET /v1/tasks/${taskId} 查询结果`;
+  const content = `任务已受理，task_id=${taskId}，待人工处理；可通过 GET /v1/tasks/${taskId} 查询结果` +
+    (conversation.turn_index > 0 ? `（会话 ${conversation.conversation_id} 第 ${conversation.turn_index + 1} 轮）` : '');
 
   if (parsed.stream) {
     // opt-in 中途状态推送：上游传 stream_events:true，保持连接实时推送到终态（免轮询）
@@ -145,6 +166,8 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
   const accepted = encoder.makeChatCompletion({ id: chatId, model: parsed.model, created, content });
   accepted.task_id = taskId;
   accepted.status = 'pending';
+  accepted.conversation_id = conversation.conversation_id;
+  accepted.turn_index = conversation.turn_index || 0;
   res.json(accepted);
 });
 
@@ -183,6 +206,13 @@ router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
     // 上游视图（含进度：SLA 剩余/处理人/优先级）+ 治理决策（分级理由/质量验收/审计健康）
     const audit = await queue.verifyAuditChain(task.id);
     const view = await taskView.buildTaskView(task);
+    // 多轮追问：带会话的请求额外返回时间线摘要，上游据此理解上下文
+    if (task.conversation_id) {
+      view.conversation = {
+        id: task.conversation_id,
+        turns: await conversations.conversationSummary(task.conversation_id, task.tenant_id),
+      };
+    }
     res.json({ ...view, audit: { valid: audit.valid } });
   } catch (e) {
     console.error('[任务回查失败]', e.message);

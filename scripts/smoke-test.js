@@ -207,7 +207,31 @@ async function poll(fn, max = 20) {
   const bText = new TextDecoder('utf-8').decode(bBuf);
   ok('计费导出 CSV(BOM)', bExport.status === 200 && bBuf[0] === 0xEF && bBuf[1] === 0xBB && bBuf[2] === 0xBF);
 
-  // 7.5 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
+  // 7.5 多轮追问（会话）
+  const c1 = await api('POST', '/v1/chat/completions', {
+    model: 'human-llm', project_code: MARK,
+    messages: [{ role: 'user', content: '冒烟会话第一轮' }],
+  });
+  ok('/v1 返回 conversation_id', c1.status === 200 && !!c1.data.conversation_id && c1.data.turn_index === 0);
+  const convId = c1.data && c1.data.conversation_id;
+  if (convId) {
+    const c2 = await api('POST', '/v1/chat/completions', {
+      model: 'human-llm', conversation_id: convId,
+      messages: [{ role: 'user', content: '冒烟会话第二轮追问' }],
+    });
+    ok('追问挂到同一会话(turn=1)', c2.status === 200 && c2.data.conversation_id === convId && c2.data.turn_index === 1);
+    if (c2.data && c2.data.task_id) {
+      const cv = await api('GET', '/v1/tasks/' + c2.data.task_id);
+      ok('/v1 回查带会话时间线', cv.status === 200 && !!cv.data.conversation && cv.data.conversation.turns.length >= 2);
+    }
+    const cbad = await api('POST', '/v1/chat/completions', {
+      model: 'human-llm', conversation_id: 'conv-not-exist',
+      messages: [{ role: 'user', content: 'x' }],
+    });
+    ok('非法 conversation_id 拒绝(400)', cbad.status === 400);
+  }
+
+  // 7.6 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
   const met = await fetch(BASE + '/metrics');
   const metText = await met.text();
   ok('Prometheus /metrics', met.status === 200 && metText.includes('p390_'));
@@ -254,6 +278,12 @@ async function poll(fn, max = 20) {
   await db.run(`DELETE FROM alerts WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM billing_ledger WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
+  // 会话第二轮的任务没有 project_code，单独按会话清理
+  await db.run(`DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
+  await db.run(`DELETE FROM request_logs WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
+  await db.run(`DELETE FROM billing_ledger WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
+  await db.run(`DELETE FROM alerts WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
+  await db.run(`DELETE FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM request_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM tasks WHERE project_code = $1`, [MARK]);
   await db.run(`DELETE FROM approvals WHERE requester = $1`, [MARK]);

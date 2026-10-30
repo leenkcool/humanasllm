@@ -121,6 +121,28 @@ window.HLM = window.HLM || {};
         resultHtml += `<div class="ctx" style="border-left:3px solid var(--danger);"><div class="k">${t('task.rejectReason')}</div><pre>${esc(nl(task.reject_reason))}</pre></div>`;
       }
 
+      // 多轮追问：会话时间线（跨轮次上下文，避免工程师只看孤立的当前轮）
+      const turns = task.conversation_turns;
+      let convHtml = '';
+      if (Array.isArray(turns) && turns.length > 1) {
+        const rows = turns.map(x => {
+          const msgs = (x.request_payload && x.request_payload.messages) || [];
+          const ask = msgs.filter(m => m.role === 'user').map(m => String(m.content || '')).join('\n');
+          const isCurrent = x.id === task.id;
+          return `<div class="conv-turn ${isCurrent ? 'current' : ''}">
+            <div class="conv-head">${t('conv.turn', { n: (parseInt(x.turn_index, 10) || 0) + 1 })}
+              <span class="tag ${x.status}">${STATUS_LABEL[x.status] || x.status}</span>
+              <span class="mono">#${x.id}</span>
+              ${isCurrent ? `<span class="tag medium">${t('conv.current')}</span>` : ''}</div>
+            <div class="conv-q">${esc(String(ask).slice(0, 300))}</div>
+            ${x.status === 'completed' && x.result_text
+              ? `<div class="conv-a">${esc(String(x.result_text).slice(0, 300))}</div>`
+              : `<div class="conv-a muted">${x.reject_reason ? esc(x.reject_reason) : t('conv.noAnswer')}</div>`}
+          </div>`;
+        }).join('');
+        convHtml = `<div class="ctx"><div class="k">${t('conv.title', { n: turns.length })}</div>${rows}</div>`;
+      }
+
       const body = `
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
           <span class="tag ${task.status}">${STATUS_LABEL[task.status] || task.status}</span>
@@ -136,6 +158,7 @@ window.HLM = window.HLM || {};
           <span class="chip">upstream: <span class="mono">${esc(task.upstream_request_id || '-')}</span></span>
         </div>
         <div class="ctx" style="display:flex;gap:8px;flex-wrap:wrap;">${metaHtml || `<span class="k">${t('task.noTags')}</span>`} ${params ? `<span style="color:var(--muted);font-size:12px;align-self:center;">${params}</span>` : ''}</div>
+        ${convHtml}
         <div class="ctx"><div class="k">${t('task.context', { n: messages.length })}</div>${msgsHtml}</div>
         ${toolsHtml}
         ${resultHtml}

@@ -243,6 +243,12 @@ window.HLM = window.HLM || {};
     'mobile.notifyOn': '通知已开',
     'mobile.notifyOff': '开启通知',
     'mobile.webOnly': '仅工作台可用',
+
+    // 多轮追问（会话时间线）
+    'conv.title': '会话时间线（共 {n} 轮）',
+    'conv.turn': '第 {n} 轮',
+    'conv.current': '当前',
+    'conv.noAnswer': '尚未答复',
     'page.prd.title': '需求 / PRD',
     'page.prd.desc': '二次开发验证过的需求沉淀到 PRD.md（git 本地提交）',
     'prd.appendTitle': '追加需求',
@@ -845,6 +851,12 @@ window.HLM = window.HLM || {};
     'mobile.notifyOn': 'Notifications on',
     'mobile.notifyOff': 'Enable alerts',
     'mobile.webOnly': 'Workbench only',
+
+    // Multi-turn conversation timeline
+    'conv.title': 'Conversation timeline ({n} turns)',
+    'conv.turn': 'Turn {n}',
+    'conv.current': 'Current',
+    'conv.noAnswer': 'Not answered yet',
     'page.prd.title': 'Requirements / PRD',
     'page.prd.desc': 'Record verified requirements into PRD.md (local git commit)',
     'prd.appendTitle': 'Append requirement',

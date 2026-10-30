@@ -265,6 +265,11 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS last_reminded_at TIMESTAMP`);
   // 智能派单：按处理人 + 状态聚合负载
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_assignee_status ON tasks(assignee_id, status)`);
+  // 多轮追问：同一会话的多轮任务通过 conversation_id 串成时间线（不传该字段行为完全不变）
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS conversation_id VARCHAR(64)`);
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id INTEGER`);
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS turn_index INTEGER NOT NULL DEFAULT 0`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_conversation ON tasks(conversation_id, turn_index)`);
   // ===== 分级策略引擎种子规则（幂等：task_rules 为空时播种） =====
   await seedRules();
   // ===== 工单模板示例（幂等：task_templates 为空时播种，开源开箱即可见） =====

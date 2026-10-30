@@ -160,14 +160,16 @@ async function notifyMatchedEngineers(taskId, skillsRaw, tenantId) {
   }
 }
 
-/** 上游请求接入 → 创建 pending 任务（多租户：上游 API key 路由租户，无则默认租户） */async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenantIdParam, templateId, origin }) {
+/** 上游请求接入 → 创建 pending 任务（多租户：上游 API key 路由租户，无则默认租户） */
+async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenantIdParam, templateId, origin, conversation }) {
   const db = getDb();
   const priority = parsed.extra.priority || 'medium';
   let tenantId = tenantIdParam;
   if (!tenantId) { const def = rows(await db.exec('SELECT id FROM tenants WHERE code = ?', ['default']))[0]; tenantId = def ? def.id : null; }
   // 分级策略引擎定级（规则白名单锁死 > 上游显式 > 默认 general），rule_id 留痕分级理由
   const cat = await classify({ messages: parsed.messages, body: parsed.extra, tenantId });
-  const category = cat.category;
+  // 多轮追问：受保护类会话不允许因追问内容变化而降级
+  const category = (conversation && conversation.categoryOverride) || cat.category;
   const ruleId = cat.rule_id;
   const projectCode = parsed.extra.project_code || null;
   // 上游完成回调地址（仅接受 http/https，非法值丢弃不影响建单）
@@ -176,15 +178,19 @@ async function notifyMatchedEngineers(taskId, skillsRaw, tenantId) {
   const metaTags = parsed.extra.meta_tags || parsed.extra.meta || null;
   const skills = parsed.extra.skills || null;
   const payload = { ...parsed, created };
+  const conversationId = (conversation && conversation.conversation_id) || null;
+  const parentTaskId = (conversation && conversation.parent_task_id) || null;
+  const turnIndex = (conversation && conversation.turn_index) || 0;
 
   const { lastId } = await db.run(
     `INSERT INTO tasks
-       (upstream_request_id, model, stream, priority, category, rule_id, project_code, callback_url, meta_tags, request_payload, status, timeout_at, tenant_id, skills, template_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?, ?, ?)`,
+       (upstream_request_id, model, stream, priority, category, rule_id, project_code, callback_url, meta_tags, request_payload, status, timeout_at, tenant_id, skills, template_id, conversation_id, parent_task_id, turn_index)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?, ?, ?, ?, ?, ?)`,
     [chatId, parsed.model, parsed.stream, priority, category, ruleId, projectCode, callbackUrl,
       metaTags ? JSON.stringify(metaTags) : null,
       JSON.stringify(payload),
-      timeoutMinutes('pending', priority), tenantId, skills, templateId || null]
+      timeoutMinutes('pending', priority), tenantId, skills, templateId || null,
+      conversationId, parentTaskId, turnIndex]
   );
   await addLog(lastId, 'create', null,
     templateId ? { status: 'pending', template_id: templateId } : { status: 'pending' },
@@ -198,7 +204,7 @@ async function notifyMatchedEngineers(taskId, skillsRaw, tenantId) {
     event: 'task:new', title: `新人工任务 #${lastId}`,
     text: `优先级 ${priority} / 类别 ${category}${summary ? '\n' + summary : ''}`, taskId: lastId,
   });
-  return { taskId: lastId };
+  return { taskId: lastId, conversationId, turnIndex };
 }
 
 /** 状态流转核心：校验合法性 + 写审计 + 更新 + 推送 */
