@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title data-i18n="sso.title">单点登录 · Human as Agent</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%232563eb'/><path d='M10 22l6-6 4 4 8-9v5h-2v4H26l2-2 2 2z' fill='white'/></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <h1 data-i18n="sso.heading">正在完成单点登录…</h1>
+      <p id="ssoMsg" style="color:var(--muted);font-size:13px;" data-i18n="sso.hint">请稍候，正在换取登录凭证。</p>
+      <p id="ssoErr" style="color:var(--danger);font-size:13px;min-height:18px;"></p>
+      <a href="/login.html" class="btn" data-i18n="sso.back">返回登录页</a>
+    </div>
+  </div>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/utils.js"></script>
+  <script>
+    (function () {
+      var I = window.HLM.I18n;
+      I.applyStatic();
+      var err = document.getElementById('ssoErr');
+      var msg = document.getElementById('ssoMsg');
+
+      // token 只从 fragment 读取：不发给服务端、不进日志与 Referer
+      var params = new URLSearchParams(location.hash.replace(/^#/, ''));
+      var token = params.get('token');
+      var errorText = params.get('error');
+      var next = params.get('next') || '/workbench.html';
+      if (next.charAt(0) !== '/' || next.charAt(1) === '/' || next.indexOf('\\') !== -1) next = '/workbench.html';
+
+      if (errorText) {
+        msg.style.display = 'none';
+        err.textContent = decodeURIComponent(errorText);
+        // 清掉地址栏里的错误参数，避免刷新重复提示
+        history.replaceState(null, '', '/sso.html');
+        return;
+      }
+      if (!token) {
+        msg.style.display = 'none';
+        err.textContent = I.t('sso.noToken');
+        return;
+      }
+
+      localStorage.setItem('hlm_token', token);
+      // 用 /api/auth/me 取回角色与权限清单（与密码登录写入的结构一致）
+      fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + token, 'Accept-Language': I.acceptHeader() } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.success && d.data) localStorage.setItem('hlm_user', JSON.stringify(d.data));
+          history.replaceState(null, '', '/sso.html');
+          location.replace(next);
+        })
+        .catch(function () {
+          history.replaceState(null, '', '/sso.html');
+          location.replace(next);
+        });
+    })();
+  </script>
+</body>
+</html>

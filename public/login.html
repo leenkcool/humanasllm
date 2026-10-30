@@ -35,6 +35,14 @@
         <button class="btn primary" type="submit" id="loginBtn" data-i18n="login.btn">登 录</button>
         <p id="errMsg" style="color:var(--danger);font-size:13px;margin-top:12px;min-height:18px;"></p>
       </form>
+      <div id="ssoBox" style="display:none;margin-top:14px;">
+        <div style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;margin-bottom:8px;">
+          <span style="flex:1;height:1px;background:var(--border);"></span>
+          <span data-i18n="login.ssoOr">或使用企业账号登录</span>
+          <span style="flex:1;height:1px;background:var(--border);"></span>
+        </div>
+        <div id="ssoButtons" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
       <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:13px;">
         <a href="javascript:showRegister()" data-i18n="login.noAccount" style="color:var(--primary);text-decoration:none;">没有账号？注册</a>
         <a href="javascript:showForgot()" data-i18n="login.forgot" style="color:var(--muted);text-decoration:none;">忘记密码</a>
@@ -75,6 +83,28 @@
         applyLang();
       };
       applyLang();
+
+      // ===== 企业 SSO：有配置才显示按钮（未配置时零影响）=====
+      (async function loadSso() {
+        try {
+          var res = await fetch(window.location.origin + '/api/auth/sso/providers');
+          var data = await res.json();
+          var list = (data && data.data) || [];
+          if (!list.length) return;
+          var box = document.getElementById('ssoBox');
+          var btns = document.getElementById('ssoButtons');
+          btns.innerHTML = list.map(function (p) {
+            return '<a class="btn" style="display:block;text-align:center;text-decoration:none;" href="'
+              + '/api/auth/sso/' + encodeURIComponent(p.name) + '/start?next=' + encodeURIComponent(nextUrl()) + '">'
+              + '<span></span></a>';
+          }).join('');
+          // 用 textContent 赋值，避免提供方名称被当作 HTML 注入
+          Array.prototype.forEach.call(btns.querySelectorAll('a'), function (a, i) {
+            a.querySelector('span').textContent = list[i].label || list[i].name;
+          });
+          box.style.display = 'block';
+        } catch (e) { /* SSO 不可用不影响密码登录 */ }
+      })();
 
       function langHeaders() {
         return { 'Content-Type': 'application/json; charset=utf-8', 'Accept-Language': I.acceptHeader() };

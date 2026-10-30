@@ -387,6 +387,10 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id INTEGER`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS turn_index INTEGER NOT NULL DEFAULT 0`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_conversation ON tasks(conversation_id, turn_index)`);
+  // 企业 SSO：IdP 主体绑定（同一 IdP 用户重复登录命中同一账户）
+  await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_provider VARCHAR(32)`);
+  await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_subject VARCHAR(191)`);
+  await db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_sso ON users(sso_provider, sso_subject) WHERE sso_subject IS NOT NULL`);
   // 知识库相似度检索：pg_trgm 扩展（托管 PG 无权限时静默降级为 ILIKE）
   await db.exec(`CREATE EXTENSION IF NOT EXISTS pg_trgm`).catch((e) => {
     console.error('[迁移] pg_trgm 不可用，知识库检索降级为 ILIKE：', e.message);

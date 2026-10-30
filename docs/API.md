@@ -186,7 +186,19 @@ AI 向人类提审批（资源/权限/项目申请），**异步受理**：创�
 | POST | `/api/auth/register` | `{username, email, password, name?}`；`USER_REGISTER_MODE=open` 返回 token 直接登录；`audit` 返回待审核 |
 | POST | `/api/auth/forgot-password` | `{email}` → 重置密码并发邮件（SMTP 未配置返回 `demoPassword`） |
 | PUT | `/api/auth/password` | `{oldPassword, newPassword}` 改密 |
-| GET | `/api/auth/me` | 当前用户信息 |
+| GET | `/api/auth/me` | 当前用户信息（含 `role` 与 `permissions` 权限点清单） |
+
+### 企业 SSO（OAuth2 / OIDC 授权码，配置驱动）
+环境变量 `SSO_PROVIDERS` 里声明过的提供方才可用；未配置时下列接口零影响（列表为空、start 返回 404）。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/auth/sso/providers` | 已启用提供方 `[{name, label}]`（登录页据此显示按钮） |
+| GET | `/api/auth/sso/:name/start?next=/queue` | 302 到 IdP 授权页，携带一次性 `state`（TTL 10 分钟）；`next` 仅接受站内相对路径，防开放重定向 |
+| GET | `/api/auth/sso/:name/callback?code=&state=` | 校验 state → 换 token → 取 userinfo → 绑定/建号 → 302 到 `/sso.html#token=&next=&created=`（JWT 走 fragment，不进服务端日志与 Referer） |
+
+行为开关：`SSO_AUTO_CREATE`（默认 `true`，首次登录自动建号，角色只取 `SSO_<NAME>_DEFAULT_ROLE` 且永不 `admin`）、`SSO_LINK_BY_EMAIL`（默认 `true`，按邮箱绑定既有账户且不改其角色）。
+字段映射可覆盖：`SSO_<NAME>_{ID,USERNAME,EMAIL,NAME}_FIELD`（默认 `sub` / `preferred_username` / `email` / `name`）。
 
 ### 工作台统计 / 任务
 | 方法 | 路径 | 说明 |

@@ -33,6 +33,7 @@ routes/
   gateway.js           # 网关配置 + 多工具 SKILL/AGENT 生成/微调/安装
   audit.js             # 合规报告 + 质量数据资产导出
   annotations.js       # 产出标注 + 私有评测集（快照 / SFT·评测导出）
+  sso.js               # 企业 SSO：providers / start（302 授权页）/ callback（换 JWT）
   prd.js               # PRD 需求沉淀（git 本地提交）
   index.js             # 路由总挂载
 services/
@@ -52,10 +53,11 @@ services/
   toolCalls.js         # tools/function calling（声明校验 + tool_calls 归一化）
   permissionService.js # 三权分立权限矩阵（sys_admin/sec_admin/audit_admin/engineer）+ requirePermission
   annotationService.js # 答复标注 + 私有评测集不可变快照 + SFT/评测 JSONL
+  ssoService.js        # OAuth2/OIDC 授权码：提供方解析 + state 一次性 + profile 映射
   waiters.js           # 等待者单例（审批挂起等待）
   i18n.js / csv.js     # 消息翻译 / CSV 导出
   websocket.js         # Socket.IO 推送（task:new/update/timeout）
-public/                # 落地页(landing/) + 登录页 + 工作台(workbench.html + utils/api/ws/ui/app/i18n.js)
+public/                # 落地页(landing/) + 登录页 + SSO 中继页(sso.html) + 工作台(workbench.html + utils/api/ws/ui/app/i18n.js)
 scripts/seed.js        # 种子账户
 ```
 
@@ -74,6 +76,7 @@ scripts/seed.js        # 种子账户
 - `POST /api/auth/login`（admin/engineer1/engineer2，密码 admin123）
 - `POST /api/auth/register`（用户名/邮箱/密码；`USER_REGISTER_MODE` 控制 open 注册即用 / audit 管理员审核启用）
 - `POST /api/auth/forgot-password`（用注册邮箱重置密码，向该邮箱发新密码；SMTP 可配置）
+- `/api/auth/sso/providers | /:name/start | /:name/callback`（企业 SSO OAuth2/OIDC 授权码，配置驱动；未配置时列表为空、start 404）
 - `/api/workbench/summary | governance | queue | mine | unfinished`
 - `/api/tasks` + `/api/tasks/:id/{claim|complete|reject|pause|resume|requeue|reopen|cancel|project}`
 - `/api/approvals` + `/api/approvals/:id/{approve|reject}`（审批列表/批准并提供资源/驳回）
@@ -102,6 +105,8 @@ scripts/seed.js        # 种子账户
 `SSE_HEARTBEAT_MS`(默认 15000)、`SSE_EVENTS_MAX_MIN`(默认 60，中途状态推送保活/最长保持)、
 `USER_REGISTER_MODE`(open/audit)、`SMTP_HOST/PORT/SECURE/USER/PASS/FROM`(邮件，可选)、
 `NOTIFY_EMAIL_TO`、`NOTIFY_WEBHOOK_URL`(通知渠道：邮件收件人/企微钉钉webhook，可选)、
+`SSO_PROVIDERS`(逗号分隔提供方名，空=不启用)、`SSO_<NAME>_{LABEL,CLIENT_ID,CLIENT_SECRET,AUTH_URL,TOKEN_URL,USERINFO_URL,SCOPE,DEFAULT_ROLE,ID_FIELD,USERNAME_FIELD,EMAIL_FIELD,NAME_FIELD}`、
+`SSO_AUTO_CREATE`(默认 true；false=仅已有账户可登)、`SSO_LINK_BY_EMAIL`(默认 true，按邮箱绑定既有账户)、
 `GATEWAY_INSTALL_ROOT`(服务器端安装根，可选；默认 data/installed)
 
 ## 命令

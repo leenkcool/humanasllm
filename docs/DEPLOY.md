@@ -193,7 +193,38 @@ curl http://localhost:39000/v1/tasks/<task_id>
 
 ---
 
-## 十、升级
+## 十、企业 SSO 配置（OAuth2 / OIDC）
+
+登录页的「公司统一登录」按钮**只在配置后才能看到**，未配置时零影响。
+
+```bash
+# .env
+SSO_PROVIDERS=corp
+SSO_CORP_LABEL=公司统一登录
+SSO_CORP_CLIENT_ID=<IdP 分配>
+SSO_CORP_CLIENT_SECRET=<IdP 分配>
+SSO_CORP_AUTH_URL=https://id.example.com/oauth2/authorize
+SSO_CORP_TOKEN_URL=https://id.example.com/oauth2/token
+SSO_CORP_USERINFO_URL=https://id.example.com/oauth2/userinfo
+SSO_CORP_SCOPE=openid profile email
+SSO_CORP_DEFAULT_ROLE=engineer   # 自动建号角色，只能是 engineer/sys_admin/sec_admin/audit_admin
+SSO_AUTO_CREATE=true             # false = 仅允许已存在的账户登录
+SSO_LINK_BY_EMAIL=true           # 按邮箱把 SSO 身份绑定到既有本地账户（角色不变）
+```
+
+IdP 侧回调地址填：`http://<本网关地址>/api/auth/sso/corp/callback`（生产建议 HTTPS 域名）。
+
+要点：
+- `SSO_PROVIDERS` 里**声明过的名字才可用**，字段不全的提供方自动忽略（不会 500）。
+- 用户字段映射可覆盖：`SSO_CORP_ID_FIELD` / `_USERNAME_FIELD` / `_EMAIL_FIELD` / `_NAME_FIELD`（默认 `sub` / `preferred_username` / `email` / `name`）。
+- `state` 存**进程内存**（TTL 10 分钟、一次性）。**多实例部署需改为共享存储**（Redis 或数据库表），否则用户在 A 实例发起、回调落到 B 实例会失败；单实例网关无此问题。
+- JWT 通过 URL fragment（`/sso.html#token=...`）交给前端，不经过服务端访问日志与 Referer。
+- 自动化登录用户永远不会被授予 `admin`：`DEFAULT_ROLE` 白名单校验，显式排除 `admin`。
+- 企微/钉钉/GitHub/Keycloak/Azure AD 都是同一套参数，按各自控制台填三个 URL 即可；**LDAP 未实现**（需额外适配层）。
+
+---
+
+## 十一、升级
 
 ```bash
 # 1. 备份数据库（见下节）
@@ -210,7 +241,7 @@ pm2 restart p390    # 或 bg.ps1 kill + start
 
 ---
 
-## 十一、备份与恢复
+## 十二、备份与恢复
 
 ### 一键备份
 
@@ -293,7 +324,7 @@ node scripts/drill-restore.js --keep-backup # 保留演练备份供排查
 
 ---
 
-## 十二、监控（Prometheus）
+## 十三、监控（Prometheus）
 
 ```bash
 curl -s http://192.168.168.3:39000/metrics | head -40
@@ -333,7 +364,7 @@ scrape_configs:
 
 ---
 
-## 十三、PWA 与 HTTPS
+## 十四、PWA 与 HTTPS
 
 浏览器只在**安全上下文**下允许注册 Service Worker 与请求通知权限：
 
@@ -381,7 +412,7 @@ PUBLIC_BASE_URL=https://your.domain
 
 ---
 
-## 十四、安全基线
+## 十五、安全基线
 
 1. **改默认密码**：admin/engineer 账户部署后立即改密。
 2. **改 `JWT_SECRET`**：生产必须唯一随机。
@@ -394,7 +425,7 @@ PUBLIC_BASE_URL=https://your.domain
 
 ---
 
-## 十五、故障排查（FAQ）
+## 十六、故障排查（FAQ）
 
 | 现象 | 排查 |
 |---|---|
@@ -409,7 +440,7 @@ PUBLIC_BASE_URL=https://your.domain
 
 ---
 
-## 十六、跨平台注意
+## 十七、跨平台注意
 
 - 命令统一用 `curl`（Windows 10+ 原生自带，无需 `curl.exe`）。
 - SKILL/AGENT 模板已跨平台（相对路径，网关地址安装时替换）。

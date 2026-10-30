@@ -4,6 +4,7 @@
  *  - /v1/*          OpenAI 兼容接口
  */
 const authRoutes = require('./auth');
+const ssoRoutes = require('./sso');
 const userRoutes = require('./users');
 const taskRoutes = require('./tasks');
 const workbenchRoutes = require('./workbench');
@@ -28,6 +29,7 @@ const backupRoutes = require('./backup');
 module.exports = function (app) {
   // 工作台 REST
   app.use('/api/auth', authRoutes);
+  app.use('/api/auth/sso', ssoRoutes);   // 企业 SSO（OAuth2/OIDC 授权码）
   app.use('/api/users', userRoutes);
   app.use('/api/tasks', taskRoutes);
   app.use('/api/workbench', workbenchRoutes);

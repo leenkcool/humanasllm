@@ -276,7 +276,13 @@ async function poll(fn, max = 20) {
     ok('评测集详情含样本', detail.status === 200 && Array.isArray(detail.data.data.items));
   }
 
-  // 7.9 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
+  // 7.9 企业 SSO（未配置时零影响：列表为空，未声明的提供方一律 404）
+  const ssoProv = await api('GET', '/api/auth/sso/providers');
+  ok('SSO 提供方列表', ssoProv.status === 200 && Array.isArray(ssoProv.data.data));
+  const ssoBad = await api('GET', '/api/auth/sso/nonexistent/start');
+  ok('未配置的 SSO 提供方 404', ssoBad.status === 404);
+
+  // 7.10 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
   const met = await fetch(BASE + '/metrics');
   const metText = await met.text();
   ok('Prometheus /metrics', met.status === 200 && metText.includes('p390_'));

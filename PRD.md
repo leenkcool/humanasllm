@@ -2,6 +2,14 @@
 
 > 本项目所有验证过的功能需求在此记录。任何二次开发（AI Agent 或人）完成并验证后，**必须**在此追加条目（日期 + 功能描述），并 git commit + push。
 
+## 2026-10-30 - 企业 SSO（OAuth2 / OIDC 授权码，配置驱动）
+- 描述：新增 `services/ssoService.js` + `routes/sso.js` + `public/sso.html`，登录页按需出现「公司统一登录」按钮。不绑定厂商：企微 / 钉钉 / GitHub / Keycloak / Azure AD 都只是三个 URL + client 凭据。
+- 配置：`SSO_PROVIDERS` 逗号声明提供方名，按 `SSO_<NAME>_*` 填参；字段不全的提供方自动忽略。未配置时登录页无变化、`/start` 返回 404（零影响）。
+- 安全：`state` 一次性 + 10 分钟 TTL + 提供方绑定（防 CSRF 与重放）；`next` 只接受站内相对路径（防开放重定向）；JWT 通过 URL fragment 交给前端，不进服务端日志与 Referer。
+- 账户策略：`SSO_AUTO_CREATE=true` 首次登录自动建号，角色取 `SSO_<NAME>_DEFAULT_ROLE` 白名单且**永不 admin**；`SSO_LINK_BY_EMAIL=true` 时按邮箱绑定既有账户且**不改其角色**；`SSO_AUTO_CREATE=false` 时未开通账户给出明确提示不建号。
+- 已知边界：`state` 存进程内存，多实例部署需换共享存储（单实例网关无影响）；LDAP 未实现。
+- 验证：单元 7（提供方完整性 / 未声明名字不可用 / 重定向防护 / state 一次性与过期 / 授权 URL / profile 清洗）+ 集成 4（本地 mock IdP 跑完整链路：自动建号、邮箱绑定、拒建号、state 重放）通过；冒烟 +2；全量 211/211、84/84、13 页浏览器回归通过。
+
 ## 2026-10-30 - 细粒度 RBAC（三权分立）
 - 描述：新增 `services/permissionService.js` 权限矩阵 + `middleware/auth.js` 的 `requirePermission(perm)`；路由门禁从「角色名 `admin`」改为「权限点」，覆盖用户 / 租户 / 项目 / 备份 / 派单 / 计费 / 模板 / 规则 / 抽检 / 评测集 / 服务器端安装 / 告警。
 - 角色：`sys_admin`（用户、租户、项目、备份、派单、计费、模板）、`sec_admin`（分级规则、模板、抽检、评测集、告警、审计读取）、`audit_admin`（**仅** `audit.read`，只读）、`admin`（超管，`*`）、`engineer`（无管理权限，行为与之前一致）。

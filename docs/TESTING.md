@@ -1,20 +1,20 @@
 # Human as Agent · 测试方案
 
-> 现状（2026-10-30）：**200 项自动化测试 + 82 项 API 冒烟 + 13 页浏览器回归**，全部通过。
+> 现状（2026-10-30）：**211 项自动化测试 + 84 项 API 冒烟 + 13 页浏览器回归**，全部通过。
 > 本文说明分层策略、如何新增测试、以及踩过的坑。
 
 ## 一、四层测试
 
 | 层 | 文件 | 数量 | 依赖 | 命令 |
 |---|---|---|---|---|
-| **单元** | `tests/unit/*.test.js` | 20 文件 | 无（纯函数） | `node --test tests/unit/*.test.js` |
-| **集成** | `tests/integration/*.test.js` | 21 文件 | **真实 PG（库 `p390`）** | `node --test tests/integration/*.test.js` |
-| **API 冒烟** | `scripts/smoke-test.js` | 82 项 | 服务须已启动（39000） | `npm run test:smoke` |
+| **单元** | `tests/unit/*.test.js` | 21 文件 | 无（纯函数） | `node --test tests/unit/*.test.js` |
+| **集成** | `tests/integration/*.test.js` | 22 文件 | **真实 PG（库 `p390`）** | `node --test tests/integration/*.test.js` |
+| **API 冒烟** | `scripts/smoke-test.js` | 84 项 | 服务须已启动（39000） | `npm run test:smoke` |
 | **浏览器回归** | `scripts/ui-check.js` | 13 页 | puppeteer + 服务已启动 | `npm run ui:check` |
 
-全量：`npm test`（200 项，约 60-90 秒）。
+全量：`npm test`（211 项，约 60-90 秒）。
 
-## 二、单元测试（20 个）
+## 二、单元测试（21 个）
 
 纯函数直测，`require` 业务模块，**不初始化数据库**：
 
@@ -38,8 +38,9 @@
 | `pwa` | manifest 结构、PNG 尺寸、SW 分支与护栏、HTML 标签 |
 | `metrics` / `backup` | 指标渲染、备份文件名/保留策略 |
 | `i18nConsistency` | **中英 key 集合一致、占位符一致**（长期锁死双语遗漏） |
+| `sso` | 提供方配置完整性、`next` 开放重定向防护、state 一次性/过期、用户信息映射清洗 |
 
-## 三、集成测试（21 个）
+## 三、集成测试（22 个）
 
 连**真实 PostgreSQL 库 `p390`**（非独立测试库），每个用例自建租户、`finally` 自清理。
 
@@ -58,10 +59,11 @@
 | `review` / `feedback` / `mobileTerminal` | 审核流程、效果回流、定向推送与起草守卫 |
 | `annotations` | 标注校验、跨租户、评测集快照不可变、SFT/评测导出 |
 | `rbac` | 三权分立路由门禁：sys_admin / sec_admin 互不覆盖、audit_admin 只读、防越权自升 admin |
+| `sso` | 本地 mock IdP 跑完整授权码链路：自动建号（默认 engineer）、按邮箱绑定既有账户不改角色、`SSO_AUTO_CREATE=false` 拒建号、state 重放拒绝 |
 
-## 四、API 冒烟（82 项）
+## 四、API 冒烟（84 项）
 
-需服务已启动。覆盖 health/models、登录、任务全链路、审批、项目、CSV、治理、模板、派单、告警、计费、会话、审核、标注与评测集、三权分立门禁、监控、PWA 静态资源、权限边界、租户隔离。结束时自动清理 `project_code='smoke'` 的数据、`smoke-*` 评测集与冒烟账户。
+需服务已启动。覆盖 health/models、登录、任务全链路、审批、项目、CSV、治理、模板、派单、告警、计费、会话、审核、标注与评测集、三权分立门禁、SSO 提供方（未配置时零影响）、监控、PWA 静态资源、权限边界、租户隔离。结束时自动清理 `project_code='smoke'` 的数据、`smoke-*` 评测集与冒烟账户。
 
 ## 五、浏览器回归（13 页）
 

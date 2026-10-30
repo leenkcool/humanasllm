@@ -18,8 +18,9 @@
 - **智能漂移**：general 简单任务可自动 AI 承接（可开关），涉密类锁死
 - **人机协作闭环**：工程师终端（移动优先 + 定向推送 + AI 起草留痕）、多轮追问、知识库三级作用域、答复审核（单人审核 + 抽检）、效果回流
 - **数据飞轮**：答复标注（good/partial/bad + 缺陷标签 + 期望答复）→ 私有评测集不可变快照 → SFT / 评测 JSONL 导出
-- **测试体系**：200 项单元/集成测试 + 82 项 API 回归 + 13 页浏览器回归，关键安全边界全覆盖
+- **测试体系**：211 项单元/集成测试 + 84 项 API 回归 + 13 页浏览器回归，关键安全边界全覆盖
 - **三权分立**：`sys_admin`（人/资源）/ `sec_admin`（策略/质量）/ `audit_admin`（只读审计）/ `admin` 超管，权限矩阵集中在 `services/permissionService.js`
+- **企业 SSO**：OAuth2/OIDC 授权码流程，`SSO_*` 环境变量声明即启用（企微/钉钉/GitHub/Keycloak/Azure AD 通用）；state 一次性防 CSRF、JWT 走 URL fragment、可按邮箱绑定既有账户
 
 ## 🌐 与 FDE（前沿部署工程师）的关系
 
@@ -94,8 +95,8 @@ npm start         # 监听 0.0.0.0:39000
 ### 常用命令
 
 ```bash
-npm test              # 200 项单元/集成测试
-npm run test:smoke    # 82 项 API 冒烟（需服务已启动）
+npm test              # 211 项单元/集成测试
+npm run test:smoke    # 84 项 API 冒烟（需服务已启动）
 npm run ui:check      # 13 页浏览器回归（puppeteer）
 npm run backup        # 数据库备份 → data/backups/
 npm run restore <文件> # 恢复（会先自动备份当前库）
@@ -150,7 +151,7 @@ npm run check:secret  # 推仓库前敏感信息扫描
 - ✅ 📱 移动端 PWA + 超时告警升级序列 —— **已交付 2026-10**
 
 **企业就绪（中期）**
-- 🔐 企业 SSO（OAuth2 / LDAP / 企微 / 钉钉）
+- ✅ 🔐 企业 SSO（OAuth2/OIDC 授权码，`SSO_*` 声明即启用；LDAP 待补）—— **已交付 2026-10**
 - ✅ 🛡️ 细粒度 RBAC + 三权分立（sys_admin / sec_admin / audit_admin 只读）—— **已交付 2026-10**
 - ✅ 🧑‍💻 多工程师负载均衡自动分配（技能匹配 + 负载 + 通过率加权）—— **已交付 2026-10**
 - ✅ 💰 计费计量（按任务计时计费 + 租户月度账单）—— **已交付 2026-10**

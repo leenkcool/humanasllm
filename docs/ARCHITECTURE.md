@@ -8,7 +8,7 @@
 |---|---|
 | 后端 | Node.js + Express 4 + Socket.IO |
 | 数据库 | PostgreSQL 5433（库 `p390`，19 张表） |
-| 认证 | JWT（jsonwebtoken + bcryptjs），admin / engineer 双角色 |
+| 认证 | JWT（jsonwebtoken + bcryptjs），五角色三权分立（admin / sys_admin / sec_admin / audit_admin / engineer）；可选企业 SSO（OAuth2/OIDC 授权码，换回同一套 JWT） |
 | 前端 | Vanilla HTML/JS/CSS（IIFE 模块，SVG 图标，4 主题，响应式，中英 i18n） |
 | AI 中继 | 原生 `fetch`（OpenAI 兼容，一次 + stream 透传） |
 | 通知 | notifier（邮件 nodemailer + Webhook，均可配置，未配置降级） |
@@ -20,7 +20,7 @@
 server.js            # 入口：Socket.IO 认证 + 安全头 + /metrics + 路由 + 启动扫描器
 ├── middleware/       # auth(JWT+角色+租户key) / security(头+CORS+限流) / taskAccess(租户+归属校验)
 ├── db/               # index(连接+建表+迁移+pg_trgm) / adapters/{pg,mysql,sqlite} / dialect
-├── routes/           # v1(OpenAI) approvals projects tasks workbench auth users logs
+├── routes/           # v1(OpenAI) approvals projects tasks workbench auth sso users logs
 │                     #   rules(分级配置) tenants(租户) gateway(多工具安装) audit prd index
 │                     #   templates dispatch alerts billing knowledge reviews backup metrics
 ├── services/         # 业务核心
@@ -131,7 +131,7 @@ Socket.IO 房间模型（`user:*` / `admin` / `system`），事件：
 
 | 表 | 关键字段 | 用途 |
 |---|---|---|
-| `users` | username, email, password, role(admin/sys_admin/sec_admin/audit_admin/engineer), name, is_active, skills, tenant_id | 账户（三权分立见 `services/permissionService.js`） |
+| `users` | username, email, password, role(admin/sys_admin/sec_admin/audit_admin/engineer), name, is_active, skills, tenant_id, sso_provider, sso_subject | 账户（三权分立见 `services/permissionService.js`；`(sso_provider, sso_subject)` 唯一索引用于 SSO 身份绑定） |
 | `tasks` | upstream_request_id, model, stream, priority, category, rule_id, project_code, payload, status, assignee_id, result_text, reject_reason, timeout_at, conversation_id, turn_index, template_id, escalation_level, remind_count | 人工任务 |
 | `task_logs` | task_id, action, old_value(JSONB), new_value(JSONB), actor_name, remark, prev_hash, hash | 状态审计（哈希链防篡改） |
 | `request_logs` | task_id, tenant_id, direction(in/out), payload(JSONB), model | 请求/输出日志 |
