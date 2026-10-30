@@ -156,5 +156,37 @@ window.HLM = window.HLM || {};
     }
   }
 
-  window.HLM.Review = { renderForTask, promptApprove, promptRevision, spotCheck, loadPending };
+  /** admin 待抽检队列（confidential 已放行的答复） */
+  async function loadSpotCheck() {
+    const box = $('#spotCheckBox');
+    if (!box) return;
+    box.innerHTML = `<div class="empty" style="padding:20px;">…</div>`;
+    try {
+      const r = await API.get('/reviews/spot-check');
+      const list = r.data || [];
+      if (!list.length) {
+        box.innerHTML = `<div class="empty" style="padding:24px;">${t('rv.spotEmpty')}</div>`;
+        return;
+      }
+      box.innerHTML = `<div class="tbl-wrap"><table class="data">
+        <thead><tr><th>${t('table.id')}</th><th>${t('table.priority')}</th><th>${t('rv.answer')}</th>
+          <th>${t('rv.scoreTotal')}</th><th>${t('table.action')}</th></tr></thead>
+        <tbody>${list.map(x => `<tr>
+          <td class="nowrap"><span class="mono">#${x.task_id}</span></td>
+          <td><span class="tag ${esc(x.priority)}">${esc(x.priority)}</span></td>
+          <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(String(x.result_text || '').slice(0, 60))}</td>
+          <td class="nowrap">${x.score_total != null ? x.score_total : '-'}</td>
+          <td class="nowrap">
+            <button class="btn sm" onclick="window.HLM.UI.openDetail(${x.task_id})">${t('common.view')}</button>
+            <button class="btn sm primary" onclick="window.HLM.Review.spotCheck(${x.task_id}, true)">${t('rv.spotPass')}</button>
+            <button class="btn danger sm" onclick="window.HLM.Review.spotCheck(${x.task_id}, false)">${t('rv.spotFail')}</button>
+          </td>
+        </tr>`).join('')}</tbody></table></div>`;
+    } catch (e) {
+      box.innerHTML = '';
+      toast(e.message, 'error');
+    }
+  }
+
+  window.HLM.Review = { renderForTask, promptApprove, promptRevision, spotCheck, loadPending, loadSpotCheck };
 })();

@@ -348,7 +348,9 @@ window.HLM = window.HLM || {};
         <button class="icon-btn" onclick="window.HLM.App.route()">${Icons.refresh}</button></div>
       <div class="stats" id="rvStats"></div>
       <div class="card"><div class="card-head"><span class="t">${t('rv.pendingQueue')}</span></div>
-        <div class="card-body-flush" id="reviewQueueBox"></div></div>`;
+        <div class="card-body-flush" id="reviewQueueBox"></div></div>
+      ${currentUser.role === 'admin' ? `<div class="card"><div class="card-head"><span class="t">${t('rv.spotQueue')}</span></div>
+        <div class="card-body-flush" id="spotCheckBox"></div></div>` : ''}`;
     try {
       const st = await API.get('/reviews/stats');
       const d = st.data;
@@ -360,6 +362,7 @@ window.HLM = window.HLM || {};
         <div class="stat"><div class="num">${d.avg_score != null ? d.avg_score : '-'}</div><div class="lbl">${t('rv.scoreTotal')}</div></div>`;
     } catch (e) { /* 统计失败不阻塞列表 */ }
     await HLM.Review.loadPending();
+    if (currentUser.role === 'admin') await HLM.Review.loadSpotCheck();
     updateBadges();
   }
 
