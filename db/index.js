@@ -175,6 +175,43 @@ CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
 CREATE INDEX IF NOT EXISTS idx_alerts_tenant ON alerts(tenant_id, status);
 CREATE INDEX IF NOT EXISTS idx_alerts_task ON alerts(task_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS billing_rates (
+  id SERIAL PRIMARY KEY,
+  tenant_id INTEGER,
+  category VARCHAR(20) NOT NULL,
+  priority VARCHAR(10) NOT NULL,
+  unit_price_cents INTEGER NOT NULL,
+  min_charge_cents INTEGER NOT NULL DEFAULT 0,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (tenant_id, category, priority)
+);
+
+-- PG 的 UNIQUE 不约束 NULL 相等：全局费率行需部分唯一索引防重复
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_billing_rates_global ON billing_rates(category, priority) WHERE tenant_id IS NULL;
+
+CREATE TABLE IF NOT EXISTS billing_ledger (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id),
+  tenant_id INTEGER,
+  project_code TEXT,
+  category VARCHAR(20),
+  priority VARCHAR(10),
+  assignee_id INTEGER,
+  billable_minutes NUMERIC(10,2) NOT NULL DEFAULT 0,
+  unit_price_cents INTEGER NOT NULL DEFAULT 0,
+  min_charge_cents INTEGER NOT NULL DEFAULT 0,
+  amount_cents INTEGER NOT NULL DEFAULT 0,
+  source VARCHAR(16) NOT NULL DEFAULT 'manual',
+  period VARCHAR(7) NOT NULL,
+  meta JSONB,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (task_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_billing_ledger_tenant ON billing_ledger(tenant_id, period);
+CREATE INDEX IF NOT EXISTS idx_billing_ledger_period ON billing_ledger(period);
 `;
 
 function createAdapter() {

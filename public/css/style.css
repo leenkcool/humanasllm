@@ -177,3 +177,78 @@ td .mono { font-family: Consolas, monospace; font-size: 12px; background: var(--
   .stats { grid-template-columns: repeat(3, 1fr); }
 }
 /* 窄窗/竖屏自动折叠由 app.js applyResponsive 加 .collapsed 控制，可手动展开 */
+
+/* ===== 智能派单：候选人评分条 ===== */
+.score-bar { height: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.score-bar span { display: block; height: 100%; border-radius: 4px; transition: width .3s; }
+.dispatch-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.dispatch-row:last-child { border-bottom: none; }
+
+/* ===== 告警级别标签 ===== */
+.tag.lvl1 { background: rgba(217,119,6,.12); color: var(--warning); }
+.tag.lvl2 { background: rgba(234,88,12,.14); color: #ea580c; }
+.tag.lvl3 { background: rgba(220,38,38,.14); color: var(--danger); font-weight: 600; }
+.tag.lvl4 { background: rgba(147,51,234,.12); color: #9333ea; }
+.tag.lvl5 { background: rgba(127,29,29,.16); color: #7f1d1d; font-weight: 600; }
+[data-theme="dark"] .tag.lvl5 { color: #fca5a5; }
+
+/* ===== 移动端 PWA 底座：底部导航 + 安全区（仅 ≤768px 生效，桌面隐藏）===== */
+.bottom-nav { display: none; }
+
+@media (max-width: 768px) {
+  .main {
+    padding-top: calc(14px + env(safe-area-inset-top));
+    padding-bottom: calc(70px + env(safe-area-inset-bottom) + 14px);
+  }
+  .sidebar { padding-top: env(safe-area-inset-top); }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    box-shadow: 0 -1px 6px rgba(15, 23, 42, .06);
+  }
+  .bottom-nav .bn-item {
+    flex: 1 1 0; min-width: 0; min-height: 44px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    padding: 4px 2px; border-radius: 8px;
+    color: var(--muted); text-decoration: none;
+    font-size: 11px; line-height: 1.1; position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav .bn-item .bn-ic { display: inline-flex; align-items: center; justify-content: center; }
+  .bottom-nav .bn-item .bn-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .bottom-nav .bn-item.active { color: var(--primary); background: var(--primary-weak); }
+  .bottom-nav .bn-item:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .bottom-nav .bn-item .bn-badge {
+    position: absolute; top: 2px; left: 50%; transform: translateX(4px);
+    min-width: 16px; height: 16px; padding: 0 4px;
+    background: var(--danger); color: #fff; border-radius: 8px;
+    font-size: 10px; line-height: 16px; text-align: center;
+  }
+
+  /* 触控目标 ≥44px（WCAG 2.5.5） */
+  .btn { min-height: 44px; padding: 10px 16px; font-size: 14px; }
+  .btn.sm { min-height: 44px; padding: 8px 12px; font-size: 13px; }
+  .icon-btn { width: 44px; height: 44px; }
+  .menu-btn { width: 44px; height: 44px; }
+  .nav-item { min-height: 44px; }
+  /* 16px 可防 iOS Safari 聚焦时自动放大页面 */
+  .form-input, .form-select, .form-textarea { min-height: 44px; font-size: 16px; }
+
+  /* Toast 上移 + 横向拉满，避免被底部导航遮挡 */
+  #toastBox { top: calc(12px + env(safe-area-inset-top)); left: 12px; right: 12px; }
+  .toast { max-width: 100%; }
+
+  /* 弹窗在手机上不超出安全区 */
+  .modal { max-height: calc(100dvh - 24px - env(safe-area-inset-bottom)); }
+  .modal.lg, .modal.sm { max-width: none; }
+}
+
+/* 表格横向滚动体验（触屏） */
+.tbl-wrap { -webkit-overflow-scrolling: touch; }
+

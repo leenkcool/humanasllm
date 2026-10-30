@@ -130,6 +130,55 @@ const EN = {
   // queueService 验收单（运维/涉密类）
   '运维/涉密任务需附验收说明（做了什么、自检结果）': 'Ops/confidential tasks require an acceptance note (what was done, self-check)',
   '验收说明疑似占位，请填写实际完成情况': 'Acceptance note looks like a placeholder; please describe actual work',
+
+  // 工单模板
+  '模板名称必填': 'Template name is required',
+  'payload_template 必须是对象': 'payload_template must be an object',
+  'payload_template 过大': 'payload_template is too large',
+  'default_meta_tags 必须是对象': 'default_meta_tags must be an object',
+  '获取模板失败': 'Failed to fetch templates',
+  '模板不存在': 'Template not found',
+  '模板不存在或已停用': 'Template not found or disabled',
+  '新建模板失败': 'Failed to create template',
+  '更新模板失败': 'Failed to update template',
+  '删除模板失败': 'Failed to delete template',
+  '模板建单失败': 'Failed to create task from template',
+  '模板缺少 messages，且未提供 overrides.messages': 'Template has no messages and overrides.messages was not provided',
+
+  // 智能派单
+  '任务不存在': 'Task not found',
+  '无权限操作该任务': 'You cannot operate on this task',
+  '智能派单未启用': 'Smart dispatch is disabled',
+  '当前租户没有可派单的工程师': 'No assignable engineer in this tenant',
+  '指定工程师不在本租户候选集内': 'The specified engineer is not eligible in this tenant',
+  '获取派单建议失败': 'Failed to get dispatch suggestions',
+  '派单失败': 'Dispatch failed',
+  '获取负载概览失败': 'Failed to get workload overview',
+
+  // 告警中心
+  '获取告警失败': 'Failed to fetch alerts',
+  '获取告警统计失败': 'Failed to fetch alert stats',
+  '告警不存在': 'Alert not found',
+  '你无权确认该告警': 'You cannot acknowledge this alert',
+  '该告警已处理': 'This alert was already handled',
+  '确认告警失败': 'Failed to acknowledge alert',
+  '解决告警失败': 'Failed to resolve alert',
+  '仅管理员可标记解决': 'Only administrators can resolve alerts',
+
+  // 计费计量
+  '费率不能为负数': 'Rate cannot be negative',
+  '获取计费概览失败': 'Failed to fetch billing overview',
+  '获取计费账单失败': 'Failed to fetch billing statement',
+  '获取计费明细失败': 'Failed to fetch billing ledger',
+  '获取费率失败': 'Failed to fetch billing rates',
+  '保存费率失败': 'Failed to save rate',
+  '删除费率失败': 'Failed to delete rate',
+  '补结算失败': 'Failed to run settlement',
+
+  // 备份
+  '已有备份正在执行，请稍后再试': 'A backup is already running, please try again later',
+  '读取备份历史失败': 'Failed to read backup history',
+  '备份脚本不存在：scripts/backup.js': 'Backup script not found: scripts/backup.js',
 };
 
 // 动态模板消息：前缀 → 英文前缀

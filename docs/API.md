@@ -220,6 +220,66 @@ AI 向人类提审批（资源/权限/项目申请），**异步受理**：创�
 | PUT | `/api/users/:id` | 管理员更新（角色/姓名/启停/重置密码） |
 | DELETE | `/api/users/:id` | 删除 |
 
+### 工单模板
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/templates?include_disabled=1` | 列表（当前租户可见：全局 `tenant_id IS NULL` + 租户专属）；`include_disabled` 仅 admin |
+| GET | `/api/templates/:id` | 详情（跨租户 404） |
+| POST | `/api/templates` | admin 新建 `{name*, description, category, priority, skills, project_code, system_prompt, payload_template, default_meta_tags, enabled}` |
+| PUT | `/api/templates/:id` | admin 更新任意子集 |
+| DELETE | `/api/templates/:id` | admin 软删（置 `enabled=false`，保留历史引用） |
+| POST | `/api/templates/:id/apply` | `{overrides?: {messages, priority, skills, project_code, meta_tags, category, tools}}` → `{task_id, template_id}` |
+
+> 模板只提供**默认值**，上游显式值优先；`category` 仅作「上游显式声明」交给分级引擎，**规则命中仍白名单锁死**，模板无法把涉密任务降级为 general。
+
+### 智能派单
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/dispatch/tasks/:id/suggest?limit=5` | 派单建议（只读）：候选人排序 + 打分理由 + `assignable` |
+| POST | `/api/dispatch/tasks/:id/assign` | admin `{user_id?, dry_run?}` → 派单（`dry_run` 只返回建议） |
+| GET | `/api/dispatch/workload` | admin：工程师负载概览 |
+
+打分：`100 × (0.5×技能匹配 + 0.3×空闲负载 + 0.2×一次通过率)`；任务无技能要求时技能维度取中性 0.5；无历史时质量分按 0.7 兜底。派单复用 `claimTask`，走同一状态机与审计哈希链。
+
+### 告警中心
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/alerts?status=active&level=&kind=&task_id=&page=&size=` | 告警列表（join `task_status` / `assignee_name`） |
+| GET | `/api/alerts/stats` | `{active, acked, resolved, by_level{1..5}, by_kind, oldest_active_at}` |
+| POST | `/api/alerts/:id/ack` | 确认（admin 或该任务处理人） |
+| POST | `/api/alerts/:id/resolve` | admin 标记解决 |
+
+五级告警：L1 SLA 过半 → L2 临近超时 → L3 已违约 → L4 驳回滞留 → L5 严重滞留。去重靠 `tasks.escalation_level` 原子递增，同级别只发一次。
+
+### 计费计量
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/billing/overview` | 本期概览（总额/任务数/日均/时价均值/按分级/Top 项目） |
+| GET | `/api/billing/statement?period=YYYY-MM` | 月度账单：按分级/项目/工程师/来源汇总 |
+| GET | `/api/billing/ledger?period=&page=&size=` | 计费明细（分页） |
+| GET | `/api/billing/export?period=` | CSV 导出（utf-8 BOM） |
+| GET | `/api/billing/rates` | 费率列表（全局 + 本租户） |
+| POST | `/api/billing/rates` | admin upsert 费率 |
+| DELETE | `/api/billing/rates/:id` | admin 删除租户费率（全局只读） |
+| POST | `/api/billing/settle` | admin 手工批量补结算 `{limit?}` |
+
+计费规则：仅 `completed` 且人工参与的任务计费；AI 兜底/漂移记 0 分钟但仍写流水（`source=ai_relay|ai_shift`）；时长 = `completed_at - COALESCE(claimed_at, created_at)` 向上取整到 0.5 分钟；金额 = `max(时长×单价, 最低消费)`。金额单位统一为**分**。
+
+### 合规报告 / 数据资产
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/audit/report` | 合规报告 JSON（**按租户过滤**）：分级分布 / AI 兜底核查 / 哈希链健康 / 审批统计 / 一次通过率 |
+| GET | `/api/audit/report?format=html&lang=zh\|en` | 自包含 HTML 报告页（内嵌 CSS + `@media print`），浏览器打印即导出 PDF |
+| GET | `/api/audit/dataset?category=` | 质量数据资产导出（NDJSON）；非 general 需 admin |
+
+### 运维
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/metrics` | 可选 `METRICS_TOKEN` | Prometheus 指标（`prom-client`；未安装时自动降级为零依赖实现） |
+| GET | `/api/backup/list` | admin | 备份历史（`data/backups/manifest.jsonl`） |
+| POST | `/api/backup/run` | admin | 异步触发备份，进度走 Socket.IO `backup:progress` |
+| GET | `/api/backup/status` | admin | 是否在跑 + 最近结果 |
+
 ---
 
 ## 三、错误码

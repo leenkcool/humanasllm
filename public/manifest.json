@@ -1,0 +1,21 @@
+{
+  "name": "Human as Agent · 工程师工作台",
+  "short_name": "Human Agent",
+  "description": "让工程师作为「人肉大模型」接入 Agent 调度框架",
+  "start_url": "/workbench.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#2563eb",
+  "background_color": "#f4f6fb",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "任务队列", "short_name": "队列", "url": "/workbench.html#/queue", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "告警中心", "short_name": "告警", "url": "/workbench.html#/alerts", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

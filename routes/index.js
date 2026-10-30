@@ -17,6 +17,10 @@ const tenantRoutes = require('./tenants');
 const gatewayRoutes = require('./gateway');
 const prdRoutes = require('./prd');
 const templateRoutes = require('./templates');
+const dispatchRoutes = require('./dispatch');
+const alertRoutes = require('./alerts');
+const billingRoutes = require('./billing');
+const backupRoutes = require('./backup');
 
 module.exports = function (app) {
   // 工作台 REST
@@ -44,6 +48,18 @@ module.exports = function (app) {
 
   // 工单模板库（常用任务模板化，一键建单）
   app.use('/api/templates', templateRoutes);
+
+  // 智能派单（技能匹配 + 负载均衡 + 历史质量）
+  app.use('/api/dispatch', dispatchRoutes);
+
+  // 告警中心（SLA 升级序列 + 审批超时）
+  app.use('/api/alerts', alertRoutes);
+
+  // 计费计量（人力成本可核算 + 租户账单）
+  app.use('/api/billing', billingRoutes);
+
+  // 数据备份（工作台触发 + 历史）
+  app.use('/api/backup', backupRoutes);
 
   // 租户管理（多租户 v1）
   app.use('/api/tenants', tenantRoutes);

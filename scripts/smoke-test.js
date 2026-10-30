@@ -165,6 +165,60 @@ async function poll(fn, max = 20) {
   });
   ok('/v1 非法 template_id 拒绝(400)', tplBad.status === 400);
 
+  // 7.2 智能派单
+  const dTask = await api('POST', '/v1/chat/completions', {
+    model: 'human-llm', project_code: MARK, skills: 'postgres,ops',
+    messages: [{ role: 'user', content: '冒烟派单任务' }],
+  });
+  const dispatchTaskId = dTask.data && dTask.data.task_id;
+  ok('/v1 建派单候选任务', dTask.status === 200 && !!dispatchTaskId);
+  if (dispatchTaskId) {
+    const sug = await api('GET', `/api/dispatch/tasks/${dispatchTaskId}/suggest`, null, token);
+    ok('派单建议含候选人', sug.status === 200 && sug.data.success &&
+      Array.isArray(sug.data.data.candidates) && !!sug.data.data.recommended);
+    const dry = await api('POST', `/api/dispatch/tasks/${dispatchTaskId}/assign`, { dry_run: true }, token);
+    ok('派单 dry_run 不改状态', dry.status === 200 && dry.data.success && dry.data.dry_run === true);
+    const afterDry = await api('GET', '/api/tasks/' + dispatchTaskId, null, token);
+    ok('dry_run 后任务仍 pending', afterDry.data.data.status === 'pending');
+    const asg = await api('POST', `/api/dispatch/tasks/${dispatchTaskId}/assign`, {}, token);
+    ok('一键派单 → processing', asg.status === 200 && asg.data.data.task.status === 'processing');
+    const wl = await api('GET', '/api/dispatch/workload', null, token);
+    ok('工程师负载概览', wl.status === 200 && Array.isArray(wl.data.data));
+  }
+
+  // 7.3 告警中心
+  const aStats = await api('GET', '/api/alerts/stats', null, token);
+  ok('告警统计', aStats.status === 200 && typeof aStats.data.data.active === 'number' &&
+    !!aStats.data.data.by_level);
+  const aList = await api('GET', '/api/alerts?status=all&size=5', null, token);
+  ok('告警列表分页结构', aList.status === 200 && Array.isArray(aList.data.data.data));
+
+  // 7.4 计费计量
+  const bOv = await api('GET', '/api/billing/overview', null, token);
+  ok('计费概览', bOv.status === 200 && bOv.data.success && typeof bOv.data.data.total_cents === 'number');
+  const bRates = await api('GET', '/api/billing/rates', null, token);
+  ok('费率列表含全局默认', bRates.status === 200 &&
+    (bRates.data.data || []).some(r => r.tenant_id === null));
+  const period = new Date().toISOString().slice(0, 7);
+  const bLedger = await api('GET', '/api/billing/ledger?period=' + period, null, token);
+  ok('计费明细分页', bLedger.status === 200 && Array.isArray(bLedger.data.data.data));
+  const bExport = await fetch(BASE + '/api/billing/export?period=' + period, { headers: { Authorization: 'Bearer ' + token } });
+  const bBuf = new Uint8Array(await bExport.arrayBuffer());
+  const bText = new TextDecoder('utf-8').decode(bBuf);
+  ok('计费导出 CSV(BOM)', bExport.status === 200 && bBuf[0] === 0xEF && bBuf[1] === 0xBB && bBuf[2] === 0xBF);
+
+  // 7.5 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
+  const met = await fetch(BASE + '/metrics');
+  const metText = await met.text();
+  ok('Prometheus /metrics', met.status === 200 && metText.includes('p390_'));
+  const mf = await fetch(BASE + '/manifest.json');
+  ok('PWA manifest', mf.status === 200 && (mf.headers.get('content-type') || '').includes('manifest'));
+  const swRes = await fetch(BASE + '/sw.js');
+  ok('PWA sw.js 可获取且不缓存', swRes.status === 200 &&
+    (swRes.headers.get('cache-control') || '').includes('no-cache'));
+  const offline = await fetch(BASE + '/offline.html');
+  ok('PWA 离线页', offline.status === 200);
+
 
   // 8. 权限边界 / 多工具安装 / 服务器端安装越界 / 租户隔离
   const engLogin = await api('POST', '/api/auth/login', { username: 'engineer1', password: 'admin123' });
@@ -173,6 +227,12 @@ async function poll(fn, max = 20) {
   ok('工程师无权访问规则(403)', forbidden.status === 403);
   const tplForbidden = await api('POST', '/api/templates', { name: 'smoke-禁止' }, engToken);
   ok('工程师无权建模板(403)', tplForbidden.status === 403);
+  const dForbidden = await api('POST', `/api/dispatch/tasks/${dispatchTaskId || 1}/assign`, {}, engToken);
+  ok('工程师无权派单(403)', dForbidden.status === 403);
+  const bForbidden = await api('POST', '/api/billing/rates', { category: 'general', priority: 'high', unit_price_cents: 1 }, engToken);
+  ok('工程师无权改费率(403)', bForbidden.status === 403);
+  const bkForbidden = await api('GET', '/api/backup/list', null, engToken);
+  ok('工程师无权查看备份(403)', bkForbidden.status === 403);
 
   const instOpen = await api('GET', '/api/gateway/install?tool=opencode');
   ok('多工具安装(opencode→AGENTS+command)', instOpen.status === 200 && instOpen.data.data.files.length === 2 && instOpen.data.data.files[1].path.includes('.opencode'));
@@ -189,8 +249,10 @@ async function poll(fn, max = 20) {
   const isoTasks = await api('GET', '/api/tasks?size=5', null, isoLogin.data.data.token);
   ok('租户隔离(新租户任务空)', isoTasks.status === 200 && isoTasks.data.data.data.length === 0);
 
-  // 9. 清理本次创建的测试数据
+  // 9. 清理本次创建的测试数据（顺序：子表 → 主表）
   const db = getDb();
+  await db.run(`DELETE FROM alerts WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
+  await db.run(`DELETE FROM billing_ledger WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM request_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM tasks WHERE project_code = $1`, [MARK]);

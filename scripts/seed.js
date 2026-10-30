@@ -20,9 +20,9 @@ async function seed() {
   for (const acc of accounts) {
     const exists = await db.exec('SELECT id, email FROM users WHERE username = ?', [acc.username]);
     if (exists.length > 0 && exists[0].values.length > 0) {
-      // 已存在用户：补充邮箱与技能标签（缺失时），供智能派单演示使用
-      await db.run('UPDATE users SET email = COALESCE(email, ?) WHERE username = ?', [acc.email, acc.username]);
-      await db.run('UPDATE users SET skills = COALESCE(skills, ?) WHERE username = ?', [acc.skills, acc.username]);
+      // 已存在用户：补充邮箱与技能标签（缺失或空串时），供智能派单演示使用
+      await db.run('UPDATE users SET email = COALESCE(NULLIF(email, \'\'), ?) WHERE username = ?', [acc.email, acc.username]);
+      await db.run('UPDATE users SET skills = COALESCE(NULLIF(skills, \'\'), ?) WHERE username = ?', [acc.skills, acc.username]);
       console.log(`[种子] 用户 ${acc.username} 已存在，补充邮箱/技能`);
       continue;
     }

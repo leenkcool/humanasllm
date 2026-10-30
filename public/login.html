@@ -2,10 +2,17 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="i18n-title" content="meta.title.login">
   <title>登录 · Human as Agent</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%232563eb'/><path d='M10 22l6-6 4 4 8-9v5h-2v4H26l2-2 2 2z' fill='white'/></svg>">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Human Agent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -38,6 +45,8 @@
   <a id="langSwitch" href="javascript:void(0)" style="position:fixed;top:16px;right:20px;font-size:13px;color:var(--primary);text-decoration:none;z-index:10;">English</a>
   <script src="/js/i18n.js"></script>
   <script src="/js/utils.js"></script>
+  <script src="/js/pwa.js"></script>
+  <script>window.HLM.PWA.register();</script>
   <script>
     (function () {
       var I = window.HLM.I18n;

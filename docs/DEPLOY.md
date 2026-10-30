@@ -212,20 +212,176 @@ pm2 restart p390    # 或 bg.ps1 kill + start
 
 ## 十一、备份与恢复
 
-```bash
-# PostgreSQL 备份
-pg_dump -U p390 p390 > p390_$(date +%F).sql
+### 一键备份
 
-# 恢复
-psql -U p390 p390 < p390_备份.sql
+```bash
+node scripts/backup.js              # → data/backups/p390-YYYYMMDD-HHmmss.sql.gz
+node scripts/backup.js --keep 14    # 保留最近 14 份（默认，可用 BACKUP_KEEP 覆盖）
+node scripts/backup.js --dry-run    # 只打印将要执行的命令，不落盘
+node scripts/backup.js --out D:\p390-backup   # 指定目录
 ```
 
-关键数据：`tasks` / `task_logs` / `approvals` / `projects` / `users` / `task_rules` / `tenants`。
+产物三件套：
+
+| 产物 | 说明 |
+|---|---|
+| `p390-<ts>.sql.gz` | `pg_dump --no-owner --no-privileges --clean --if-exists` 流式 gzip |
+| `p390-<ts>.files/` | `gateway_config.json` / `gateway_files.json` / `gateway_skill.md` / `gateway_agent.md` |
+| `manifest.jsonl` | 每行 `{ts,file,bytes,sha256,db,host}`，供工作台历史查询 |
+
+备份后自动校验：文件 > 1KB、gzip 魔数与解压、内容含 `PostgreSQL database dump`，任一不过则删除残包并退出码 1。
+
+`--clean --if-exists` 让备份可**直接覆盖恢复到已有库**，否则恢复到已存在的库会因 `relation already exists` 整体失败。配合 `psql --single-transaction`，恢复失败即整体回滚。
+
+### 定时备份
+
+Windows 任务计划程序（每天 02:00）：
+
+```powershell
+schtasks /create /tn "p390-backup" /sc daily /st 02:00 /tr "\"C:\Program Files\nodejs\node.exe\" G:\dev\p390\scripts\backup.js --quiet"
+```
+
+Linux crontab：
+
+```cron
+0 2 * * * cd /opt/p390 && /usr/bin/node scripts/backup.js --quiet >> logs/backup.log 2>&1
+```
+
+### 恢复
+
+```bash
+# 1) 先停服务，避免恢复期间有写入
+pm2 stop p390
+# 2) 恢复（非 --yes 时必须手输 RESTORE；会先自动备份当前库并打印路径）
+node scripts/restore.js data/backups/p390-20261030-020000.sql.gz
+# 3) 启动并自测
+pm2 start p390
+curl -s http://192.168.168.3:39000/api/health
+```
+
+安全护栏：
+
+1. 非 `--yes` 时必须交互输入 `RESTORE`（非 TTY 环境直接拒绝，防 CI 挂起）
+2. 恢复前**强制自动备份当前库**，路径打印在日志里；可用 `--no-safety-backup` 跳过（不推荐）
+3. `psql --single-transaction --set ON_ERROR_STOP=1`，任一语句失败整体回滚
+4. 恢复后自动打印表数量与 `users` / `tasks` 行数
+
+### 恢复演练（可进 CI）
+
+```bash
+node scripts/drill-restore.js               # 备份 → 恢复临时库 → 比对 → 删临时库
+node scripts/drill-restore.js --keep-backup # 保留演练备份供排查
+```
+
+输出 `{ backup_file, backup_bytes, tables, rows_before, rows_after, match, duration_ms }`；任一表行数不一致退出码 1；临时库 `p390_drill_<ts>` 在 `finally` 中必删。演练备份写在 `data/backups/drill/`，不污染正式 manifest。
+
+### 工作台触发
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/backup/list` | admin | 备份历史（manifest 倒序，缺失时回退扫描磁盘） |
+| POST | `/api/backup/run` | admin | 异步备份，立即返回 `{started:true}`，进度走 Socket.IO `backup:progress` |
+| GET | `/api/backup/status` | admin | 是否在跑 + 最近一次结果 + 磁盘份数 |
+
+`/run` 有进程内互斥，同一时刻只允许一个备份；并发请求返回 409。
+
+### ⚠️ PG 客户端版本
+
+`pg_dump` / `psql` / `createdb` / `dropdb` **通常不在 PATH**。脚本自动按 `PG_BIN` → PATH → 常见安装目录探测，取主版本最高的 `bin`。
+
+**客户端版本必须 ≥ 服务端**：PG18 的 dump 含 `SET transaction_timeout = 0;`（PG17 引入），用 psql 16 恢复会报 `unrecognized configuration parameter`。脚本内置版本闸门，不匹配时直接拒绝并提示。
+
+---
+
+## 十二、监控（Prometheus）
+
+```bash
+curl -s http://192.168.168.3:39000/metrics | head -40
+```
+
+`prometheus.yml`：
+
+```yaml
+scrape_configs:
+  - job_name: p390
+    scrape_interval: 15s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['192.168.168.3:39000']
+```
+
+指标清单：
+
+| 指标 | 类型 | 说明 |
+|---|---|---|
+| `p390_http_requests_total{method,route,status}` | Counter | route 为路由模板，未匹配归 `unmatched` |
+| `p390_http_request_duration_seconds{method,route}` | Histogram | 桶 .005…10 |
+| `p390_tasks{status}` / `p390_tasks_by_category{category}` | Gauge | 每 15s 刷新 |
+| `p390_tasks_overdue` | Gauge | 超 `timeout_at` 且未终态 |
+| `p390_approvals{status}` / `p390_alerts_active{level}` | Gauge | |
+| `p390_engineers_active` | Gauge | `is_active=true` 的工程师 |
+| `p390_billing_amount_cents_total` | Gauge | 计费流水总额 |
+| `p390_db_up` | Gauge | 1/0 |
+| `p390_ai_relay_total{result}` / `p390_task_timeout_total{phase}` | Counter | 供业务自增 |
+
+开关：`METRICS_ENABLED=false` 关闭端点与采集；配置 `METRICS_TOKEN` 后需 `Authorization: Bearer <token>`。`/metrics` 挂在全站限流之前，抓取请求不占用 `RATE_LIMIT` 额度。
+
+建议告警：`p390_db_up == 0`（2 分钟）、`p390_tasks_overdue > 0`（10 分钟）、`rate(p390_ai_relay_total{result="failed"}[5m]) > 0.2`。
+
+关键数据表：`tasks` / `task_logs` / `request_logs` / `approvals` / `projects` / `users` / `task_rules` / `tenants` / `task_templates` / `alerts` / `billing_rates` / `billing_ledger`。
 应用配置：`.env` + `data/gateway_config.json`（网关接入配置）。
 
 ---
 
-## 十二、安全基线
+## 十三、PWA 与 HTTPS
+
+浏览器只在**安全上下文**下允许注册 Service Worker 与请求通知权限：
+
+| 访问地址 | 能否装 PWA |
+|---|---|
+| `http://localhost:39000` / `http://127.0.0.1:39000` | ✅（本机验证用这个） |
+| `http://192.168.168.3:39000` | ❌ 非安全上下文 |
+| `https://your.domain` | ✅（需配证书） |
+
+局域网/远程要装 PWA，需 Caddy 或 nginx 反代 + HTTPS 证书：
+
+```caddyfile
+p390.example.com {
+  reverse_proxy 127.0.0.1:39000
+  # SSE 不缓冲（/v1 stream_events、任务事件流）
+  reverse_proxy {
+    to 127.0.0.1:39000
+    flush_interval -1
+  }
+}
+```
+
+nginx 等价配置需 `proxy_buffering off;` 与 `proxy_read_timeout 3600s;`，否则 SSE 中途推送会被缓冲。
+
+反代后设置 `.env`：
+
+```dotenv
+PUBLIC_BASE_URL=https://your.domain
+```
+
+（用于密码重置链接与通知深链；PWA 本身用相对 URL，不依赖它。）
+
+**验证步骤**：
+
+1. `http://localhost:39000/login.html` → DevTools → Application → Manifest 无错误、可 Install
+2. Application → Service Workers：`/sw.js` activated
+3. Network 面板确认 `/api/*`、`/socket.io/*` **不经** ServiceWorker 缓存
+4. 勾选 Offline → 刷新 → 落到 `/offline.html`
+5. 侧栏「开启通知」授权后，另开窗口建任务 → 后台标签收到系统通知，点击聚焦工作台
+
+**注意**：
+- 改前端代码后必须递增 `public/sw.js` 的 `VERSION`，否则旧缓存不会清理
+- Service Worker 明确不缓存 `/api/*`、`/v1/*`、`/socket.io/*`（携带 JWT 与租户数据，缓存会导致登出后越权读取）
+- 本项目不引入 Web Push / VAPID：通知依赖页面内 Socket.IO 在线，完全关闭浏览器后收不到（刻意的取舍，避免额外服务依赖）
+
+---
+
+## 十四、安全基线
 
 1. **改默认密码**：admin/engineer 账户部署后立即改密。
 2. **改 `JWT_SECRET`**：生产必须唯一随机。
@@ -238,7 +394,7 @@ psql -U p390 p390 < p390_备份.sql
 
 ---
 
-## 十三、故障排查（FAQ）
+## 十五、故障排查（FAQ）
 
 | 现象 | 排查 |
 |---|---|
@@ -253,7 +409,7 @@ psql -U p390 p390 < p390_备份.sql
 
 ---
 
-## 十四、跨平台注意
+## 十六、跨平台注意
 
 - 命令统一用 `curl`（Windows 10+ 原生自带，无需 `curl.exe`）。
 - SKILL/AGENT 模板已跨平台（相对路径，网关地址安装时替换）。

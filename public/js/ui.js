@@ -139,11 +139,13 @@ window.HLM = window.HLM || {};
         <div class="ctx"><div class="k">${t('task.context', { n: messages.length })}</div>${msgsHtml}</div>
         ${toolsHtml}
         ${resultHtml}
+        ${['pending', 'returned'].includes(task.status) ? `<div class="ctx" id="dispatchPanel"><div class="k">${t('dispatch.title')}</div><div id="dispatchBox"><span style="color:var(--muted);font-size:12px;">${t('dispatch.loading')}</span></div></div>` : ''}
         <div class="ctx"><div class="k">${t('task.audit')} <button class="btn sm" onclick="window.HLM.UI.verifyChain(${task.id})">${t('task.verifyChain')}</button></div><pre style="font-size:11px;">${(task.logs || []).map(l => `[${fmt(l.created_at)}] ${esc(l.action)} — ${esc(l.actor_name || t('task.system'))}${l.remark ? ' · ' + esc(l.remark) : ''}`).join('\n') || t('task.none')}</pre><div id="chainBox"></div></div>
       `;
 
       const foot = actionButtons(task);
       openModal(t('task.detailTitle', { id: task.id }), body, foot, 'lg');
+      if (['pending', 'returned'].includes(task.status)) HLM.Dispatch.suggest(task.id);
     } catch (e) {
       toast(e.message, 'error');
     }
@@ -211,8 +213,7 @@ window.HLM = window.HLM || {};
       btns += `<button class="btn danger" onclick="window.HLM.UI.promptReject(${id})">${t('task.reject')}</button>`;
     }
     if (task.status === 'returned') btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('claim', ${id})">${t('task.claimAgain')}</button>`;
-    if (task.status === 'returned' || task.status === 'paused') btns += `<button class="btn" onclick="window.HLM.UI.promptRequeue(${id})">${t('task.requeue')}</button>`;
-    if (task.status === 'completed' && isOwner) btns += `<button class="btn danger" onclick="window.HLM.UI.promptReopen(${id})">${t('task.reopen')}</button>`;
+    if (task.status === 'returned' || task.status === 'paused') btns += `<button class="btn" onclick="window.HLM.UI.promptRequeue(${id})">${t('task.requeue')}</button>`;    if (task.status === 'completed' && isOwner) btns += `<button class="btn danger" onclick="window.HLM.UI.promptReopen(${id})">${t('task.reopen')}</button>`;
     if (!['completed', 'cancelled'].includes(task.status)) btns += `<button class="btn danger" onclick="window.HLM.UI.promptCancel(${id})">${t('task.cancel')}</button>`;
     return btns;
   }
@@ -385,10 +386,10 @@ window.HLM = window.HLM || {};
     } catch (e) { box.innerHTML = `<div class="empty" style="padding:40px;">${esc(e.message)}</div>`; }
   }
 
-  // 一次通过率单元格
+  // 一次通过率单元格（PG 的 COUNT(*) 返回字符串，必须先转数字，否则 "0" 会被当成真值算出 NaN%）
   function rateCell(u) {
-    const c = u.completed || 0;
-    const r = u.reopened || 0;
+    const c = parseInt(u.completed, 10) || 0;
+    const r = parseInt(u.reopened, 10) || 0;
     if (!c) return '-';
     return `<span style="color:var(--success);font-weight:600;">${Math.max(0, Math.round((1 - r / c) * 1000) / 10)}%</span>`;
   }
@@ -399,7 +400,7 @@ window.HLM = window.HLM || {};
       const r = await API.get('/users');
       const u = (r.data || []).find(x => x.id === id);
       if (!u) return toast(t('user.notFound'), 'error');
-      const c = u.completed || 0, rr = u.reopened || 0;
+      const c = parseInt(u.completed, 10) || 0, rr = parseInt(u.reopened, 10) || 0;
       const rate = c > 0 ? Math.max(0, Math.round((1 - rr / c) * 1000) / 10) + '%' : '-';
       const html = `
         <div class="ctx"><div class="k">${t('user.username')}</div><div><strong>${esc(u.username)}</strong></div></div>

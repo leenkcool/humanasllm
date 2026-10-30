@@ -2,9 +2,17 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="i18n-title" content="meta.title.index">
   <title>Human as Agent · 工程师工作台</title>
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Human Agent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%232563eb'/><path d='M10 22l6-6 4 4 8-9v5h-2v4H26l2-2 2 2z' fill='white'/></svg>">
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -45,13 +53,20 @@
     </main>
   </div>
 
+  <!-- 移动端底部导航（≤768px 由 CSS 显示，桌面隐藏） -->
+  <nav class="bottom-nav" id="bottomNav" aria-label="快捷导航"></nav>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/i18n.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/ws.js"></script>
   <script src="/js/templates.js"></script>
+  <script src="/js/billing.js"></script>
+  <script src="/js/dispatch.js"></script>
+  <script src="/js/alerts.js"></script>
   <script src="/js/ui.js"></script>
+  <script src="/js/pwa.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

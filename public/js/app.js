@@ -8,6 +8,7 @@ window.HLM = window.HLM || {};
   const API = window.HLM.API;
   const UI = window.HLM.UI;
   const WS = window.HLM.WS;
+  const PWA = window.HLM.PWA || null;
 
   let currentUser = null;
 
@@ -42,8 +43,10 @@ window.HLM = window.HLM || {};
     { id: 'mine', label: () => t('nav.mine'), icon: 'mine', show: () => true },
     { id: 'logs', label: () => t('nav.logs'), icon: 'logs', show: () => true },
     { id: 'approvals', label: () => t('nav.approvals'), icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
+    { id: 'alerts', label: () => t('nav.alerts'), icon: 'bells', show: () => true, badge: () => window._activeAlerts || 0 },
     { id: 'projects', label: () => t('nav.projects'), icon: 'folder', show: () => true },
     { id: 'templates', label: () => t('nav.templates'), icon: 'template', show: () => true },
+    { id: 'billing', label: () => t('nav.billing'), icon: 'zap', show: () => true },
     { id: 'gateway', label: () => t('nav.gateway'), icon: 'bot', show: () => true },
     { id: 'prd', label: () => t('nav.prd'), icon: 'file', show: () => true },
     { id: 'users', label: () => t('nav.users'), icon: 'users', show: () => (currentUser.role === 'admin') },
@@ -75,6 +78,7 @@ window.HLM = window.HLM || {};
     applyStatic();
     applyUserBadge();
     renderSidebar();
+    renderBottomNav();
     WS.refreshStatus();
     refresh();
   }
@@ -93,6 +97,20 @@ window.HLM = window.HLM || {};
   function highlight() {
     const page = (location.hash.replace('#/', '') || 'dashboard');
     document.querySelectorAll('.nav-item').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+    document.querySelectorAll('.bottom-nav .bn-item').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+  }
+
+  // ===== 移动端底部导航（≤768px 由 CSS 显示，桌面隐藏）=====
+  function renderBottomNav() {
+    const box = document.getElementById('bottomNav');
+    if (!box) return;
+    const MOBILE_NAV = ['dashboard', 'queue', 'alerts', 'mine'];
+    box.innerHTML = NAV.filter(n => MOBILE_NAV.includes(n.id) && n.show()).map(n => `
+      <a class="bn-item" data-page="${n.id}" href="#/${n.id}">
+        <span class="bn-ic">${Icons[n.icon]}</span>
+        <span class="bn-txt">${n.label()}</span>
+        <span class="bn-badge" data-badge="${n.id}" style="display:none"></span>
+      </a>`).join('');
   }
 
   // ===== 页面渲染 =====
@@ -249,7 +267,6 @@ window.HLM = window.HLM || {};
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  // ===== 审批页 =====
   async function renderApprovals() {
     const content = $('#content');
     content.innerHTML = `
@@ -288,6 +305,29 @@ window.HLM = window.HLM || {};
     await loadProjects();
   }
 
+  // ===== 告警中心页 =====
+  async function renderAlerts() {
+    const content = $('#content');
+    const tabs = [
+      ['active', t('alerts.tab.active')],
+      ['acked', t('alerts.tab.acked')],
+      ['resolved', t('alerts.tab.resolved')],
+      ['all', t('common.all')],
+    ];
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">${t('page.alerts.title')}</div><div class="page-desc">${t('page.alerts.desc')}</div></div>
+        <div class="spacer"></div>
+        <button class="icon-btn" onclick="window.HLM.Alerts.load()">${Icons.refresh}</button></div>
+      <div class="stats" id="alertStats"></div>
+      <div class="card">
+        <div class="card-head" id="alertTabs">
+          ${tabs.map(([k, l]) => `<button class="btn sm ${k === 'active' ? 'primary' : ''}" data-tab="${k}" onclick="window.HLM.Alerts.switchTab('${k}')">${esc(l)}</button>`).join('')}
+        </div>
+        <div class="card-body-flush" id="alertsBox"></div>
+      </div>`;
+    await HLM.Alerts.load();
+  }
+
   // ===== 工单模板页 =====
   async function renderTemplates() {
     const content = $('#content');
@@ -298,6 +338,13 @@ window.HLM = window.HLM || {};
         <button class="btn" onclick="window.HLM.Templates.load()">${t('common.refresh')}</button></div>
       <div id="templatesBox"></div>`;
     await HLM.Templates.load();
+  }
+
+  // ===== 计费计量（人力成本可核算 + 租户账单） =====
+  async function renderBilling() {
+    const content = $('#content');
+    content.innerHTML = `<div id="billingBox"></div>`;
+    await window.HLM.Billing.render($('#billingBox'), { isAdmin: currentUser.role === 'admin' });
   }
 
   // ===== 接入配置（生成 SKILL/AGENT + 在线微调） =====
@@ -535,7 +582,7 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, projects: renderProjects, templates: renderTemplates, gateway: renderGateway, prd: renderPrd, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, alerts: renderAlerts, projects: renderProjects, templates: renderTemplates, billing: renderBilling, gateway: renderGateway, prd: renderPrd, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');
@@ -550,20 +597,48 @@ window.HLM = window.HLM || {};
   function refresh() { route(); }
 
   // ===== Socket 事件 =====
+  // 页面不可见时才发系统通知；可见时 toast 已足够，避免打扰
+  function notifyBackground(title, hash) {
+    if (document.visibilityState === 'visible') return;
+    if (!PWA) return;
+    PWA.notify(title, { body: t('app.name'), tag: 'hlm-' + hash, url: '/workbench.html' + hash });
+  }
+
   function bindWS() {
-    WS.on('new', () => { toast(t('toast.newTask'), 'info'); updateBadges(); refresh(); });
+    WS.on('new', () => { toast(t('toast.newTask'), 'info'); updateBadges(); refresh(); notifyBackground(t('toast.newTask'), '#/queue'); });
     WS.on('update', (d) => { toast(t('toast.taskUpdate', { id: d.id, status: STATUS_LABEL[d.status] || d.status }), 'info'); refresh(); });
-    WS.on('timeout', (d) => { toast(t('toast.taskTimeout', { id: d.id }), 'warning'); refresh(); });
+    WS.on('timeout', (d) => { toast(t('toast.taskTimeout', { id: d.id }), 'warning'); refresh(); notifyBackground(t('toast.taskTimeout', { id: d.id }), '#/queue'); });
     WS.on('approval:new', () => { toast(t('toast.newApproval'), 'info'); refresh(); });
     WS.on('approval:update', () => { toast(t('toast.approvalUpdate'), 'info'); refresh(); });
     WS.on('approval:overdue', (d) => { toast(t('toast.approvalOverdue', { id: d.id }), 'warning'); refresh(); });
+    // 告警升级（L1 发给处理人；L2~L5 发给 admin；L3/L5 全站广播）
+    WS.on('alert:new', (d) => {
+      toast(t('toast.alertNew', { level: d.level, title: d.title || '' }), 'warning');
+      notifyBackground(t('toast.alertNew', { level: d.level, title: d.title || '' }), '#/alerts');
+      loadAlertBadge();
+    });
+    WS.on('alert:escalate', (d) => {
+      toast(t('toast.alertEscalate', { level: d.level, title: d.title || '' }), 'error');
+      notifyBackground(t('toast.alertEscalate', { level: d.level, title: d.title || '' }), '#/alerts');
+      loadAlertBadge();
+    });
+  }
+
+  /** 只刷告警徽标（避免整页重绘打断用户操作） */
+  async function loadAlertBadge() {
+    try {
+      const s = await API.get('/alerts/stats');
+      window._activeAlerts = (s.data && s.data.active) || 0;
+      updateBadges();
+    } catch (e) { /* 静默 */ }
   }
 
   function updateBadges() {
-    document.querySelectorAll('.nav-item .badge').forEach(b => {
+    document.querySelectorAll('.nav-item .badge, .bn-item .bn-badge').forEach(b => {
       const n = b.dataset.badge;
       const cnt = n === 'queue' ? (window._pendingCount || 0)
-        : n === 'approvals' ? (window._pendingApprovals || 0) : 0;
+        : n === 'approvals' ? (window._pendingApprovals || 0)
+        : n === 'alerts' ? (window._activeAlerts || 0) : 0;
       b.style.display = cnt > 0 ? 'block' : 'none';
       b.textContent = cnt;
     });
@@ -601,16 +676,20 @@ window.HLM = window.HLM || {};
     applyStatic();
     applyUserBadge();
     renderSidebar();
+    renderBottomNav();
     initSidebar();
     WS.init();
     bindWS();
+    loadAlertBadge();
+    // PWA 增强：注册 Service Worker（非安全上下文自动跳过；失败不影响主应用）
+    if (PWA) PWA.register().catch(() => {});
     window.addEventListener('hashchange', route);
     route();
     UI.startCountdown();
     window.HLM.refresh = refresh;
   }
 
-  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt, onToolChange, copyInstall, serverInstall, appendPrd };
+  window.HLM.App = { logout, route, loadQueue, loadApprovals, loadProjects, refresh, switchLang, generateGateway, saveGateway, saveFile, copyPrompt, onToolChange, copyInstall, serverInstall, appendPrd, updateBadges, loadAlertBadge };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

@@ -12,6 +12,10 @@ const { securityHeaders, corsOptions, createGlobalLimiter } = require('./middlew
 const wsService = require('./services/websocket');
 const queue = require('./services/queueService');
 const approval = require('./services/approvalService');
+const alertService = require('./services/alertService');
+const billing = require('./services/billingService');
+const metrics = require('./services/metricsService');
+const metricsRoutes = require('./routes/metrics');
 const { translateJson } = require('./services/i18n');
 
 const app = express();
@@ -52,7 +56,12 @@ wsService.setIO(io);
 // ===== 基础安全中间件（不含 CSP / HSTS） =====
 app.use(securityHeaders);
 app.use(cors(corsOptions()));
+
+// /metrics 在全站限流之前挂载 → 抓取请求不占用 RATE_LIMIT 额度
+if (metrics.isEnabled()) app.use('/metrics', metricsRoutes);
+
 app.use(createGlobalLimiter());
+app.use(metrics.metricsMiddleware);   // 只记录不拦截，须早于业务路由
 
 // 基础中间件
 app.use(express.json({ limit: '20mb' }));
@@ -61,8 +70,22 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // i18n：按 Accept-Language 翻译用户可见 message（en 时）
 app.use(translateJson);
 
-// 静态文件服务
-app.use(express.static(path.join(__dirname, 'public')));
+// ===== PWA 静态资源缓存头 =====
+// manifest 必须用 application/manifest+json，express 默认给 application/json，部分浏览器会忽略清单
+app.get('/manifest.json', (req, res) => {
+  res.type('application/manifest+json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+
+// 静态文件服务（sw.js 强制 no-cache：Worker 文件被长期缓存会导致新版本永远不生效）
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (/sw\.js$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
 
 // 注册路由
 routes(app);
@@ -89,6 +112,18 @@ async function start() {
 
     approval.startApprovalScanner();
     console.log('[审批] 超时提醒已启动');
+
+    alertService.startEscalationScanner();
+    console.log('[告警] 升级序列扫描已启动');
+
+    await billing.seedRates();            // 幂等：全局默认费率
+    console.log('[计费] 默认费率就绪');
+
+    billing.startBillingScanner();
+    console.log('[计费] 补结算扫描已启动（60s）');
+
+    metrics.startGaugeRefresher();
+    if (metrics.isEnabled()) console.log('[监控] 业务指标刷新已启动（15s）');
 
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`Human-as-LLM 人工代理网关已启动: http://0.0.0.0:${PORT}`);

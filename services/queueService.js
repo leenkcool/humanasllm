@@ -29,6 +29,9 @@ const STATUS = {
 // 状态机合法转换表（独立单例，见 services/stateMachine.js）
 const TRANSITIONS = TASK_TRANSITIONS;
 
+/** 终态：进入后收起该任务的活跃告警 */
+const TERMINAL_OK = ['completed', 'cancelled'];
+
 const PENDING_MIN = () => parseInt(process.env.TASK_PENDING_TIMEOUT_MIN) || 60;
 const PROCESSING_MIN = () => parseInt(process.env.TASK_PROCESSING_TIMEOUT_MIN) || 120;
 
@@ -191,6 +194,11 @@ async function transition(taskId, to, actor, remark, updates = {}) {
   if (callback.TERMINAL_EVENTS[to]) {
     callback.notify(updated).catch(e => console.error('[上游回调异常]', e.message));
   }
+  // 终态：收起该任务的活跃告警（惰性 require 避免循环依赖）
+  if (TERMINAL_OK.includes(to)) {
+    require('./alertService').resolveAlerts(taskId)
+      .catch(e => console.error('[告警收起失败]', e.message));
+  }
   return { ok: true, task: updated };
 }
 
@@ -348,6 +356,8 @@ async function timeoutTask(taskId, phase) {
   });
   if (t.ok) {
     ws.broadcast('task:timeout', { id: taskId, phase });
+    // L3 违约告警：真正超时归还后写告警（惰性 require 避免与 alertService 循环依赖）
+    require('./alertService').recordBreach(t.task, { phase }).catch(e => console.error('[告警写入失败]', e.message));
     // 通知：涉密/运维类不 AI 代答，需人工重派；general 类 AI 兜底失败也通知
     const cat = (t.task && t.task.category) || 'general';
     notifier.send({

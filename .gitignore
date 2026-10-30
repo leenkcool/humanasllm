@@ -22,3 +22,6 @@ data/human_followup.json
 
 # Claude Code 会话日志（本地，不入库；文件名含特殊连字符，用通配符匹配）
 session*log*.txt
+
+# UI 回归截图（scripts/ui-check.js 产出，本地不入库）
+data/ui-shots/

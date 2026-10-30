@@ -129,24 +129,24 @@ function resolveWaiter(id, result) {
   waiters.resolve(id, result);
 }
 
-/** 待审批超时提醒（每 60 秒扫描一次，超过 24h 未处理的标红提醒） */
+/**
+ * 待审批超时提醒（每 60 秒扫描一次，超过 24h 未处理标红提醒）
+ * 实际逻辑委托 alertService.scanOverdueApprovals（含 last_reminded_at 去重，
+ * 修掉旧实现每 60 秒无限重复发信的缺陷）；惰性 require 避免循环依赖。
+ */
 function startApprovalScanner() {
-  setInterval(async () => {
-    try {
-      const r = await getDb().exec(
-        `SELECT id FROM approvals WHERE status = 'pending' AND created_at < NOW() - interval '24 hours'`
-      );
-      for (const row of (r[0] ? r[0].values : [])) {
-        ws.broadcast('approval:overdue', { id: row[0] });
-        notifier.send({ event: 'approval:overdue', title: `审批超时 #${row[0]}`, text: '已超 24h 未处理，请及时审批' });
-      }
-    } catch (e) {
-      console.error('[审批超时扫描失败]', e.message);
-    }
+  setInterval(() => {
+    require('./alertService').scanOverdueApprovals()
+      .catch(e => console.error('[审批超时扫描失败]', e.message));
   }, 60000);
+}
+
+/** 审批超时扫描（转调 alertService，供集成测试直接调用） */
+function scanOverdueApprovals() {
+  return require('./alertService').scanOverdueApprovals();
 }
 
 module.exports = {
   STATUS, TRANSITIONS, getApproval, getApprovalByNo, listApprovals,
-  createApproval, approve, reject, waitForApproval, startApprovalScanner,
+  createApproval, approve, reject, waitForApproval, startApprovalScanner, scanOverdueApprovals,
 };
