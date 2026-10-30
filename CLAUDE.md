@@ -32,6 +32,7 @@ routes/
   tenants.js           # 租户管理（多租户）
   gateway.js           # 网关配置 + 多工具 SKILL/AGENT 生成/微调/安装
   audit.js             # 合规报告 + 质量数据资产导出
+  annotations.js       # 产出标注 + 私有评测集（快照 / SFT·评测导出）
   prd.js               # PRD 需求沉淀（git 本地提交）
   index.js             # 路由总挂载
 services/
@@ -49,6 +50,7 @@ services/
   taskEvents.js        # 任务事件总线（供 /v1 SSE 中途推送订阅）
   sseStream.js         # /v1 SSE 中途状态推送（opt-in stream_events:true）
   toolCalls.js         # tools/function calling（声明校验 + tool_calls 归一化）
+  annotationService.js # 答复标注 + 私有评测集不可变快照 + SFT/评测 JSONL
   waiters.js           # 等待者单例（审批挂起等待）
   i18n.js / csv.js     # 消息翻译 / CSV 导出
   websocket.js         # Socket.IO 推送（task:new/update/timeout）
@@ -79,6 +81,7 @@ scripts/seed.js        # 种子账户
 - `/api/tenants`（租户管理，多租户）
 - `/api/gateway/config | generate | files | install | install-server`（接入配置 + 多工具 SKILL/AGENT 生成/微调/安装）
 - `/api/audit/report | dataset`（合规报告 + 质量数据资产导出）
+- `/api/annotations`（产出标注 + 私有评测集：`/candidates`、`/stats`、`/eval-sets`、`/eval-sets/:id/export?format=sft|eval`、`/:taskId`）
 - `/api/prd`（读 PRD.md / 追加需求，git 本地提交）
 - `/api/logs/requests | tasks`、`/api/users`
 

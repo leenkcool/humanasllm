@@ -22,6 +22,7 @@ const alertRoutes = require('./alerts');
 const billingRoutes = require('./billing');
 const knowledgeRoutes = require('./knowledge');
 const reviewRoutes = require('./reviews');
+const annotationRoutes = require('./annotations');
 const backupRoutes = require('./backup');
 
 module.exports = function (app) {
@@ -68,6 +69,9 @@ module.exports = function (app) {
 
   // 答复审核（质量分层：单人审核 + confidential 抽检）
   app.use('/api/reviews', reviewRoutes);
+
+  // 产出标注 + 私有评测集（数据飞轮：标注 → 快照 → SFT / 评测集）
+  app.use('/api/annotations', annotationRoutes);
 
   // 租户管理（多租户 v1）
   app.use('/api/tenants', tenantRoutes);

@@ -46,6 +46,7 @@ window.HLM = window.HLM || {};
     { id: 'alerts', label: () => t('nav.alerts'), icon: 'bells', show: () => true, badge: () => window._activeAlerts || 0 },
     { id: 'projects', label: () => t('nav.projects'), icon: 'folder', show: () => true },
     { id: 'reviews', label: () => t('nav.reviews'), icon: 'check', show: () => true, badge: () => window._pendingReviews || 0 },
+    { id: 'annotations', label: () => t('nav.annotations'), icon: 'tag', show: () => true },
     { id: 'knowledge', label: () => t('nav.knowledge'), icon: 'bible', show: () => true },
     { id: 'templates', label: () => t('nav.templates'), icon: 'template', show: () => true },
     { id: 'billing', label: () => t('nav.billing'), icon: 'zap', show: () => true },
@@ -366,6 +367,33 @@ window.HLM = window.HLM || {};
     updateBadges();
   }
 
+  // ===== 产出标注 + 私有评测集页 =====
+  async function renderAnnotations() {
+    const content = $('#content');
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">${t('page.annotations.title')}</div><div class="page-desc">${t('page.annotations.desc')}</div></div>
+        <div class="spacer"></div>
+        ${currentUser.role === 'admin' ? `<button class="btn primary" onclick="window.HLM.Annotations.createSet()">${Icons.plus}${t('an.createSet')}</button>` : ''}
+        <button class="icon-btn" onclick="window.HLM.Annotations.load()">${Icons.refresh}</button></div>
+      <div class="stats" id="anStats"></div>
+      <div class="card"><div class="card-head" id="anTabs">
+          ${[['unannotated', t('an.tab.unannotated')], ['annotated', t('an.tab.annotated')], ['all', t('an.tab.all')]]
+            .map(([k, l], i) => `<button class="btn sm ${i === 0 ? 'primary' : ''}" data-antab="${k}" onclick="window.HLM.Annotations.switchTab('${k}')">${esc(l)}</button>`).join('')}
+          <div class="spacer"></div>
+          <select class="form-select" id="anCatFilter" style="width:130px;" onchange="window.HLM.Annotations.switchCategory(this.value)">
+            <option value="">${t('common.all')}</option>
+            <option value="general">${t('category.general')}</option>
+            <option value="confidential">${t('category.confidential')}</option>
+            <option value="ops">${t('category.ops')}</option>
+          </select>
+        </div>
+        <div class="card-body-flush" id="anQueueBox"></div></div>
+      <div class="card"><div class="card-head"><span class="t">${t('an.sets')}</span></div>
+        <div class="card-body-flush" id="anSetsBox"></div></div>
+      <div class="card" id="anExtra"></div>`;
+    await HLM.Annotations.load();
+  }
+
   // ===== 知识库页 =====
   async function renderKnowledge() {
     const content = $('#content');
@@ -646,7 +674,7 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, alerts: renderAlerts, projects: renderProjects, reviews: renderReviews, knowledge: renderKnowledge, templates: renderTemplates, billing: renderBilling, gateway: renderGateway, prd: renderPrd, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, alerts: renderAlerts, projects: renderProjects, reviews: renderReviews, annotations: renderAnnotations, knowledge: renderKnowledge, templates: renderTemplates, billing: renderBilling, gateway: renderGateway, prd: renderPrd, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');

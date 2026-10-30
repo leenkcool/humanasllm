@@ -2,7 +2,7 @@
 
 > 产品级长期蓝图：现状全景、真实缺口、体验诊断、三阶段路线、开源变现。
 > 对应 README「Roadmap」章节的完整版，README 仅留方向摘要。
-> 状态核对日期：2026-10-30（源码逐条核实；**阶段 A/B 已交付**：模板工单、合规报告 PDF、智能派单、告警升级序列、计费计量、监控 /metrics、数据备份+恢复演练、移动端 PWA；**人机协作闭环已交付**：工程师终端 + AI 起草留痕、多轮追问、项目成员 + 知识库、答复审核、效果回流）。
+> 状态核对日期：2026-10-30（源码逐条核实；**阶段 A/B 已交付**：模板工单、合规报告 PDF、智能派单、告警升级序列、计费计量、监控 /metrics、数据备份+恢复演练、移动端 PWA；**人机协作闭环已交付**：工程师终端 + AI 起草留痕、多轮追问、项目成员 + 知识库、答复审核、效果回流；**数据飞轮后半段已交付**：产出标注 + 私有评测集快照 + SFT/评测 JSONL 导出）。
 
 ---
 
@@ -15,9 +15,10 @@
 | **核心网关** | OpenAI 兼容 `/v1/models`、`/v1/chat/completions`（一次性 + SSE）、`/v1/tasks/:id` 回查、`/v1/governance/rules`；可选 `UPSTREAM_API_KEY`；AI 中继降级（DeepSeek）；异步受理（即回 `task_id`）；未完成聚合防遗忘 |
 | **治理层** | 分级引擎 + 白名单锁死（涉密/运维禁 AI 兜底）、审批异步化 + 回查、质量验收分层（占位/过短拦截 + 运维类强制验收单）、工程师评级（技能 + 一次通过率）、审计哈希链、通知（邮件 + Webhook）、治理 dashboard + 合规报告、SLA 分级（按优先级差异化超时）、分级规则配置后台、多租户 v1/v2（upstream_key 路由 + 数据隔离）、智能漂移 v1/v2、质量数据资产导出（JSONL，涉密仅 admin） |
 | **产品化** | Stripe 风格落地页、任务/审批/项目/用户/PRD 工作台、多工具安装（13 种 agent 工具 SKILL/AGENT 生成 + 在线微调 + 本机全装 + 服务器端安装）、接入配置页、CSV 导出、i18n 中英、4 主题响应式、敏感扫描脚本 |
-| **工程基建** | 178 项单元/集成 + 68 项 API 回归 + 12 页浏览器回归 + Gitea Actions CI；12 份 docs；Windows/Linux 部署手册；超时扫描 + 审批 24h 提醒 |
+| **工程基建** | 187 项单元/集成 + 77 项 API 回归 + 13 页浏览器回归 + Gitea Actions CI；12 份 docs；Windows/Linux 部署手册；超时扫描 + 审批 24h 提醒 |
+| **数据飞轮** | 答复审核 → 人工标注（good/partial/bad + 缺陷标签 + 期望答复）→ 私有评测集不可变快照 → SFT / 评测 JSONL 导出 |
 
-规模：22 个路由模块 / 31 个服务 / **16 张表**（users、tasks、task_logs、request_logs、approvals、projects、task_rules、tenants、task_templates、alerts、billing_rates、billing_ledger、project_members、knowledge_entries、task_reviews、task_feedback）。
+规模：23 个路由模块 / 32 个服务 / **19 张表**（users、tasks、task_logs、request_logs、approvals、projects、task_rules、tenants、task_templates、alerts、billing_rates、billing_ledger、project_members、knowledge_entries、task_reviews、task_feedback、task_annotations、eval_sets、eval_set_items）。
 
 ---
 
@@ -55,7 +56,7 @@
 | # | 缺口 |
 |---|---|
 | 15 | FDE 入驻 + 结算（能力市场雏形） |
-| 16 | 产出回流标注 → 私有评测集 → 精调闭环（导出已做，标注闭环未做） |
+| 16 | ~~产出回流标注 → 私有评测集 → 精调闭环~~ ✅ | **已交付（2026-10-30）**：`task_annotations`（三档标签 + 缺陷标签 + 期望答复）+ `eval_sets`/`eval_set_items` 不可变快照 + SFT/评测 JSONL 导出；工作台「标注」页含覆盖率与高频缺陷标签。精调本身由外部训练框架执行（导出格式对齐 OpenAI messages） |
 | 17 | AgentOps / OpenTelemetry 对接 |
 | 18 | HITL / MoA 集成示例（LangChain / AgentTeams） |
 | 19 | SKILL / AGENT 模板市场 |
@@ -98,7 +99,7 @@
 ### 阶段 C「生态与变现」（4–6 月+）
 
 12. FDE 入驻 + 结算（能力市场）
-13. 产出回流标注 → 私有评测集闭环（数据飞轮）
+13. ~~产出回流标注 → 私有评测集闭环（数据飞轮）~~ ✅ **已交付 2026-10-30** → 验收达成：标注 → 快照 → 导出 JSONL，覆盖率与缺陷标签可量化
 14. AgentOps / OTel 对接 + LangChain/AgentTeams 官方示例
 15. SKILL / AGENT 模板市场
 16. 托管 SaaS 上线（变现起点）
@@ -146,6 +147,17 @@
 | 复用 | 项目成员 + 知识库三级作用域 | 同类问题反复从零答 |
 | 质量 | 单人审核 + confidential 抽检 + 四维评分 | 「经专业人员审计」此前无留痕 |
 | 回流 | 上游反馈 + 未解决自动重开追问 + 有效率统计 | 不知道答复是否真的解决问题 |
+
+## 五-补二、数据飞轮后半段（2026-10-30 交付）
+
+审核解决了「答复是否可放行」，但答复本身有没有沉淀成资产此前是断的。本轮补齐「标注 → 私有评测集 → 训练/评测数据」：
+
+| 环节 | 交付 | 解决什么 |
+|---|---|---|
+| 标注 | `task_annotations`：good / partial / bad + 缺陷标签 + 期望答复；不合格必须给原因 | 答复质量此前只有 4 维评分，缺少可枚举的缺陷原因 |
+| 快照 | `eval_sets` / `eval_set_items`：生成即冻结，重标注不改写历史 | 评测集需要版本可比，不能随标注漂移 |
+| 导出 | `format=sft`（OpenAI messages，仅含有参考答案的样本）/ `format=eval`（全量含金标） | 「导出已做」只是原始 JSONL，缺少训练目标与金标 |
+| 门禁 | 涉密 / 运维 / 混合类评测集导出仅 admin | 与 `/api/audit/dataset` 同一策略，数据不出网关 |
 
 ## 六、已修复问题记录
 

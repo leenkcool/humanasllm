@@ -280,6 +280,55 @@ CREATE TABLE IF NOT EXISTS task_feedback (
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_feedback_resolved ON task_feedback(resolved);
+
+-- 产出标注：人工对已完成答复打标（good/partial/bad + 缺陷标签 + 期望答复）
+CREATE TABLE IF NOT EXISTS task_annotations (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id),
+  label VARCHAR(16) NOT NULL,
+  tags TEXT,
+  note TEXT,
+  expected TEXT,
+  annotator_id INTEGER REFERENCES users(id),
+  annotator_name VARCHAR(64),
+  tenant_id INTEGER,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (task_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_annotations_tenant ON task_annotations(tenant_id, label);
+
+-- 私有评测集：标注快照的不可变版本（生成后内容冻结，便于对比与追溯）
+CREATE TABLE IF NOT EXISTS eval_sets (
+  id SERIAL PRIMARY KEY,
+  version VARCHAR(32) NOT NULL,
+  name VARCHAR(128),
+  category VARCHAR(20),
+  item_count INTEGER NOT NULL DEFAULT 0,
+  stats JSONB,
+  tenant_id INTEGER,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (tenant_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_eval_sets_tenant ON eval_sets(tenant_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS eval_set_items (
+  id SERIAL PRIMARY KEY,
+  set_id INTEGER NOT NULL REFERENCES eval_sets(id) ON DELETE CASCADE,
+  task_id INTEGER NOT NULL,
+  category VARCHAR(20),
+  label VARCHAR(16) NOT NULL,
+  tags TEXT,
+  prompt TEXT NOT NULL,
+  completion TEXT,
+  target TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eval_set_items_set ON eval_set_items(set_id);
 `;
 
 function createAdapter() {

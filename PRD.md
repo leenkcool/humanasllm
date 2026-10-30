@@ -2,6 +2,15 @@
 
 > 本项目所有验证过的功能需求在此记录。任何二次开发（AI Agent 或人）完成并验证后，**必须**在此追加条目（日期 + 功能描述），并 git commit + push。
 
+## 2026-10-30 - 产出标注 + 私有评测集（数据飞轮后半段）
+- 描述：新增 `task_annotations`（标注）、`eval_sets` / `eval_set_items`（评测集快照）三张表 + `services/annotationService.js` + `routes/annotations.js` + 工作台「标注」页。
+- 标注：`POST /api/annotations/:taskId`，三档 `good | partial | bad` + 缺陷标签（逗号分隔归一）+ 说明 + **期望答复**（人工给出的正确答案）；`partial` / `bad` 必须给说明或期望答复，否则 400；同一任务幂等 upsert；写入审计哈希链（`action=annotate`）。
+- 权限：仅 admin 或该任务接单人可标注（避免外人随意改质量结论）；跨租户按 404。
+- 评测集：`POST /api/annotations/eval-sets`（admin）按类目/标签筛选生成**不可变快照**（内容复制进 `eval_set_items`，之后重标注不改写历史版本），版本号 `vYYYYMMDD-HHmm`。
+- 导出：`GET /api/annotations/eval-sets/:id/export?format=sft|eval` —— `sft` 输出 OpenAI `messages` 结构（good 取原答复、partial/bad 取期望答复，无参考答案的样本跳过）；`eval` 全量含 `expected_output` 金标。涉密 / 运维 / 混合类评测集导出仅 admin（与 `/api/audit/dataset` 同一门禁）。
+- 统计：`GET /api/annotations/stats` 返回标注覆盖率、三档分布、按分级拆分、Top 10 高频缺陷标签、评测集版本数。
+- 验证：单元 5（标签归一 / 提示词口径 / SFT·评测结构 / 标签白名单）+ 集成 4（标注校验与幂等、跨租户、快照不可变与导出、统计）通过；冒烟 +9；浏览器回归新增「标注」页（13 页全通过）。
+
 ## 2026-10-30 - 答复效果回流（数据飞轮第一环）
 - 描述：新增 `task_feedback` 表 + `services/feedbackService.js` + `POST /v1/tasks/:id/feedback`（上游回传 `{resolved, rating, comment}`，幂等覆盖）。上游能表达「这条答复到底解决了没有」，这是此前完全缺失的一环。
 - 自动重开：`resolved=false` 且任务在 7 天内完成且无后续轮次 → **自动重开为同一会话的追问**（复用多轮追问模型，`parent_task_id` 指向原任务，受保护类继承分级），人工继续跟进而不是让上游自己重派。

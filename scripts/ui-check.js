@@ -46,7 +46,7 @@ function attach(page, bucket) {
 }
 
 const PAGES = ['dashboard', 'queue', 'mine', 'logs', 'approvals', 'alerts',
-  'projects', 'templates', 'billing', 'gateway', 'prd', 'users'];
+  'projects', 'templates', 'billing', 'gateway', 'prd', 'users', 'annotations'];
 
 (async () => {
   const browser = await puppeteer.launch({

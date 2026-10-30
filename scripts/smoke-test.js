@@ -245,7 +245,38 @@ async function poll(fn, max = 20) {
     ok('上游回查带 review_status', v1rv.status === 200 && v1rv.data.review_status === 'delivered');
   }
 
-  // 7.8 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
+  // 7.8 产出标注 + 私有评测集（数据飞轮）
+  const anStats = await api('GET', '/api/annotations/stats', null, token);
+  ok('标注统计', anStats.status === 200 && typeof anStats.data.data.completed === 'number');
+  if (taskId) {
+    // 不合格标注必须给出原因或期望答复，否则无信息量
+    const anBad = await api('POST', '/api/annotations/' + taskId, { label: 'bad' }, token);
+    ok('不合格标注缺原因被拒(400)', anBad.status === 400);
+    const anOk = await api('POST', '/api/annotations/' + taskId, {
+      label: 'good', tags: 'smoke', note: '冒烟标注',
+    }, token);
+    ok('标注写入', anOk.status === 200 && anOk.data.data.label === 'good');
+    const anGet = await api('GET', '/api/annotations/' + taskId, null, token);
+    ok('标注回读', anGet.status === 200 && anGet.data.data && anGet.data.data.label === 'good');
+    const anCand = await api('GET', '/api/annotations/candidates?filter=annotated&size=5', null, token);
+    ok('已标注队列含本条', anCand.status === 200 && anCand.data.data.data.some(x => x.task_id === taskId));
+  }
+  const setRes = await api('POST', '/api/annotations/eval-sets',
+    { name: 'smoke-评测集', category: 'general' }, token);
+  ok('生成评测集', setRes.status === 200 && setRes.data.data.item_count >= 1);
+  if (setRes.status === 200) {
+    const setId = setRes.data.data.id;
+    const exp = await fetch(BASE + `/api/annotations/eval-sets/${setId}/export?format=sft`, {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const expText = await exp.text();
+    ok('评测集导出 NDJSON', exp.status === 200 && expText.split('\n').every(l => !l || l.startsWith('{')),
+      expText.slice(0, 80));
+    const detail = await api('GET', '/api/annotations/eval-sets/' + setId, null, token);
+    ok('评测集详情含样本', detail.status === 200 && Array.isArray(detail.data.data.items));
+  }
+
+  // 7.9 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
   const met = await fetch(BASE + '/metrics');
   const metText = await met.text();
   ok('Prometheus /metrics', met.status === 200 && metText.includes('p390_'));
@@ -271,6 +302,8 @@ async function poll(fn, max = 20) {
   ok('工程师无权改费率(403)', bForbidden.status === 403);
   const bkForbidden = await api('GET', '/api/backup/list', null, engToken);
   ok('工程师无权查看备份(403)', bkForbidden.status === 403);
+  const anForbidden = await api('POST', '/api/annotations/eval-sets', { name: 'smoke-禁止' }, engToken);
+  ok('工程师无权生成评测集(403)', anForbidden.status === 403);
 
   const instOpen = await api('GET', '/api/gateway/install?tool=opencode');
   ok('多工具安装(opencode→AGENTS+command)', instOpen.status === 200 && instOpen.data.data.files.length === 2 && instOpen.data.data.files[1].path.includes('.opencode'));
@@ -289,6 +322,10 @@ async function poll(fn, max = 20) {
 
   // 9. 清理本次创建的测试数据（顺序：子表 → 主表）
   const db = getDb();
+  await db.run(`DELETE FROM task_annotations WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
+  await db.run(`DELETE FROM task_annotations WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
+  await db.run(`DELETE FROM eval_set_items WHERE set_id IN (SELECT id FROM eval_sets WHERE name LIKE 'smoke-%')`, []);
+  await db.run(`DELETE FROM eval_sets WHERE name LIKE 'smoke-%'`, []);
   await db.run(`DELETE FROM alerts WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM billing_ledger WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);

@@ -7,7 +7,7 @@
 | 层 | 选型 |
 |---|---|
 | 后端 | Node.js + Express 4 + Socket.IO |
-| 数据库 | PostgreSQL 5433（库 `p390`，16 张表） |
+| 数据库 | PostgreSQL 5433（库 `p390`，19 张表） |
 | 认证 | JWT（jsonwebtoken + bcryptjs），admin / engineer 双角色 |
 | 前端 | Vanilla HTML/JS/CSS（IIFE 模块，SVG 图标，4 主题，响应式，中英 i18n） |
 | AI 中继 | 原生 `fetch`（OpenAI 兼容，一次 + stream 透传） |
@@ -147,16 +147,20 @@ Socket.IO 房间模型（`user:*` / `admin` / `system`），事件：
 | `knowledge_entries` | title, category, scope(project/tenant/global), project_code, problem, solution, tags, use_count | 知识库（答复复用） |
 | `task_reviews` | task_id(unique), status(draft/delivered/needs_revision/spot_checked), reviewer_id, 四维评分, score_total | 答复审核 |
 | `task_feedback` | task_id(unique), resolved, rating, comment | 上游效果反馈（数据飞轮） |
+| `task_annotations` | task_id(unique), label(good/partial/bad), tags, note, expected, annotator_id, tenant_id | 产出标注（数据飞轮后半段） |
+| `eval_sets` | version(租户内唯一), name, category, item_count, stats, tenant_id | 私有评测集版本（不可变快照） |
+| `eval_set_items` | set_id, task_id, label, tags, prompt, completion, target | 评测集样本（生成时冻结） |
 
 **关系**：
 - `tasks.project_code` → `projects.code`（列表 join 出 `project_name`）；`tasks.rule_id` → `task_rules.id`（分级理由留痕）；`tasks.template_id` → `task_templates.id`
 - `tasks.conversation_id` 自关联：同一会话按 `turn_index` 排序成时间线，`parent_task_id` 指向上一轮
 - `users/tasks/approvals/projects/task_rules/alert/billing/knowledge.tenant_id` → `tenants.id`
 - `project_members(user_id, project_code)` → 项目级权限（知识库 `scope=project` 的可见性依赖此表）
-- `task_reviews/task_feedback/billing_ledger/alerts.task_id` → `tasks.id`，**均带外键**（删任务前必须先删这些子表）
+- `task_reviews/task_feedback/task_annotations/billing_ledger/alerts.task_id` → `tasks.id`，**均带外键**（删任务前必须先删这些子表）
+- `eval_set_items.set_id` → `eval_sets.id`（级联删除）；`eval_set_items.task_id` **不设外键**——快照要能独立于任务存续
 - `approvals.type=project` 批准后自动写入 `projects`，并把创建者设为 `owner`
 
-> 共 16 张表。新增带外键的表后，所有集成测试的清理顺序必须补齐，否则删除 `tasks` 会因外键失败导致测试挂起。
+> 共 19 张表。新增带外键的表后，所有集成测试的清理顺序必须补齐，否则删除 `tasks` 会因外键失败导致测试挂起。
 
 ## 五、人机协作闭环（2026-10 交付）
 

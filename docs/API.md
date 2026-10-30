@@ -336,6 +336,24 @@ AI 向人类提审批（资源/权限/项目申请），**异步受理**：创�
 
 `resolved=false` 且在 7 天内完成且无后续轮次 → **自动重开为同会话追问**（返回 `reopened_task_id`）。
 
+### 产出标注 / 私有评测集（数据飞轮）
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/annotations/candidates` | JWT | `?filter=unannotated\|annotated\|all&category=&page=&size=` 已完成答复队列 |
+| GET | `/api/annotations/stats` | JWT | 标注覆盖率 / 三档分布 / 高频缺陷标签 / 评测集数量 |
+| GET | `/api/annotations/:taskId` | JWT | 某任务的标注 |
+| POST | `/api/annotations/:taskId` | admin 或该任务接单人 | `{label: good\|partial\|bad, tags?, note?, expected?}` 幂等 upsert |
+| GET | `/api/annotations/eval-sets` | JWT | 评测集版本列表 |
+| POST | `/api/annotations/eval-sets` | admin | `{name?, category?: general\|ops\|confidential\|null, labels?}` 生成**不可变快照** |
+| GET | `/api/annotations/eval-sets/:id` | JWT | 版本详情（含样本） |
+| GET | `/api/annotations/eval-sets/:id/export` | general 任意 / 其他 admin | `?format=sft\|eval` 导出 JSONL |
+
+- `partial` / `bad` **必须**给出 `note` 或 `expected`，否则 400（无信息量的标注对评测/精调无价值）。
+- 快照生成后内容冻结：之后重新标注不会改写历史版本，便于 `v1` vs `v2` 对比。
+- `format=sft`：`{"messages":[{"role":"user",...},{"role":"assistant",...}],"metadata":{...}}`，仅导出有参考答案的样本（good 取原答复，partial/bad 取 `expected`）。
+- `format=eval`：`{"input","expected_output","actual_output","label","tags","metadata"}`，全量导出。
+- 涉密 / 运维 / 混合类评测集导出仅 admin（与 `/api/audit/dataset` 同一门禁）。
+
 ---
 
 ## 三、错误码

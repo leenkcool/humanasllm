@@ -165,6 +165,7 @@ window.HLM = window.HLM || {};
         ${['processing', 'paused'].includes(task.status) ? `<div class="ctx"><div class="k">${t('kb.similar')}</div><div id="kbSimilarBox"></div></div>` : ''}
         ${task.feedback ? `<div class="ctx"><div class="k">${t('task.feedbackTitle')}</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span class="tag ${task.feedback.resolved ? 'completed' : 'returned'}">${task.feedback.resolved ? t('task.feedbackResolved') : t('task.feedbackUnresolved')}</span>${task.feedback.rating ? `<span class="chip">★ ${task.feedback.rating}/5</span>` : ''}</div>${task.feedback.comment ? `<pre>${esc(task.feedback.comment)}</pre>` : ''}</div>` : ''}
         ${task.status === 'completed' ? `<div class="ctx"><div class="k">${t('page.reviews.title')}</div><div id="reviewBox"></div></div>` : ''}
+        ${task.status === 'completed' ? `<div class="ctx"><div class="k">${t('an.title')}</div><div id="annotationBox"></div></div>` : ''}
         ${['pending', 'returned'].includes(task.status) ? `<div class="ctx" id="dispatchPanel"><div class="k">${t('dispatch.title')}</div><div id="dispatchBox"><span style="color:var(--muted);font-size:12px;">${t('dispatch.loading')}</span></div></div>` : ''}
         <div class="ctx"><div class="k">${t('task.audit')} <button class="btn sm" onclick="window.HLM.UI.verifyChain(${task.id})">${t('task.verifyChain')}</button></div><pre style="font-size:11px;">${(task.logs || []).map(l => `[${fmt(l.created_at)}] ${esc(l.action)} — ${esc(l.actor_name || t('task.system'))}${l.remark ? ' · ' + esc(l.remark) : ''}`).join('\n') || t('task.none')}</pre><div id="chainBox"></div></div>
       `;
@@ -174,6 +175,7 @@ window.HLM = window.HLM || {};
       if (['pending', 'returned'].includes(task.status)) HLM.Dispatch.suggest(task.id);
       if (['processing', 'paused'].includes(task.status)) HLM.Knowledge.similarForTask(task.id);
       if (task.status === 'completed') HLM.Review.renderForTask(task.id);
+      if (task.status === 'completed' && HLM.Annotations) HLM.Annotations.renderForTask(task.id);
     } catch (e) {
       toast(e.message, 'error');
     }

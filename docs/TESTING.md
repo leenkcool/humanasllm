@@ -1,20 +1,20 @@
 # Human as Agent · 测试方案
 
-> 现状（2026-10-30）：**178 项自动化测试 + 68 项 API 冒烟 + 12 页浏览器回归**，全部通过。
+> 现状（2026-10-30）：**187 项自动化测试 + 77 项 API 冒烟 + 13 页浏览器回归**，全部通过。
 > 本文说明分层策略、如何新增测试、以及踩过的坑。
 
 ## 一、四层测试
 
 | 层 | 文件 | 数量 | 依赖 | 命令 |
 |---|---|---|---|---|
-| **单元** | `tests/unit/*.test.js` | 18 文件 | 无（纯函数） | `node --test tests/unit/*.test.js` |
-| **集成** | `tests/integration/*.test.js` | 19 文件 | **真实 PG（库 `p390`）** | `node --test tests/integration/*.test.js` |
-| **API 冒烟** | `scripts/smoke-test.js` | 68 项 | 服务须已启动（39000） | `npm run test:smoke` |
-| **浏览器回归** | `scripts/ui-check.js` | 12 页 | puppeteer + 服务已启动 | `npm run ui:check` |
+| **单元** | `tests/unit/*.test.js` | 19 文件 | 无（纯函数） | `node --test tests/unit/*.test.js` |
+| **集成** | `tests/integration/*.test.js` | 20 文件 | **真实 PG（库 `p390`）** | `node --test tests/integration/*.test.js` |
+| **API 冒烟** | `scripts/smoke-test.js` | 77 项 | 服务须已启动（39000） | `npm run test:smoke` |
+| **浏览器回归** | `scripts/ui-check.js` | 13 页 | puppeteer + 服务已启动 | `npm run ui:check` |
 
-全量：`npm test`（178 项，约 60-90 秒）。
+全量：`npm test`（187 项，约 60-90 秒）。
 
-## 二、单元测试（18 个）
+## 二、单元测试（19 个）
 
 纯函数直测，`require` 业务模块，**不初始化数据库**：
 
@@ -30,6 +30,7 @@
 | `dispatchService` | 打分公式（技能/负载/通过率）、排序确定性 |
 | `escalation` | SLA 比例边界、级别计算、终态不告警 |
 | `reviewService` | 分级策略、四维评分、上游状态映射 |
+| `annotation` | 缺陷标签归一、提示词口径、SFT/评测 JSONL 结构、标签白名单 |
 | `conversationService` | 会话继承、受保护类不降级、上限 |
 | `draftService` | **分级红线**（confidential/ops 禁止 AI 起草）、上下文截断 |
 | `reportRenderer` | HTML 自包含、XSS 转义、中英分离 |
@@ -37,7 +38,7 @@
 | `metrics` / `backup` | 指标渲染、备份文件名/保留策略 |
 | `i18nConsistency` | **中英 key 集合一致、占位符一致**（长期锁死双语遗漏） |
 
-## 三、集成测试（19 个）
+## 三、集成测试（20 个）
 
 连**真实 PostgreSQL 库 `p390`**（非独立测试库），每个用例自建租户、`finally` 自清理。
 
@@ -54,12 +55,13 @@
 | `billing` | 计费金额/幂等/租户隔离 |
 | `knowledge` | 项目成员隔离、涉密拒绝、相似检索 |
 | `review` / `feedback` / `mobileTerminal` | 审核流程、效果回流、定向推送与起草守卫 |
+| `annotations` | 标注校验、跨租户、评测集快照不可变、SFT/评测导出 |
 
-## 四、API 冒烟（68 项）
+## 四、API 冒烟（77 项）
 
-需服务已启动。覆盖 health/models、登录、任务全链路、审批、项目、CSV、治理、模板、派单、告警、计费、会话、审核、监控、PWA 静态资源、权限边界、租户隔离。结束时自动清理 `project_code='smoke'` 的数据。
+需服务已启动。覆盖 health/models、登录、任务全链路、审批、项目、CSV、治理、模板、派单、告警、计费、会话、审核、标注与评测集、监控、PWA 静态资源、权限边界、租户隔离。结束时自动清理 `project_code='smoke'` 的数据与 `smoke-*` 评测集。
 
-## 五、浏览器回归（12 页）
+## 五、浏览器回归（13 页）
 
 `npm run ui:check` 用 puppeteer 真实打开工作台，逐页检查：
 
@@ -90,13 +92,15 @@ const unique = () => `mytest-${process.pid}-${Date.now().toString(36)}-${++seq}`
 **新增带外键的表后，必须同步给所有旧测试补清理**，否则删 `tasks` 会外键失败，`finally` 里的 `server.close()` 不执行 → **测试进程挂起**（实测卡死过两次）。
 
 ```
-task_reviews / task_feedback / alerts / billing_ledger
+task_reviews / task_feedback / task_annotations / alerts / billing_ledger
   → task_logs / request_logs
     → tasks
       → project_members / knowledge_entries / approvals
         → users
           → tenants
 ```
+
+`eval_set_items`（→ `eval_sets`）**不引用 tasks**，但含任务快照内容；按租户清理时先删 `eval_set_items` 再删 `eval_sets`。
 
 ### 3. 扫全库的函数要防并发干扰
 
