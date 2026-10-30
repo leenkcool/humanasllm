@@ -15,9 +15,9 @@
 | **核心网关** | OpenAI 兼容 `/v1/models`、`/v1/chat/completions`（一次性 + SSE）、`/v1/tasks/:id` 回查、`/v1/governance/rules`；可选 `UPSTREAM_API_KEY`；AI 中继降级（DeepSeek）；异步受理（即回 `task_id`）；未完成聚合防遗忘 |
 | **治理层** | 分级引擎 + 白名单锁死（涉密/运维禁 AI 兜底）、审批异步化 + 回查、质量验收分层（占位/过短拦截 + 运维类强制验收单）、工程师评级（技能 + 一次通过率）、审计哈希链、通知（邮件 + Webhook）、治理 dashboard + 合规报告、SLA 分级（按优先级差异化超时）、分级规则配置后台、多租户 v1/v2（upstream_key 路由 + 数据隔离）、智能漂移 v1/v2、质量数据资产导出（JSONL，涉密仅 admin） |
 | **产品化** | Stripe 风格落地页、任务/审批/项目/用户/PRD 工作台、多工具安装（13 种 agent 工具 SKILL/AGENT 生成 + 在线微调 + 本机全装 + 服务器端安装）、接入配置页、CSV 导出、i18n 中英、4 主题响应式、敏感扫描脚本 |
-| **工程基建** | 34 项单元/集成 + 30 项 API 回归 + Gitea Actions CI；12 份 docs；Windows/Linux 部署手册；超时扫描 + 审批 24h 提醒 |
+| **工程基建** | 178 项单元/集成 + 68 项 API 回归 + 12 页浏览器回归 + Gitea Actions CI；12 份 docs；Windows/Linux 部署手册；超时扫描 + 审批 24h 提醒 |
 
-规模：14 个路由模块 / 14 个服务 / 8 张表（users、tasks、task_rules、task_logs、request_logs、approvals、projects、tenants）。
+规模：22 个路由模块 / 31 个服务 / **16 张表**（users、tasks、task_logs、request_logs、approvals、projects、task_rules、tenants、task_templates、alerts、billing_rates、billing_ledger、project_members、knowledge_entries、task_reviews、task_feedback）。
 
 ---
 

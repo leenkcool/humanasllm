@@ -16,7 +16,7 @@
 - **多租户**：`upstream_key` 路由租户，任务/审批/项目/规则数据隔离
 - **多工具安装**：为 13 种 AI Agent 工具（Claude Code / Codex / OpenCode / Gemini / Cursor / Windsurf / Aider / WorkBuddy / OpenClaw / Hermes / Pi 等）一键生成 SKILL / AGENT / 规则，支持在线微调、本机全装、服务器端安装
 - **智能漂移**：general 简单任务可自动 AI 承接（可开关），涉密类锁死
-- **测试体系**：40 项单元/集成测试 + 30 项 API 回归，关键安全边界全覆盖
+- **测试体系**：178 项单元/集成测试 + 68 项 API 回归 + 12 页浏览器回归，关键安全边界全覆盖
 
 ## 🌐 与 FDE（前沿部署工程师）的关系
 
@@ -82,10 +82,23 @@ npm start         # 监听 0.0.0.0:39000
 ```
 
 - 工作台：`http://<你的服务器IP>:39000/login.html`
+- 工程师终端（移动优先）：`http://<你的服务器IP>:39000/mobile.html`
 - OpenAI 接口：`http://<你的服务器IP>:39000/v1/chat/completions`
-- 健康检查：`GET /api/health`
+- 健康检查：`GET /api/health` · Prometheus 指标：`GET /metrics`
 
 > 数据库：PostgreSQL（库 `p390`）。配置见 `.env`（复制 `.env.example` 调整，**改掉 `JWT_SECRET`**）。
+
+### 常用命令
+
+```bash
+npm test              # 178 项单元/集成测试
+npm run test:smoke    # 68 项 API 冒烟（需服务已启动）
+npm run ui:check      # 12 页浏览器回归（puppeteer）
+npm run backup        # 数据库备份 → data/backups/
+npm run restore <文件> # 恢复（会先自动备份当前库）
+npm run drill:restore # 恢复演练（临时库比对后自动删除）
+npm run check:secret  # 推仓库前敏感信息扫描
+```
 
 ## 🔌 接入多模型调度池
 

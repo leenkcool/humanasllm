@@ -1,85 +1,134 @@
 # Human as Agent · 测试方案
 
-> 目标：给项目建立系统化测试。当前仅有 `scripts/smoke-test.js`（24 项 API 回归）+ 开发期临时验证；本方案补齐**单元 / 集成 / API 回归 / 前端 / 端到端**分层，并给出框架、覆盖矩阵、执行与 CI、分阶段落地。
+> 现状（2026-10-30）：**178 项自动化测试 + 68 项 API 冒烟 + 12 页浏览器回归**，全部通过。
+> 本文说明分层策略、如何新增测试、以及踩过的坑。
 
----
+## 一、四层测试
 
-## 一、测试分层
+| 层 | 文件 | 数量 | 依赖 | 命令 |
+|---|---|---|---|---|
+| **单元** | `tests/unit/*.test.js` | 18 文件 | 无（纯函数） | `node --test tests/unit/*.test.js` |
+| **集成** | `tests/integration/*.test.js` | 19 文件 | **真实 PG（库 `p390`）** | `node --test tests/integration/*.test.js` |
+| **API 冒烟** | `scripts/smoke-test.js` | 68 项 | 服务须已启动（39000） | `npm run test:smoke` |
+| **浏览器回归** | `scripts/ui-check.js` | 12 页 | puppeteer + 服务已启动 | `npm run ui:check` |
 
-| 层 | 覆盖 | 是否需服务/DB |
-|---|---|---|
-| **单元（Unit）** | services 纯逻辑：状态机、质量校验、编码器、i18n 字典、分类引擎纯函数、模板渲染 | 否（mock DB） |
-| **集成（Integration）** | service + DB：任务状态机全链路、审批流、项目服务、分类引擎（真规则表） | 需测试库 |
-| **API 回归（Smoke）** | HTTP 全接口：认证/任务/审批/项目/规则/租户/网关/治理/用户/日志 + 权限/边界 | 需服务 + DB |
-| **前端（可选）** | UI 渲染、四屏适配、i18n 切换 | 浏览器 |
-| **端到端（E2E，可选）** | 上游调用 → 任务 → 人工 → 回查 完整链路 | 全栈 |
+全量：`npm test`（178 项，约 60-90 秒）。
 
----
+## 二、单元测试（18 个）
 
-## 二、框架
+纯函数直测，`require` 业务模块，**不初始化数据库**：
 
-- **单元 + 集成**：Node 内置 `node:test`（Node 20+ 零依赖）+ `node:assert`。命令 `npm test` → `node --test tests/`。
-- **API 回归**：现有 `scripts/smoke-test.js`（fetch 直调，无需框架）。命令 `npm run test:smoke`。
-- **测试库**：PostgreSQL `p390_test`（跑集成前 `initDatabase` 建表 + 清库）；mock 用于 `aiRelay` / `mailer` / `websocket` / `notifier`。
-
----
-
-## 三、覆盖矩阵
-
-### 单元测试（首批已落地）
 | 文件 | 覆盖 |
 |---|---|
-| `tests/unit/stateMachine.test.js` | 任务/审批状态机合法与非法流转、`can`/`allowed` |
-| `tests/unit/quality.test.js` | `qualityCheck` 分类（general 20 字 / ops·confidential 10 字 / 占位拦截） |
-| `tests/unit/encoder.test.js` | `parseChatRequest` 扩展字段透传、`makeChatCompletion`/`StreamChunks`/`Error` 结构 |
-| `tests/unit/i18n.test.js` | 后端 message 字典直译 + 前缀模板翻译 + 未知透传 |
-| `tests/unit/categoryEngine.test.js` | `matchKeywords`/`explicitCategory` 纯函数；`classify` 规则命中（白名单锁死）/显式/默认 |
+| `stateMachine` | 任务/审批流转表、`can`/`allowed` |
+| `categoryEngine` | 关键词匹配、显式分类 |
+| `encoder` | OpenAI 请求解析、响应结构、SSE chunk |
+| `quality` | 质量校验（空/过短/占位，分分级阈值） |
+| `i18n` | 字典翻译、前缀模板 |
+| `gateway` | `renderTemplate`、路径越界防护 |
+| `templateService` | 模板合并优先级、技能归一化、可见性 |
+| `dispatchService` | 打分公式（技能/负载/通过率）、排序确定性 |
+| `escalation` | SLA 比例边界、级别计算、终态不告警 |
+| `reviewService` | 分级策略、四维评分、上游状态映射 |
+| `conversationService` | 会话继承、受保护类不降级、上限 |
+| `draftService` | **分级红线**（confidential/ops 禁止 AI 起草）、上下文截断 |
+| `reportRenderer` | HTML 自包含、XSS 转义、中英分离 |
+| `pwa` | manifest 结构、PNG 尺寸、SW 分支与护栏、HTML 标签 |
+| `metrics` / `backup` | 指标渲染、备份文件名/保留策略 |
+| `i18nConsistency` | **中英 key 集合一致、占位符一致**（长期锁死双语遗漏） |
 
-### 待补（按优先级）
-| 模块 | 关键测试点 |
+## 三、集成测试（19 个）
+
+连**真实 PostgreSQL 库 `p390`**（非独立测试库），每个用例自建租户、`finally` 自清理。
+
+| 文件 | 覆盖 |
 |---|---|
-| **哈希链** | `addLog`/`verifyAuditChain` 完整性 + 篡改检测（集成） |
-| **智能漂移** | `aiShift.shouldShift` 开关 / 仅 general / 失败回落 |
-| **网关** | `renderTemplate` 占位替换、`safeTarget` 越界、`toolFiles` 各工具产物 |
-| **通知** | `notifier.send` 邮件/Webhook（mock） |
+| `taskFlow` / `approvalFlow` | 状态机全链路、审批流 |
+| `classify` / `aiShift` | 分级规则（真规则表）、智能漂移 |
+| `hashchain` | 审计哈希链完整性 + 篡改检测 |
+| `callback` / `sseEvents` / `toolCalls` | 完成回调、SSE 中途推送、函数调用 |
+| `tenantIsolation` / `logTenantScope` | 多租户隔离（含 Issue #3 回归） |
+| `auditReport` | 合规报告租户隔离 + HTML 导出 |
+| `templates` / `conversation` | 模板建单、多轮追问 |
+| `dispatchAlerts` | 派单排序/审计、告警去重/继承 |
+| `billing` | 计费金额/幂等/租户隔离 |
+| `knowledge` | 项目成员隔离、涉密拒绝、相似检索 |
+| `review` / `feedback` / `mobileTerminal` | 审核流程、效果回流、定向推送与起草守卫 |
 
-### API 回归（smoke 已有 24 项）
-覆盖：health / models / 登录 / 任务全链路 / 审批异步+回查 / 项目 / CSV / 规则 / 治理概览 / 合规报告 / 数据资产 / 网关安装包 / 用户统计。待补：**权限边界**（engineer 访问 admin 接口 403）、**租户隔离**、**多工具安装**、**服务器端安装**。
+## 四、API 冒烟（68 项）
 
-### 集成（待补）
-- 任务状态机全链路：create → claim → complete → reopen → requeue → cancel（含审计日志、哈希链）
-- 审批流：create → approve/reject → 回查（含项目申请自动建）
-- 多租户：upstream_key 路由、读隔离、租户级规则
+需服务已启动。覆盖 health/models、登录、任务全链路、审批、项目、CSV、治理、模板、派单、告警、计费、会话、审核、监控、PWA 静态资源、权限边界、租户隔离。结束时自动清理 `project_code='smoke'` 的数据。
 
----
+## 五、浏览器回归（12 页）
 
-## 四、执行与 CI
+`npm run ui:check` 用 puppeteer 真实打开工作台，逐页检查：
 
-```bash
-npm test            # 单元 + 集成（node --test tests/）
-npm run test:smoke  # API 回归（需服务 + DB 已就绪）
+- 控制台错误 / 页面空白 / `undefined`/`NaN` 字样
+- 横向溢出（桌面 1440 与移动 390）
+- 中英切换后界面残留中文（排除用户数据）
+- 四套主题切换
+- 任务详情派单面板、会话时间线、审核面板
+- 工程师终端（匿名跳转、登录回跳、卡片、抽屉）
+- PWA：manifest 类型、SW 激活状态
+
+截图与 `report.json` 输出到 `data/ui-shots/`（已 gitignore）。发现问题时退出码 1。
+
+## 六、新增测试的硬规则
+
+### 1. 用唯一后缀，别用固定编码
+
+```js
+let seq = 0;
+const unique = () => `mytest-${process.pid}-${Date.now().toString(36)}-${++seq}`;
+// INSERT INTO tenants (code, name) VALUES (?, ?), [unique() + '-a', '租户A']
 ```
 
-**CI（Gitea Actions，可选）**：`.gitea/workflows/test.yml`：
-1. 启动 PostgreSQL（测试库）→ 2. `npm ci` → 3. `npm run seed` → 4. `npm test` + `npm run test:smoke`（后台起服务跑 smoke）。
+固定编码（如 `'tc-a'`）在库里已有残留时会撞 `tenants_code_key` 唯一约束。
 
----
+### 2. 清理顺序：子表 → 主表
 
-## 五、分阶段落地
+**新增带外键的表后，必须同步给所有旧测试补清理**，否则删 `tasks` 会外键失败，`finally` 里的 `server.close()` 不执行 → **测试进程挂起**（实测卡死过两次）。
 
-| 阶段 | 内容 | 状态 |
-|---|---|---|
-| **1 · 框架 + 核心单元** | `node:test` 框架 + 5 个纯函数单测 | ✅ 已落地 |
-| **2 · 单元补齐** | 哈希链、智能漂移、网关、通知（mock） | 待做 |
-| **3 · 集成** | 任务/审批/多租户 service+DB 全链路 | 待做 |
-| **4 · API 回归扩展** | smoke 补权限/租户/多工具/服务器端安装 | 待做 |
-| **5 · CI + 覆盖率** | Gitea Actions（`.gitea/workflows/test.yml`）+ `npm run test:coverage`（语句覆盖率 71%） | ✅ 已落地 |
+```
+task_reviews / task_feedback / alerts / billing_ledger
+  → task_logs / request_logs
+    → tasks
+      → project_members / knowledge_entries / approvals
+        → users
+          → tenants
+```
 
----
+### 3. 扫全库的函数要防并发干扰
 
-## 六、验收标准
+`settlePendingTasks({ limit })` 会扫全库，并发跑测试时其它用例的任务可能占满名额。测试里调大 `limit`。
 
-- `npm test` 全绿（单元 + 集成）
-- `npm run test:smoke` 全绿（API 回归）
-- `npm run test:coverage` 输出覆盖率（当前语句 71%）
-- 关键安全边界有测试：分级白名单锁死、租户隔离、越界拒绝、涉密禁 AI 兜底
+### 4. 别同时跑两个测试实例
+
+两个 `npm test` 并发会争抢同一个库，双双挂起。跑之前确认没有残留进程：
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -like '*--test*' }
+```
+
+### 5. 环境变量在模块加载时固化
+
+`aiRelay` 等模块若在顶层读 `process.env`，测试里改环境变量不生效。**必须在函数内动态读取**（`draftService` 的测试锁定过这个行为）。
+
+## 七、CI
+
+`.gitea/workflows/test.yml`：起 PG16 service → `npm ci` → `npm run seed` → `npm test` → 起服务 → `npm run test:smoke`。
+
+浏览器回归不进 CI（需 Chromium），作为改动前端后的本地必跑项。
+
+## 八、测试覆盖的关键安全边界
+
+以下边界由测试长期锁定，改代码时若破坏会立即失败：
+
+| 边界 | 测试 |
+|---|---|
+| 涉密/运维类禁止 AI 兜底与 AI 起草 | `draftService` + `classify` + `aiShift` |
+| 追问不降级受保护类会话 | `conversation` |
+| 知识库涉密条目不得共享 | `knowledge` |
+| 跨租户访问一律 404（不泄露存在性） | `tenantIsolation` / `logTenantScope` / `dispatchAlerts` |
+| 审计哈希链防篡改 | `hashchain` |
+| 中英文案不漏 | `i18nConsistency` |
