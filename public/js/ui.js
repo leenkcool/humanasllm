@@ -9,6 +9,13 @@ window.HLM = window.HLM || {};
 
   let detailTask = null; // 当前详情任务（供提交函数调用等二次操作读取声明信息）
 
+  // 角色显示名（三权分立：sys_admin / sec_admin / audit_admin / admin / engineer）
+  function roleLabel(role) {
+    const key = 'role.' + (role || 'engineer');
+    const label = t(key);
+    return label === key ? (role || '') : label;
+  }
+
   // 工程师技能与任务 required skills 匹配
   function skillMatch(required) {
     const my = (window.HLM.currentUser && window.HLM.currentUser.skills) || '';
@@ -438,7 +445,7 @@ window.HLM = window.HLM || {};
         <div class="ctx"><div class="k">${t('user.username')}</div><div><strong>${esc(u.username)}</strong></div></div>
         <div class="ctx"><div class="k">${t('user.name')}</div><div>${esc(u.name || '-')}</div></div>
         <div class="ctx"><div class="k">${t('user.email')}</div><div>${esc(u.email || '-')}</div></div>
-        <div class="ctx"><div class="k">${t('user.role')}</div><div>${u.role === 'admin' ? t('role.admin') : t('role.engineer')}</div></div>
+        <div class="ctx"><div class="k">${t('user.role')}</div><div>${esc(roleLabel(u.role))}</div></div>
         <div class="ctx"><div class="k">${t('user.tenant')}</div><div>${esc(u.tenant_name || '-')}</div></div>
         <div class="ctx"><div class="k">${t('user.skills')}</div><div>${esc(u.skills || '-')}</div></div>
         <div class="ctx"><div class="k">${t('user.stats')}</div><div>${t('gov.claimed')} ${c} · ${t('gov.reopened')} ${rr} · ${t('gov.passRate')} ${rate}</div></div>
@@ -496,7 +503,10 @@ window.HLM = window.HLM || {};
       <div class="form-group"><label class="form-label">${t('user.name')}</label><input class="form-input" id="uNick" value="${esc(u.name || '')}"></div>
       <div class="form-group"><label class="form-label">${t('user.skills')}</label><input class="form-input" id="uSkills" value="${esc(u.skills || '')}" placeholder="${t('user.skillsPh')}"></div>
       ${!isEdit ? `<div class="form-group"><label class="form-label">${t('user.password')}</label><input class="form-input" id="uPass" type="password"></div>` : ''}
-      <div class="form-group"><label class="form-label">${t('user.role')}</label><select class="form-select" id="uRole"><option value="engineer" ${u.role !== 'admin' ? 'selected' : ''}>${t('role.engineer')}</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>${t('role.admin')}</option></select></div>
+      <div class="form-group"><label class="form-label">${t('user.role')}</label><select class="form-select" id="uRole">
+        ${['engineer', 'sys_admin', 'sec_admin', 'audit_admin', 'admin'].map(r =>
+          `<option value="${r}" ${u.role === r || (!u.role && r === 'engineer') ? 'selected' : ''}>${esc(roleLabel(r))}</option>`).join('')}
+      </select></div>
     `, `
       <button class="btn" onclick="window.HLM.UI.closeModal()">${t('common.cancel')}</button>
       <button class="btn primary" onclick="window.HLM.UI.saveUser(${id || 'null'})">${t('common.save')}</button>`);

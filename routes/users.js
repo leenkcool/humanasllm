@@ -6,7 +6,8 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { getDb } = require('../db');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
+const perm = require('../services/permissionService');
 const { rows } = require('../services/queueService');
 
 // 列表（可筛选角色；含租户名 + 个人统计：完成/打回/一次通过率）
@@ -30,13 +31,16 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// 新增
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+// 新增（三权分立：sys_admin 可建工程师与只读角色，但不能自升或创建 admin）
+router.post('/', authenticate, requirePermission('users.manage'), async (req, res) => {
   try {
     const { username, password, role, name, skills, tenant_id } = req.body;
     if (!username || !password) return res.status(400).json({ success: false, message: '用户名和密码不能为空' });
     const r = role || 'engineer';
-    if (!['engineer', 'admin'].includes(r)) return res.status(400).json({ success: false, message: '非法角色' });
+    if (!perm.isValidRole(r)) return res.status(400).json({ success: false, message: '非法角色' });
+    if (r === 'admin' && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '仅超级管理员可授予 admin 角色' });
+    }
     const db = getDb();
     const exists = rows(await db.exec('SELECT id FROM users WHERE username = ?', [username]));
     if (exists[0]) return res.status(400).json({ success: false, message: '用户名已存在' });
@@ -57,7 +61,7 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
 });
 
 // 更新（角色/姓名/启停/重置密码）
-router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id', authenticate, requirePermission('users.manage'), async (req, res) => {
   try {
     const db = getDb();
     const id = parseInt(req.params.id);
@@ -68,7 +72,10 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     const sets = [];
     const params = [];
     if (role !== undefined) {
-      if (!['engineer', 'admin'].includes(role)) return res.status(400).json({ success: false, message: '非法角色' });
+      if (!perm.isValidRole(role)) return res.status(400).json({ success: false, message: '非法角色' });
+      if (role === 'admin' && req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: '仅超级管理员可授予 admin 角色' });
+      }
       sets.push('role = ?'); params.push(role);
     }
     if (name !== undefined) { sets.push('name = ?'); params.push(name); }
@@ -87,13 +94,17 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
 });
 
 // 删除
-router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.delete('/:id', authenticate, requirePermission('users.manage'), async (req, res) => {
   try {
     const db = getDb();
     const id = parseInt(req.params.id);
     if (id === req.user.id) return res.status(400).json({ success: false, message: '不能删除自己' });
-    const list = rows(await db.exec('SELECT id FROM users WHERE id = ?', [id]));
+    const list = rows(await db.exec('SELECT id, role FROM users WHERE id = ?', [id]));
     if (!list[0]) return res.status(404).json({ success: false, message: '用户不存在' });
+    // 只有超级管理员能删超级管理员，避免三权分立角色互相清场
+    if (list[0].role === 'admin' && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '仅超级管理员可删除 admin 账户' });
+    }
     await db.run('DELETE FROM users WHERE id = ?', [id]);
     res.json({ success: true, message: '用户已删除' });
   } catch (err) {

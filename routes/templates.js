@@ -8,12 +8,12 @@
  */
 const express = require('express');
 const router = express.Router();
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 const tpl = require('../services/templateService');
 const queue = require('../services/queueService');
 const encoder = require('../services/openaiEncoder');
 
-const admin = [authenticate, requireRole('admin')];
+const admin = [authenticate, requirePermission('templates.manage')];
 
 // 列表
 router.get('/', authenticate, async (req, res) => {

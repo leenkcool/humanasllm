@@ -50,6 +50,7 @@ services/
   taskEvents.js        # 任务事件总线（供 /v1 SSE 中途推送订阅）
   sseStream.js         # /v1 SSE 中途状态推送（opt-in stream_events:true）
   toolCalls.js         # tools/function calling（声明校验 + tool_calls 归一化）
+  permissionService.js # 三权分立权限矩阵（sys_admin/sec_admin/audit_admin/engineer）+ requirePermission
   annotationService.js # 答复标注 + 私有评测集不可变快照 + SFT/评测 JSONL
   waiters.js           # 等待者单例（审批挂起等待）
   i18n.js / csv.js     # 消息翻译 / CSV 导出

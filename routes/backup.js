@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 const ws = require('../services/websocket');
 
 const router = express.Router();
@@ -87,7 +87,7 @@ function listFilesOnDisk() {
 }
 
 // ===== GET /api/backup/list =====
-router.get('/list', authenticate, requireRole('admin'), (req, res) => {
+router.get('/list', authenticate, requirePermission('system.backup'), (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 500);
     const items = readManifest(limit);
@@ -107,7 +107,7 @@ router.get('/list', authenticate, requireRole('admin'), (req, res) => {
 });
 
 // ===== POST /api/backup/run =====
-router.post('/run', authenticate, requireRole('admin'), (req, res) => {
+router.post('/run', authenticate, requirePermission('system.backup'), (req, res) => {
   if (state.running) {
     return res.status(409).json({ success: false, message: '已有备份正在执行，请稍后再试', startedAt: state.startedAt });
   }
@@ -195,7 +195,7 @@ router.post('/run', authenticate, requireRole('admin'), (req, res) => {
 });
 
 // ===== GET /api/backup/status =====
-router.get('/status', authenticate, requireRole('admin'), (req, res) => {
+router.get('/status', authenticate, requirePermission('system.backup'), (req, res) => {
   const dir = backupDir();
   let fileCount = 0;
   let latest = null;

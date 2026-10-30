@@ -56,7 +56,7 @@ window.HLM = window.HLM || {};
     box.innerHTML = `<div class="empty" style="padding:24px;">…</div>`;
     try {
       const r = await API.get('/templates');
-      renderTemplates(r.data, box, (window.HLM.currentUser || {}).role === 'admin');
+      renderTemplates(r.data, box, window.HLM.can('templates.manage'));
     } catch (e) {
       box.innerHTML = '';
       toast(e.message, 'error');

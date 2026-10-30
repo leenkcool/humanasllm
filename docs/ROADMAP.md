@@ -2,7 +2,7 @@
 
 > 产品级长期蓝图：现状全景、真实缺口、体验诊断、三阶段路线、开源变现。
 > 对应 README「Roadmap」章节的完整版，README 仅留方向摘要。
-> 状态核对日期：2026-10-30（源码逐条核实；**阶段 A/B 已交付**：模板工单、合规报告 PDF、智能派单、告警升级序列、计费计量、监控 /metrics、数据备份+恢复演练、移动端 PWA；**人机协作闭环已交付**：工程师终端 + AI 起草留痕、多轮追问、项目成员 + 知识库、答复审核、效果回流；**数据飞轮后半段已交付**：产出标注 + 私有评测集快照 + SFT/评测 JSONL 导出）。
+> 状态核对日期：2026-10-30（源码逐条核实；**阶段 A/B 已交付**：模板工单、合规报告 PDF、智能派单、告警升级序列、计费计量、监控 /metrics、数据备份+恢复演练、移动端 PWA；**人机协作闭环已交付**：工程师终端 + AI 起草留痕、多轮追问、项目成员 + 知识库、答复审核、效果回流；**数据飞轮后半段已交付**：产出标注 + 私有评测集快照 + SFT/评测 JSONL 导出；**三权分立 RBAC 已交付**：sys_admin / sec_admin / audit_admin（只读）+ admin 超管）。
 
 ---
 
@@ -15,10 +15,10 @@
 | **核心网关** | OpenAI 兼容 `/v1/models`、`/v1/chat/completions`（一次性 + SSE）、`/v1/tasks/:id` 回查、`/v1/governance/rules`；可选 `UPSTREAM_API_KEY`；AI 中继降级（DeepSeek）；异步受理（即回 `task_id`）；未完成聚合防遗忘 |
 | **治理层** | 分级引擎 + 白名单锁死（涉密/运维禁 AI 兜底）、审批异步化 + 回查、质量验收分层（占位/过短拦截 + 运维类强制验收单）、工程师评级（技能 + 一次通过率）、审计哈希链、通知（邮件 + Webhook）、治理 dashboard + 合规报告、SLA 分级（按优先级差异化超时）、分级规则配置后台、多租户 v1/v2（upstream_key 路由 + 数据隔离）、智能漂移 v1/v2、质量数据资产导出（JSONL，涉密仅 admin） |
 | **产品化** | Stripe 风格落地页、任务/审批/项目/用户/PRD 工作台、多工具安装（13 种 agent 工具 SKILL/AGENT 生成 + 在线微调 + 本机全装 + 服务器端安装）、接入配置页、CSV 导出、i18n 中英、4 主题响应式、敏感扫描脚本 |
-| **工程基建** | 187 项单元/集成 + 77 项 API 回归 + 13 页浏览器回归 + Gitea Actions CI；12 份 docs；Windows/Linux 部署手册；超时扫描 + 审批 24h 提醒 |
+| **工程基建** | 200 项单元/集成 + 82 项 API 回归 + 13 页浏览器回归 + Gitea Actions CI；12 份 docs；Windows/Linux 部署手册；超时扫描 + 审批 24h 提醒 |
 | **数据飞轮** | 答复审核 → 人工标注（good/partial/bad + 缺陷标签 + 期望答复）→ 私有评测集不可变快照 → SFT / 评测 JSONL 导出 |
 
-规模：23 个路由模块 / 32 个服务 / **19 张表**（users、tasks、task_logs、request_logs、approvals、projects、task_rules、tenants、task_templates、alerts、billing_rates、billing_ledger、project_members、knowledge_entries、task_reviews、task_feedback、task_annotations、eval_sets、eval_set_items）。
+规模：23 个路由模块 / 33 个服务 / **19 张表**（users、tasks、task_logs、request_logs、approvals、projects、task_rules、tenants、task_templates、alerts、billing_rates、billing_ledger、project_members、knowledge_entries、task_reviews、task_feedback、task_annotations、eval_sets、eval_set_items）。
 
 ---
 
@@ -48,7 +48,7 @@
 | 11 | ~~**合规报告 PDF 导出**~~ ✅ | **已交付（2026-10-30）**：自包含 HTML 报告页（内嵌 CSS + `@media print` + A4），浏览器打印即导出 PDF；顺带修掉 `audit/report` 跨租户统计越权 |
 | 12 | ~~**多工程师负载均衡分配**~~ ✅ | **已交付（2026-10-30）**：技能匹配 0.5 + 空闲负载 0.3 + 一次通过率 0.2 加权打分，建议/一键派单/DRY-RUN，复用 `claimTask` 走同一状态机与审计链 |
 | 13 | ~~**移动端 / PWA**~~ ✅ | **已交付（2026-10-30）**：manifest + Service Worker（App Shell / 离线页 / notificationclick）+ 移动端底部导航 + 安全区 + 44px 触控目标。本机 `localhost` 可验证，远程需 HTTPS |
-| 14 | **细粒度 RBAC + 审计配置化** | 仅 admin/engineer 两角色，三权分立未落地 |
+| 14 | ~~**细粒度 RBAC + 审计配置化**~~ ✅ | **已交付（2026-10-30）**：三权分立落地——`sys_admin`（用户/租户/项目/备份/派单）、`sec_admin`（分级规则/模板/抽检/评测集）、`audit_admin`（**只读**审计与合规）、`admin` 超管超越；`services/permissionService.js` 集中权限矩阵 + `requirePermission` 门禁，前端按权限隐藏入口。审计管理员「不得有任何写权限」由单元测试长期锁死 |
 | 21 | ~~**计费计量**~~ ✅ | **已交付（2026-10-30）**：按任务计时计费（分级 × 优先级费率 + 最低消费），租户费率覆盖全局，月度账单/明细流水/CSV 导出，`billing_ledger` 幂等结算（AI 产出记 0 元） |
 
 ### C. 生态变现（远期）
@@ -71,7 +71,7 @@
 - **接入（对 agent/开发者）**：~~异步受理 + 手动轮询，无回调 webhook、无中途 SSE；无 tools~~ ✅ **已补齐（2026-09-16）**：回调 webhook + SSE 中途推送 + tools/function calling 全部交付，接入层断点清除。
 - **交互一致性断裂**：任务 = 异步轮询（小时级），审批 = 同步挂起（分钟级）——设计各自合理，但上游要理解两套契约。
 - **使用（对工程师）**：工作台桌面单页、移动端弱 → on-call 接单不及时；SLA 有倒计时无（前端不展示 deadline）；超时靠人盯。
-- **治理（对管理员）**：RBAC 粗糙、审计不可配置、合规证明不可导出（仅 JSON）。
+- **治理（对管理员）**：~~RBAC 粗糙~~ ✅ 三权分立已交付（2026-10-30）；审计不可配置、合规证明不可导出 → 合规报告与评测集导出已补齐
 - **部署运维**：无 Docker、无监控、无备份 → 私有化落地摩擦大、数据安全底气不足。
 - **商业化**：无计费 → SaaS 无法按量收费；无租户报表/PDF 报告 → 企业采购审核缺材料。
 
@@ -91,7 +91,7 @@
 ### 阶段 B「企业就绪」（2–4 月）
 
 7. 企业 SSO（OAuth2 先行，再 LDAP/企微/钉钉）
-8. 细粒度 RBAC（三权分立落地）+ 审计配置化
+8. ~~细粒度 RBAC（三权分立落地）+ 审计配置化~~ ✅ **已交付 2026-10-30** → 验收达成：三个管理角色权限互不覆盖，审计管理员只读由测试锁定
 9. 计费计量（人力成本核算 + 租户账单）
 10. 合规报告 PDF / 定时 / 订阅导出
 11. 多工程师负载均衡自动派单
@@ -158,6 +158,22 @@
 | 快照 | `eval_sets` / `eval_set_items`：生成即冻结，重标注不改写历史 | 评测集需要版本可比，不能随标注漂移 |
 | 导出 | `format=sft`（OpenAI messages，仅含有参考答案的样本）/ `format=eval`（全量含金标） | 「导出已做」只是原始 JSONL，缺少训练目标与金标 |
 | 门禁 | 涉密 / 运维 / 混合类评测集导出仅 admin | 与 `/api/audit/dataset` 同一策略，数据不出网关 |
+
+## 五-补三、三权分立 RBAC（2026-10-30 交付）
+
+原先只有 `admin` / `engineer` 两档，管理员权力过度集中，审计角色无从谈起。本轮把「管理」拆成三种互不覆盖的职责：
+
+| 角色 | 权限 | 设计意图 |
+|---|---|---|
+| `sys_admin` 系统管理员 | 用户 / 租户 / 项目 / 备份 / 派单 / 计费 / 模板 | 管「人和资源」 |
+| `sec_admin` 安全管理员 | 分级规则 / 模板 / 抽检 / 评测集 / 告警 | 管「策略和质量」 |
+| `audit_admin` 审计管理员 | **仅** 审计与合规读取 | 看得见的不能改 |
+| `admin` 超级管理员 | 全部 | 开发/演示；生产建议改用三权分立 |
+| `engineer` 工程师 | 仅任务相关（行为不变） | 零破坏 |
+
+- 统一权限矩阵在 `services/permissionService.js`，路由用 `requirePermission('users.manage')` 这类权限点而非角色名；
+- 防越权自升：非 `admin` 角色不得创建/提拔 `admin`，也不得删除 `admin` 账户；
+- 只读约束由 `tests/unit/permission.test.js` 长期锁定：除 `audit.read` 外，`audit_admin` 对任何权限点都必须为 `false`。
 
 ## 六、已修复问题记录
 

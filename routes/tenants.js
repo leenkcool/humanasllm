@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 const { rows } = require('../services/queueService');
 
 // 列表
@@ -26,7 +26,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // 新建租户（admin）
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/', authenticate, requirePermission('tenants.manage'), async (req, res) => {
   try {
     const { code, name, upstream_key } = req.body || {};
     if (!code || !name) return res.status(400).json({ success: false, message: 'code 与 name 必填' });

@@ -711,6 +711,9 @@ window.HLM = window.HLM || {};
     // 角色
     'role.admin': '管理员',
     'role.engineer': '工程师',
+    'role.sys_admin': '系统管理员',
+    'role.sec_admin': '安全管理员',
+    'role.audit_admin': '审计管理员',
 
     // API 兜底
     'api.expired': '登录已过期',
@@ -1439,6 +1442,9 @@ window.HLM = window.HLM || {};
 
     'role.admin': 'Admin',
     'role.engineer': 'Engineer',
+    'role.sys_admin': 'System Admin',
+    'role.sec_admin': 'Security Admin',
+    'role.audit_admin': 'Audit Admin',
 
     'api.expired': 'Session expired',
     'api.requestFail': 'Request failed',

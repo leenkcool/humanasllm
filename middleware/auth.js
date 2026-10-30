@@ -59,7 +59,7 @@ function signToken(payload) {
 }
 
 /**
- * 角色检查中间件
+ * 角色检查中间件（保留给「只认单一角色」的场景；新代码优先用 requirePermission）
  * @param {string} role - 要求的角色
  * @returns {Function} Express 中间件
  */
@@ -72,4 +72,12 @@ function requireRole(role) {
   };
 }
 
-module.exports = { authenticate, signToken, requireRole, getTenantByUpstreamKey, getDefaultTenantId, resolveCallerTenantId };
+/** 权限检查中间件（三权分立：sys_admin / sec_admin / audit_admin / admin） */
+function requirePermission(perm) {
+  return require('../services/permissionService').requirePermission(perm);
+}
+
+module.exports = {
+  authenticate, signToken, requireRole, requirePermission,
+  getTenantByUpstreamKey, getDefaultTenantId, resolveCallerTenantId,
+};

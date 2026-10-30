@@ -2,6 +2,13 @@
 
 > 本项目所有验证过的功能需求在此记录。任何二次开发（AI Agent 或人）完成并验证后，**必须**在此追加条目（日期 + 功能描述），并 git commit + push。
 
+## 2026-10-30 - 细粒度 RBAC（三权分立）
+- 描述：新增 `services/permissionService.js` 权限矩阵 + `middleware/auth.js` 的 `requirePermission(perm)`；路由门禁从「角色名 `admin`」改为「权限点」，覆盖用户 / 租户 / 项目 / 备份 / 派单 / 计费 / 模板 / 规则 / 抽检 / 评测集 / 服务器端安装 / 告警。
+- 角色：`sys_admin`（用户、租户、项目、备份、派单、计费、模板）、`sec_admin`（分级规则、模板、抽检、评测集、告警、审计读取）、`audit_admin`（**仅** `audit.read`，只读）、`admin`（超管，`*`）、`engineer`（无管理权限，行为与之前一致）。
+- 防越权：非 `admin` 角色不得创建 / 提拔 `admin`，也不得删除 `admin` 账户。
+- 前端：登录返回 `permissions[]`，侧栏与页面按钮按权限隐藏（`HLM.can()`），用户表单支持五种角色。
+- 验证：单元 9（矩阵自洽 / 各角色边界 / **审计管理员只读锁死** / 中间件 403）+ 集成 4（sys_admin、sec_admin、audit_admin、engineer 四类路由门禁）通过；冒烟 +5；全量 200/200。
+
 ## 2026-10-30 - 产出标注 + 私有评测集（数据飞轮后半段）
 - 描述：新增 `task_annotations`（标注）、`eval_sets` / `eval_set_items`（评测集快照）三张表 + `services/annotationService.js` + `routes/annotations.js` + 工作台「标注」页。
 - 标注：`POST /api/annotations/:taskId`，三档 `good | partial | bad` + 缺陷标签（逗号分隔归一）+ 说明 + **期望答复**（人工给出的正确答案）；`partial` / `bad` 必须给说明或期望答复，否则 400；同一任务幂等 upsert；写入审计哈希链（`action=annotate`）。

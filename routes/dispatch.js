@@ -8,11 +8,11 @@
  */
 const express = require('express');
 const router = express.Router();
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 const { assertTaskAccess } = require('../middleware/taskAccess');
 const dispatch = require('../services/dispatchService');
 
-const admin = [authenticate, requireRole('admin')];
+const admin = [authenticate, requirePermission('dispatch.assign')];
 
 /** 派单未启用时统一 403（便于一键关闭，不影响既有 claim） */
 function requireEnabled(req, res, next) {

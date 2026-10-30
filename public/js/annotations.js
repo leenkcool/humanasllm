@@ -9,7 +9,7 @@ window.HLM = window.HLM || {};
   const state = { filter: 'unannotated', category: '', page: 1 };
   const PAGE_SIZE = 20;
 
-  const isAdmin = () => ((window.HLM.currentUser || {}).role === 'admin');
+  const isAdmin = () => (window.HLM.can('annotations.evalset'));
 
   const labelOf = (k) => t('an.label.' + k);
   const LABEL_CLASS = { good: 'completed', partial: 'pending', bad: 'returned' };

@@ -84,5 +84,16 @@ window.HLM = window.HLM || {};
     $('#confirmOk').onclick = () => { closeModal(); const cb = confirmCb; confirmCb = null; if (cb) cb(); };
   }
 
-  window.HLM.U = { Icons, STATUS_LABEL, $, $$, esc, fmt, jsonStr, nl, toast, openModal, closeModal, confirmDialog };
+  /**
+   * 前端权限判定（与 services/permissionService.js 对齐）
+   * 只用于「显示/隐藏」，真正的门禁始终在服务端。
+   */
+  function can(perm) {
+    const u = window.HLM.currentUser || {};
+    if (u.role === 'admin') return true;
+    return Array.isArray(u.permissions) && u.permissions.includes(perm);
+  }
+
+  window.HLM.U = { Icons, STATUS_LABEL, $, $$, esc, fmt, jsonStr, nl, toast, openModal, closeModal, confirmDialog, can };
+  window.HLM.can = can;
 })();

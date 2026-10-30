@@ -131,7 +131,7 @@ Socket.IO 房间模型（`user:*` / `admin` / `system`），事件：
 
 | 表 | 关键字段 | 用途 |
 |---|---|---|
-| `users` | username, email, password, role(admin/engineer), name, is_active, skills, tenant_id | 账户 |
+| `users` | username, email, password, role(admin/sys_admin/sec_admin/audit_admin/engineer), name, is_active, skills, tenant_id | 账户（三权分立见 `services/permissionService.js`） |
 | `tasks` | upstream_request_id, model, stream, priority, category, rule_id, project_code, payload, status, assignee_id, result_text, reject_reason, timeout_at, conversation_id, turn_index, template_id, escalation_level, remind_count | 人工任务 |
 | `task_logs` | task_id, action, old_value(JSONB), new_value(JSONB), actor_name, remark, prev_hash, hash | 状态审计（哈希链防篡改） |
 | `request_logs` | task_id, tenant_id, direction(in/out), payload(JSONB), model | 请求/输出日志 |

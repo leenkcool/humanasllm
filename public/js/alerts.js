@@ -83,7 +83,7 @@ window.HLM = window.HLM || {};
     if (a.status === 'resolved') return `<span style="color:var(--muted);font-size:12px;">${a.resolved_at ? fmt(a.resolved_at) : '-'}</span>`;
     let b = '';
     if (a.status === 'active') b += `<button class="btn sm" onclick="window.HLM.Alerts.ack(${a.id})">${Icons.check}${t('alerts.ack')}</button>`;
-    if ((window.HLM.currentUser || {}).role === 'admin') {
+    if (window.HLM.can('alerts.manage')) {
       b += `<button class="btn sm danger" onclick="window.HLM.Alerts.resolve(${a.id})">${t('alerts.resolve')}</button>`;
     }
     return b;

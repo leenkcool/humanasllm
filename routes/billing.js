@@ -13,11 +13,11 @@
  */
 const express = require('express');
 const router = express.Router();
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 const billing = require('../services/billingService');
 const { toCSV } = require('../services/csv');
 
-const admin = [authenticate, requireRole('admin')];
+const admin = [authenticate, requirePermission('billing.manage')];
 
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 

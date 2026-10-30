@@ -9,10 +9,10 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 const { CATEGORIES } = require('../services/categoryEngine');
 
-const admin = [authenticate, requireRole('admin')];
+const admin = [authenticate, requirePermission('rules.manage')];
 
 function rows(result) {
   if (!result || !result.length) return [];

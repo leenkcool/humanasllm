@@ -11,7 +11,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 const { assertTaskAccess } = require('../middleware/taskAccess');
 const review = require('../services/reviewService');
 
@@ -29,7 +29,7 @@ router.get('/pending', authenticate, async (req, res) => {
   }
 });
 
-router.get('/spot-check', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/spot-check', authenticate, requirePermission('reviews.spotcheck'), async (req, res) => {
   try {
     res.json({ success: true, data: await review.listSpotCheck({ tenantId: req.tenant_id }) });
   } catch (e) {
@@ -107,7 +107,7 @@ router.post('/:taskId/resubmit', authenticate, async (req, res) => {
   }
 });
 
-router.post('/:taskId/spot-check', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/:taskId/spot-check', authenticate, requirePermission('reviews.spotcheck'), async (req, res) => {
   try {
     const id = parseInt(req.params.taskId);
     const { error } = await assertTaskAccess(req, res, id);

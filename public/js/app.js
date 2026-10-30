@@ -3,7 +3,7 @@ window.HLM = window.HLM || {};
 
 (function () {
   const U = window.HLM.U;
-  const { Icons, $, esc, toast, STATUS_LABEL } = U;
+  const { Icons, $, esc, toast, STATUS_LABEL, can } = U;
   const { t, lang, setLang, applyStatic } = window.HLM.I18n;
   const API = window.HLM.API;
   const UI = window.HLM.UI;
@@ -52,7 +52,7 @@ window.HLM = window.HLM || {};
     { id: 'billing', label: () => t('nav.billing'), icon: 'zap', show: () => true },
     { id: 'gateway', label: () => t('nav.gateway'), icon: 'bot', show: () => true },
     { id: 'prd', label: () => t('nav.prd'), icon: 'file', show: () => true },
-    { id: 'users', label: () => t('nav.users'), icon: 'users', show: () => (currentUser.role === 'admin') },
+    { id: 'users', label: () => t('nav.users'), icon: 'users', show: () => can('users.manage') },
   ];
 
   function renderSidebar() {
@@ -86,10 +86,15 @@ window.HLM = window.HLM || {};
     refresh();
   }
 
+  const ROLE_LABEL = () => ({
+    admin: t('role.admin'), sys_admin: t('role.sys_admin'), sec_admin: t('role.sec_admin'),
+    audit_admin: t('role.audit_admin'), engineer: t('role.engineer'),
+  });
+
   function applyUserBadge() {
     $('#userName').textContent = currentUser.name || currentUser.username || '';
     const tenant = currentUser.tenant_name ? currentUser.tenant_name + ' · ' : '';
-    $('#userRole').textContent = tenant + (currentUser.role === 'admin' ? t('role.admin') : t('role.engineer'));
+    $('#userRole').textContent = tenant + (ROLE_LABEL()[currentUser.role] || currentUser.role);
   }
 
   function setTheme(id) {
@@ -122,7 +127,7 @@ window.HLM = window.HLM || {};
     content.innerHTML = `
       <div class="topbar"><div><div class="page-title">${t('page.dashboard.title')}</div><div class="page-desc">${t('page.dashboard.desc')}</div></div>
         <div class="spacer"></div><span class="chip">model: ${esc('human-llm')}</span>
-        ${currentUser.role === 'admin' ? `<button class="btn" onclick="window.HLM.UI.showRules()">${t('rules.title')}</button>` : ''}
+        ${can('rules.manage') ? `<button class="btn" onclick="window.HLM.UI.showRules()">${t('rules.title')}</button>` : ''}
         <button class="btn" onclick="window.HLM.UI.showAuditReport()">${t('page.audit.report')}</button>
         <button class="icon-btn" onclick="window.HLM.App.route()">${Icons.refresh}</button></div>
       <div class="stats" id="statsBox"></div>
@@ -239,7 +244,7 @@ window.HLM = window.HLM || {};
     const content = $('#content');
     content.innerHTML = `<div class="topbar"><div><div class="page-title">${t('page.users.title')}</div><div class="page-desc">${t('page.users.desc')}</div></div>
       <div class="spacer"></div></div><div id="usersBox"></div>`;
-    await UI.renderUsers($('#usersBox'), currentUser.role === 'admin');
+    await UI.renderUsers($('#usersBox'), can('users.manage'));
   }
 
   // ===== 需求 / PRD（沉淀到 PRD.md，git 本地提交） =====
@@ -312,7 +317,7 @@ window.HLM = window.HLM || {};
       <div class="topbar"><div><div class="page-title">${t('page.projects.title')}</div><div class="page-desc">${t('page.projects.desc')}</div></div>
         <div class="spacer"></div>
         <button class="btn" onclick="window.HLM.UI.promptApplyProject()">${t('project.applyTitle')}</button>
-        ${currentUser.role === 'admin' ? `<button class="btn primary" onclick="window.HLM.UI.promptCreateProject()">${t('project.createTitle')}</button>` : ''}</div>
+        ${can('projects.manage') ? `<button class="btn primary" onclick="window.HLM.UI.promptCreateProject()">${t('project.createTitle')}</button>` : ''}</div>
       <div id="projectsBox"></div>`;
     await loadProjects();
   }
@@ -350,7 +355,7 @@ window.HLM = window.HLM || {};
       <div class="stats" id="rvStats"></div>
       <div class="card"><div class="card-head"><span class="t">${t('rv.pendingQueue')}</span></div>
         <div class="card-body-flush" id="reviewQueueBox"></div></div>
-      ${currentUser.role === 'admin' ? `<div class="card"><div class="card-head"><span class="t">${t('rv.spotQueue')}</span></div>
+      ${can('reviews.spotcheck') ? `<div class="card"><div class="card-head"><span class="t">${t('rv.spotQueue')}</span></div>
         <div class="card-body-flush" id="spotCheckBox"></div></div>` : ''}`;
     try {
       const st = await API.get('/reviews/stats');
@@ -363,7 +368,7 @@ window.HLM = window.HLM || {};
         <div class="stat"><div class="num">${d.avg_score != null ? d.avg_score : '-'}</div><div class="lbl">${t('rv.scoreTotal')}</div></div>`;
     } catch (e) { /* 统计失败不阻塞列表 */ }
     await HLM.Review.loadPending();
-    if (currentUser.role === 'admin') await HLM.Review.loadSpotCheck();
+    if (can('reviews.spotcheck')) await HLM.Review.loadSpotCheck();
     updateBadges();
   }
 
@@ -373,7 +378,7 @@ window.HLM = window.HLM || {};
     content.innerHTML = `
       <div class="topbar"><div><div class="page-title">${t('page.annotations.title')}</div><div class="page-desc">${t('page.annotations.desc')}</div></div>
         <div class="spacer"></div>
-        ${currentUser.role === 'admin' ? `<button class="btn primary" onclick="window.HLM.Annotations.createSet()">${Icons.plus}${t('an.createSet')}</button>` : ''}
+        ${can('annotations.evalset') ? `<button class="btn primary" onclick="window.HLM.Annotations.createSet()">${Icons.plus}${t('an.createSet')}</button>` : ''}
         <button class="icon-btn" onclick="window.HLM.Annotations.load()">${Icons.refresh}</button></div>
       <div class="stats" id="anStats"></div>
       <div class="card"><div class="card-head" id="anTabs">
@@ -426,7 +431,7 @@ window.HLM = window.HLM || {};
     content.innerHTML = `
       <div class="topbar"><div><div class="page-title">${t('page.templates.title')}</div><div class="page-desc">${t('page.templates.desc')}</div></div>
         <div class="spacer"></div>
-        ${currentUser.role === 'admin' ? `<button class="btn primary" onclick="window.HLM.Templates.promptSave()">${Icons.plus}${t('tpl.create')}</button>` : ''}
+        ${can('templates.manage') ? `<button class="btn primary" onclick="window.HLM.Templates.promptSave()">${Icons.plus}${t('tpl.create')}</button>` : ''}
         <button class="btn" onclick="window.HLM.Templates.load()">${t('common.refresh')}</button></div>
       <div id="templatesBox"></div>`;
     await HLM.Templates.load();
@@ -436,7 +441,7 @@ window.HLM = window.HLM || {};
   async function renderBilling() {
     const content = $('#content');
     content.innerHTML = `<div id="billingBox"></div>`;
-    await window.HLM.Billing.render($('#billingBox'), { isAdmin: currentUser.role === 'admin' });
+    await window.HLM.Billing.render($('#billingBox'), { isAdmin: can('billing.manage') });
   }
 
   // ===== 接入配置（生成 SKILL/AGENT + 在线微调） =====
@@ -498,7 +503,7 @@ window.HLM = window.HLM || {};
           <textarea class="form-textarea" id="gwFile" rows="16" style="font-family:monospace;font-size:12px;"></textarea>
           <div style="margin-top:8px;"><button class="btn" onclick="window.HLM.App.saveFile()">${t('gateway.saveFile')}</button></div>
         </div></div>
-      ${window.HLM.currentUser && window.HLM.currentUser.role === 'admin' ? `
+      ${can('gateway.install') ? `
       <div class="card"><div class="card-head"><span class="t">${t('gateway.serverInstall')}</span>
         <span class="chip" id="siRoot"></span></div>
         <div class="card-body">
@@ -669,7 +674,7 @@ window.HLM = window.HLM || {};
   async function loadProjects() {
     try {
       const r = await API.get('/projects');
-      UI.renderProjects(r.data, $('#projectsBox'), currentUser.role === 'admin');
+      UI.renderProjects(r.data, $('#projectsBox'), can('projects.manage'));
     } catch (e) { toast(e.message, 'error'); }
   }
 

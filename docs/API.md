@@ -14,6 +14,21 @@
   - 工作台错误：`{ "success": false, "message": "..." }`
 - 成功格式（工作台）：`{ "success": true, "data": ... }`
 
+### 角色与权限（三权分立）
+
+登录/`/api/auth/me` 返回 `permissions: string[]`，前端据此隐藏入口；**服务端始终用 `requirePermission('xxx')` 复核**。
+
+| 角色 | 权限点 |
+|---|---|
+| `admin` 超级管理员 | 全部（`*`） |
+| `sys_admin` 系统管理员 | `users.manage` `tenants.manage` `projects.manage` `system.backup` `dispatch.assign` `alerts.manage` `billing.manage` `templates.manage` |
+| `sec_admin` 安全管理员 | `rules.manage` `templates.manage` `reviews.spotcheck` `annotations.evalset` `alerts.manage` `audit.read` |
+| `audit_admin` 审计管理员 | **仅** `audit.read`（只读，任何写操作 403） |
+| `engineer` 工程师 | 无管理权限（任务相关接口照常） |
+
+- 非 `admin` 角色不得授予或删除 `admin` 账户（防越权自升）。
+- 权限矩阵集中在 `services/permissionService.js`，新增权限点必须同时登记到 `PERMISSIONS` 与至少一个角色。
+
 ---
 
 ## 一、OpenAI 兼容接口（上游直连）

@@ -56,7 +56,7 @@ window.HLM = window.HLM || {};
           <button class="btn danger sm" onclick="window.HLM.Review.promptRevision(${taskId})">${t('rv.revision')}</button>
         </div>`;
       }
-      if (x.status === 'delivered' && (window.HLM.currentUser || {}).role === 'admin') {
+      if (x.status === 'delivered' && window.HLM.can('reviews.spotcheck')) {
         html += `<div style="display:flex;gap:6px;margin-top:10px;">
           <button class="btn sm" onclick="window.HLM.Review.spotCheck(${taskId}, true)">${t('rv.spotPass')}</button>
           <button class="btn danger sm" onclick="window.HLM.Review.spotCheck(${taskId}, false)">${t('rv.spotFail')}</button>

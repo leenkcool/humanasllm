@@ -6,7 +6,7 @@ window.HLM = window.HLM || {};
   const { t } = window.HLM.I18n;
   const { API } = window.HLM;
 
-  const isAdmin = () => (window.HLM.currentUser || {}).role === 'admin';
+  const isAdmin = () => window.HLM.can('dispatch.assign');
 
   /** 任务详情里的推荐人选区块（异步填 #dispatchBox，范式同 verifyChain） */
   async function suggest(taskId) {

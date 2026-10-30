@@ -9,7 +9,7 @@ const router = express.Router();
 const project = require('../services/projectService');
 const members = require('../services/projectMemberService');
 const approval = require('../services/approvalService');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 
 // 项目列表
 router.get('/', authenticate, async (req, res) => {
@@ -23,7 +23,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // 管理员直接创建项目
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/', authenticate, requirePermission('projects.manage'), async (req, res) => {
   try {
     const p = await project.createProject({
       code: req.body.code, name: req.body.name, description: req.body.description, createdBy: req.user.id, tenantId: req.tenant_id,
@@ -59,7 +59,7 @@ router.post('/apply', authenticate, async (req, res) => {
 });
 
 // 管理员更新项目
-router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id', authenticate, requirePermission('projects.manage'), async (req, res) => {
   try {
     const p0 = await project.getProject(parseInt(req.params.id));
     if (!p0 || p0.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '项目不存在' });
@@ -71,7 +71,7 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
 });
 
 // 管理员归档 / 启用
-router.post('/:id/archive', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/:id/archive', authenticate, requirePermission('projects.manage'), async (req, res) => {
   try {
     const p0 = await project.getProject(parseInt(req.params.id));
     if (!p0 || p0.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '项目不存在' });

@@ -10,6 +10,7 @@ const { authenticate, signToken } = require('../middleware/auth');
 const { createLoginLimiter } = require('../middleware/security');
 const { rows } = require('../services/queueService');
 const { sendMail } = require('../services/mailer');
+const { permissionsOf } = require('../services/permissionService');
 
 // 注册（open 模式注册即用；audit 模式待管理员审核启用，.env 的 USER_REGISTER_MODE 控制）
 router.post('/register', async (req, res) => {
@@ -135,6 +136,7 @@ router.post('/login', createLoginLimiter(), async (req, res) => {
         user: {
           id: user.id, username: user.username, role: user.role, name: user.name, skills: user.skills || null,
           tenant_id: user.tenant_id, tenant_name: tenant ? tenant.name : null,
+          permissions: permissionsOf(user.role),
         },
       },
     });
@@ -152,7 +154,7 @@ router.get('/me', authenticate, async (req, res) => {
       await db.exec('SELECT id, username, role, name, is_active, created_at FROM users WHERE id = ?', [req.user.id])
     );
     if (!list[0]) return res.status(404).json({ success: false, message: '用户不存在' });
-    res.json({ success: true, data: list[0] });
+    res.json({ success: true, data: { ...list[0], permissions: permissionsOf(list[0].role) } });
   } catch (err) {
     console.error('[获取用户失败]', err.message);
     res.status(500).json({ success: false, message: '获取用户失败' });

@@ -305,6 +305,24 @@ async function poll(fn, max = 20) {
   const anForbidden = await api('POST', '/api/annotations/eval-sets', { name: 'smoke-禁止' }, engToken);
   ok('工程师无权生成评测集(403)', anForbidden.status === 403);
 
+  // 三权分立：安全管理员管策略、不管用户；审计管理员只读
+  await api('POST', '/api/users', { username: 'smokesec', password: 'admin123', role: 'sec_admin', name: '冒烟安全管理员' }, token);
+  await api('POST', '/api/users', { username: 'smokeaudit', password: 'admin123', role: 'audit_admin', name: '冒烟审计管理员' }, token);
+  const secLogin = await api('POST', '/api/auth/login', { username: 'smokesec', password: 'admin123' });
+  const secToken = secLogin.data.data.token;
+  ok('登录返回权限清单', secLogin.status === 200 && Array.isArray(secLogin.data.data.user.permissions)
+    && secLogin.data.data.user.permissions.includes('rules.manage'));
+  const secRule = await api('POST', '/api/rules', { name: 'smoke-sec-rule', category: 'general', keywords: 'smoke-rbac' }, secToken);
+  ok('安全管理员可维护分级规则', secRule.status === 200);
+  const secUsers = await api('POST', '/api/users', { username: 'smoke-nope', password: 'x' }, secToken);
+  ok('安全管理员不能建用户(403)', secUsers.status === 403);
+  const audLogin = await api('POST', '/api/auth/login', { username: 'smokeaudit', password: 'admin123' });
+  const audToken = audLogin.data.data.token;
+  const audList = await api('GET', '/api/users', null, audToken);
+  ok('审计管理员可读用户列表', audList.status === 200);
+  const audWrite = await api('POST', '/api/users', { username: 'smoke-nope2', password: 'x' }, audToken);
+  ok('审计管理员只读(403)', audWrite.status === 403);
+
   const instOpen = await api('GET', '/api/gateway/install?tool=opencode');
   ok('多工具安装(opencode→AGENTS+command)', instOpen.status === 200 && instOpen.data.data.files.length === 2 && instOpen.data.data.files[1].path.includes('.opencode'));
   const instGemini = await api('GET', '/api/gateway/install?tool=gemini');
@@ -343,6 +361,8 @@ async function poll(fn, max = 20) {
   await db.run(`DELETE FROM task_templates WHERE name LIKE 'smoke-%'`, []);
   await db.run(`DELETE FROM projects WHERE code LIKE 'smoke-%'`, []);
   await db.run(`DELETE FROM users WHERE username = 'smokeiso'`, []);
+  await db.run(`DELETE FROM users WHERE username IN ('smokesec', 'smokeaudit', 'smoke-nope', 'smoke-nope2')`, []);
+  await db.run(`DELETE FROM task_rules WHERE name = 'smoke-sec-rule'`, []);
   await db.run(`DELETE FROM tenants WHERE code = 'smoke-iso'`, []);
   console.log('  （已清理冒烟测试数据）');
 

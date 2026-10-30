@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 
 const DATA_DIR = path.join(__dirname, '../data');
 const CONFIG_FILE = path.join(DATA_DIR, 'gateway_config.json');
@@ -215,7 +215,7 @@ if (skipped.length) console.log('未检测到/未安装：' + skipped.join(', ')
 }
 
 // 服务器端安装：把某工具文件写入 INSTALL_ROOT/target（admin，安全校验防越界）
-router.post('/install-server', authenticate, requireRole('admin'), (req, res) => {
+router.post('/install-server', authenticate, requirePermission('gateway.install'), (req, res) => {
   try {
     const { tool, target } = req.body || {};
     if (!tool) return res.status(400).json({ success: false, message: 'tool 必填' });

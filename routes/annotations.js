@@ -11,11 +11,12 @@
  */
 const express = require('express');
 const router = express.Router();
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
+const perm = require('../services/permissionService');
 const { assertTaskAccess } = require('../middleware/taskAccess');
 const annotation = require('../services/annotationService');
 
-const isAdmin = (req) => req.user && req.user.role === 'admin';
+const isAdmin = (req) => perm.can(req.user, 'annotations.evalset');
 
 router.get('/candidates', authenticate, async (req, res) => {
   try {
@@ -51,7 +52,7 @@ router.get('/eval-sets', authenticate, async (req, res) => {
   }
 });
 
-router.post('/eval-sets', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/eval-sets', authenticate, requirePermission('annotations.evalset'), async (req, res) => {
   try {
     const category = req.body.category || null;
     // 涉密 / 运维类快照留成数据集属敏感动作，仅 admin 可做（与导出同一门禁）
@@ -85,7 +86,7 @@ router.get('/eval-sets/:id/export', authenticate, async (req, res) => {
   try {
     const set = await annotation.getEvalSet({ id: parseInt(req.params.id), tenantId: req.tenant_id, withItems: false });
     if (!set) return res.status(404).json({ success: false, message: '评测集不存在' });
-    // 涉密 / 运维 / 混合（category 为空即混合）评测集含敏感产出，仅 admin 可导出
+    // 涉密 / 运维 / 混合（category 为空即混合）评测集含敏感产出，仅具备评测集管理权限者（admin / sec_admin）可导出
     const sensitive = !set.category || set.category !== 'general';
     if (sensitive && !isAdmin(req)) {
       return res.status(403).json({ success: false, message: '涉密/运维类评测集仅管理员可导出' });
