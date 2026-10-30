@@ -135,6 +135,17 @@ router.get('/governance', authenticate, async (req, res) => {
   }
 });
 
+// 答复效果回流统计（数据飞轮第一环）
+router.get('/feedback', authenticate, async (req, res) => {
+  try {
+    const fb = require('../services/feedbackService');
+    res.json({ success: true, data: await fb.stats({ tenantId: req.tenant_id }) });
+  } catch (e) {
+    console.error('[反馈统计失败]', e.message);
+    res.status(500).json({ success: false, message: '获取反馈统计失败' });
+  }
+});
+
 // 未完成任务聚合（待接单/处理中/驳回可重派/暂停 → 长期可见，防遗忘）
 router.get('/unfinished', authenticate, async (req, res) => {
   try {

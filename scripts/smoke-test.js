@@ -231,7 +231,21 @@ async function poll(fn, max = 20) {
     ok('非法 conversation_id 拒绝(400)', cbad.status === 400);
   }
 
-  // 7.6 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
+  // 7.7 答复审核
+  const rvStats = await api('GET', '/api/reviews/stats', null, token);
+  ok('审核统计', rvStats.status === 200 && typeof rvStats.data.data.delivered === 'number');
+  const rvPending = await api('GET', '/api/reviews/pending?size=5', null, token);
+  ok('待审核队列分页结构', rvPending.status === 200 && Array.isArray(rvPending.data.data.data));
+  // 冒烟任务里已完成的 general 任务应为免审（delivered）
+  if (taskId) {
+    const rvOne = await api('GET', '/api/reviews/' + taskId, null, token);
+    ok('general 任务免审为 delivered', rvOne.status === 200 && rvOne.data.data
+      && rvOne.data.data.status === 'delivered');
+    const v1rv = await api('GET', '/v1/tasks/' + taskId);
+    ok('上游回查带 review_status', v1rv.status === 200 && v1rv.data.review_status === 'delivered');
+  }
+
+  // 7.8 合规报告 HTML（已在上面断言） / 监控 / PWA 静态资源
   const met = await fetch(BASE + '/metrics');
   const metText = await met.text();
   ok('Prometheus /metrics', met.status === 200 && metText.includes('p390_'));
@@ -278,8 +292,10 @@ async function poll(fn, max = 20) {
   await db.run(`DELETE FROM alerts WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM billing_ledger WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
+  await db.run(`DELETE FROM task_reviews WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   // 会话第二轮的任务没有 project_code，单独按会话清理
   await db.run(`DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
+  await db.run(`DELETE FROM task_reviews WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
   await db.run(`DELETE FROM request_logs WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
   await db.run(`DELETE FROM billing_ledger WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);
   await db.run(`DELETE FROM alerts WHERE task_id IN (SELECT id FROM tasks WHERE conversation_id IN (SELECT conversation_id FROM tasks WHERE project_code = $1))`, [MARK]);

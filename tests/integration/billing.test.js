@@ -64,6 +64,7 @@ async function cleanup(db, s) {
   await db.run('DELETE FROM billing_ledger WHERE tenant_id IN (?, ?)', [tenantA, tenantB]);
   const tasks = (await db.exec('SELECT id FROM tasks WHERE tenant_id IN (?, ?)', [tenantA, tenantB]))[0];
   if (tasks) for (const v of tasks.values) await db.run('DELETE FROM task_logs WHERE task_id = ?', [v[0]]);
+  await db.run('DELETE FROM task_reviews WHERE task_id IN (SELECT id FROM tasks WHERE tenant_id IN (?, ?))', [tenantA, tenantB]);
   await db.run('DELETE FROM tasks WHERE tenant_id IN (?, ?)', [tenantA, tenantB]);
   await db.run('DELETE FROM billing_rates WHERE id = ? OR tenant_id IN (?, ?)', [rateId, tenantA, tenantB]);
   await db.run('DELETE FROM users WHERE id = ?', [engId]);
@@ -228,11 +229,12 @@ test('settlePendingTasks 批量补结算（幂等）', async () => {
   try {
     const t1 = await makeTask(db, { tenantId: tenantA, assigneeId: engId, minutes: 1 });
     const t2 = await makeTask(db, { tenantId: tenantA, assigneeId: engId, minutes: 2 });
-    await billing.settlePendingTasks({ limit: 200 });
+    // 该函数扫全库，并发跑测试时其它用例的任务也会被扫到；调大 limit 保证本用例任务不被挤出
+    await billing.settlePendingTasks({ limit: 5000 });
     const cnt = await db.exec('SELECT COUNT(*) AS c FROM billing_ledger WHERE task_id IN (?, ?)', [t1, t2]);
     assert.strictEqual(Number(cnt[0].values[0][0]), 2, '两个未入账任务均被补结算');
     // 再跑一次：本租户任务不应新增流水（只校验本次造的任务）
-    await billing.settlePendingTasks({ limit: 200 });
+    await billing.settlePendingTasks({ limit: 5000 });
     const again = await db.exec('SELECT COUNT(*) AS c FROM billing_ledger WHERE task_id IN (?, ?)', [t1, t2]);
     assert.strictEqual(Number(again[0].values[0][0]), 2, '已入账任务不重复结算');
   } finally {

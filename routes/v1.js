@@ -218,6 +218,61 @@ router.get('/governance/rules', requireUpstreamKey, async (req, res) => {
   }
 });
 
+// POST /v1/tasks/:id/feedback — 上游回传答复效果（是否解决问题），用于数据飞轮
+router.post('/tasks/:id/feedback', requireUpstreamKey, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const task = await queue.getTask(id);
+    if (!task) return res.status(404).json(encoder.makeError(404, 'Task not found', 'invalid_request_error'));
+    // 租户隔离（与回查同口径）
+    const auth = req.headers.authorization || '';
+    const upKey = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.api_key || '');
+    const callerTenant = await getTenantByUpstreamKey(upKey);
+    if (callerTenant && task.tenant_id && callerTenant !== task.tenant_id) {
+      return res.status(404).json(encoder.makeError(404, 'Task not found', 'invalid_request_error'));
+    }
+    const { resolved, rating, comment } = req.body || {};
+    if (typeof resolved !== 'boolean') {
+      return res.status(400).json(encoder.makeError(400, 'resolved 必须是布尔值'));
+    }
+    const fb = require('../services/feedbackService');
+    await fb.record({ taskId: id, resolved, rating, comment, reporter: req.body.requester || 'upstream' });
+
+    // 未解决且在 7 天内 → 同会话自动重开追问
+    let reopened = null;
+    if (!resolved) {
+      const fresh = await queue.getTask(id);
+      if (await fb.shouldReopen(fresh)) {
+        const createdRes = await queue.createTaskFromRequest({
+          parsed: {
+            model: fresh.model || parsedModel(),
+            stream: false,
+            messages: [{ role: 'user', content: `追问（上游反馈未解决）: ${comment || '请补充或修正答复'}` }],
+            extra: { priority: fresh.priority, project_code: fresh.project_code },
+            tools: null,
+          },
+          chatId: encoder.makeId(), created: Math.floor(Date.now() / 1000),
+          tenantId: fresh.tenant_id,
+          origin: `上游反馈未解决，自动追问（原任务 #${id}）`,
+          conversation: {
+            conversation_id: fresh.conversation_id || `conv-fb-${id}`,
+            turn_index: (parseInt(fresh.turn_index, 10) || 0) + 1,
+            parent_task_id: id,
+            categoryOverride: ['confidential', 'ops'].includes(fresh.category) ? fresh.category : null,
+          },
+        });
+        reopened = createdRes.taskId;
+      }
+    }
+    res.json({ object: 'feedback', task_id: id, resolved, rating: rating != null ? rating : null, reopened_task_id: reopened });
+  } catch (e) {
+    console.error('[反馈记录失败]', e.message);
+    res.status(500).json(encoder.makeError(500, '反馈记录失败', 'server_error'));
+  }
+});
+
+function parsedModel() { return process.env.HUMAN_LLM_MODEL || 'human-llm'; }
+
 // GET /v1/tasks/:id — 上游凭 task_id 查询人工任务处理结果（异步受理后回查）
 router.get('/tasks/:id', requireUpstreamKey, async (req, res) => {
   try {

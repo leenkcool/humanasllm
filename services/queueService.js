@@ -292,6 +292,8 @@ async function completeTask(taskId, content, actor, opts = {}) {
     timeout_at: null,
   });
   if (t.ok) {
+    // 答复审核：按分级决定免审 / 待审（general 直接放行）
+    require('./reviewService').onCreate(t.task).catch(e => console.error('[审核记录创建失败]', e.message));
     await logRequest(taskId, 'out',
       { content: resultText, ...(outCalls.length ? { tool_calls: outCalls } : {}), model: t.task.model },
       t.task.model, t.task.tenant_id);

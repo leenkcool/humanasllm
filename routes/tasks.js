@@ -89,7 +89,9 @@ router.get('/:id', authenticate, async (req, res) => {
     if (task.conversation_id) {
       conversationTurns = await conversations.listTurns(task.conversation_id, task.tenant_id);
     }
-    res.json({ success: true, data: { ...task, rule_name: ruleName, logs, conversation_turns: conversationTurns } });
+    const feedback = await require('../services/feedbackService').getByTask(id);
+    const review = await require('../services/reviewService').getByTask(id);
+    res.json({ success: true, data: { ...task, rule_name: ruleName, logs, conversation_turns: conversationTurns, feedback, review } });
   } catch (err) {
     console.error('[任务详情失败]', err.message);
     res.status(500).json({ success: false, message: '获取任务详情失败' });

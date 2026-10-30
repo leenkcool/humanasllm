@@ -34,6 +34,7 @@ test('任务状态机全链路 pending→processing→completed→returned→pen
     await db.run('DELETE FROM task_logs WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM request_logs WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [taskId]);
+    await db.run('DELETE FROM task_reviews WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM tasks WHERE id = ?', [taskId]);
   }
 });
@@ -55,6 +56,7 @@ test('任务：质量校验拦截 + 验收单（ops 类必填）', async () => {
     await db.run('DELETE FROM task_logs WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM request_logs WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [taskId]);
+    await db.run('DELETE FROM task_reviews WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM tasks WHERE id = ?', [taskId]);
   }
 });

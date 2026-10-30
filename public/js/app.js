@@ -45,6 +45,7 @@ window.HLM = window.HLM || {};
     { id: 'approvals', label: () => t('nav.approvals'), icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
     { id: 'alerts', label: () => t('nav.alerts'), icon: 'bells', show: () => true, badge: () => window._activeAlerts || 0 },
     { id: 'projects', label: () => t('nav.projects'), icon: 'folder', show: () => true },
+    { id: 'reviews', label: () => t('nav.reviews'), icon: 'check', show: () => true, badge: () => window._pendingReviews || 0 },
     { id: 'knowledge', label: () => t('nav.knowledge'), icon: 'bible', show: () => true },
     { id: 'templates', label: () => t('nav.templates'), icon: 'template', show: () => true },
     { id: 'billing', label: () => t('nav.billing'), icon: 'zap', show: () => true },
@@ -156,6 +157,15 @@ window.HLM = window.HLM || {};
             <div style="font-size:13px;color:var(--muted);">${t('gov.claimed')} ${e.completed} · ${t('gov.reopened')} ${e.reopened} · <b style="color:var(--success);">${e.rate != null ? e.rate + '%' : '-'}</b></div>
           </div>`).join('')
         : `<div class="empty" style="padding:16px;">${t('gov.noData')}</div>`;
+      // 答复有效率（数据飞轮第一环）
+      try {
+        const fbr = await API.get('/workbench/feedback');
+        const f = fbr.data;
+        const box = $('#govBox');
+        if (box) box.insertAdjacentHTML('beforeend',
+          `<div class="stat"><div class="num" id="fbRate">${f.rate != null ? f.rate + '%' : '-'}</div><div class="lbl">${t('fb.rate')}</div></div>`
+          + `<div class="stat"><div class="num">${f.total || 0}</div><div class="lbl">${t('fb.total')}</div></div>`);
+      } catch (e) { /* 无反馈数据时忽略 */ }
       const q = await API.get('/workbench/unfinished');
       UI.renderTasks(q.data, '#queueBody');
     } catch (e) { toast(e.message, 'error'); }
@@ -327,6 +337,30 @@ window.HLM = window.HLM || {};
         <div class="card-body-flush" id="alertsBox"></div>
       </div>`;
     await HLM.Alerts.load();
+  }
+
+  // ===== 答复审核页 =====
+  async function renderReviews() {
+    const content = $('#content');
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">${t('page.reviews.title')}</div><div class="page-desc">${t('page.reviews.desc')}</div></div>
+        <div class="spacer"></div>
+        <button class="icon-btn" onclick="window.HLM.App.route()">${Icons.refresh}</button></div>
+      <div class="stats" id="rvStats"></div>
+      <div class="card"><div class="card-head"><span class="t">${t('rv.pendingQueue')}</span></div>
+        <div class="card-body-flush" id="reviewQueueBox"></div></div>`;
+    try {
+      const st = await API.get('/reviews/stats');
+      const d = st.data;
+      $('#rvStats').innerHTML = `
+        <div class="stat pending"><div class="num">${d.pending}</div><div class="lbl">${t('rv.status.draft')}</div></div>
+        <div class="stat returned"><div class="num">${d.revision}</div><div class="lbl">${t('rv.status.needs_revision')}</div></div>
+        <div class="stat completed"><div class="num">${d.delivered}</div><div class="lbl">${t('rv.status.delivered')}</div></div>
+        <div class="stat"><div class="num">${d.spot_checked}</div><div class="lbl">${t('rv.status.spot_checked')}</div></div>
+        <div class="stat"><div class="num">${d.avg_score != null ? d.avg_score : '-'}</div><div class="lbl">${t('rv.scoreTotal')}</div></div>`;
+    } catch (e) { /* 统计失败不阻塞列表 */ }
+    await HLM.Review.loadPending();
+    updateBadges();
   }
 
   // ===== 知识库页 =====
@@ -609,7 +643,7 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, alerts: renderAlerts, projects: renderProjects, knowledge: renderKnowledge, templates: renderTemplates, billing: renderBilling, gateway: renderGateway, prd: renderPrd, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, alerts: renderAlerts, projects: renderProjects, reviews: renderReviews, knowledge: renderKnowledge, templates: renderTemplates, billing: renderBilling, gateway: renderGateway, prd: renderPrd, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');

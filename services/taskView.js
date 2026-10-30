@@ -31,7 +31,18 @@ function slaRemainingSec(task) {
 }
 
 /** 上游任务视图（结构化治理字段 + content） */
+function reviewStatusLabel(review) {
+  if (!review) return null;
+  const st = review.status;
+  if (st === 'delivered' || st === 'spot_checked') return 'delivered';
+  if (st === 'needs_revision') return 'needs_revision';
+  return 'reviewing';
+}
+
 async function buildTaskView(task) {
+  const review = await getDb().exec('SELECT status FROM task_reviews WHERE task_id = ?', [task.id])
+    .then(r => (r[0] && r[0].values[0]) ? { status: r[0].values[0][0] } : null)
+    .catch(() => null);
   const ruleRow = task.rule_id
     ? (await getDb().exec('SELECT name FROM task_rules WHERE id = ?', [task.rule_id]))[0]
     : null;
@@ -46,7 +57,9 @@ async function buildTaskView(task) {
     task_id: task.id,
     status: task.status,
     // 函数调用产出：content 为 null（OpenAI 语义），结果在 tool_calls
-    content: toolCallsOut ? null : statusContent(task),
+    content: (review && reviewStatusLabel(review) !== 'delivered')
+      ? `答复待审核（状态：${reviewStatusLabel(review)}）`
+      : (toolCallsOut ? null : statusContent(task)),
     tool_calls: toolCallsOut,
     finish_reason: task.status === 'completed' ? (toolCallsOut ? 'tool_calls' : 'stop') : null,
     model: task.model,
@@ -60,6 +73,8 @@ async function buildTaskView(task) {
     sla_remaining_sec: slaRemainingSec(task),
     timeout_at: task.timeout_at || null,
     // 多轮追问：会话归属（不传 conversation_id 的旧请求这两项为 null / 0）
+    // 答复审核：未放行前上游拿到 reviewing，不返回内容
+    review_status: review ? reviewStatusLabel(review) : null,
     conversation_id: task.conversation_id || null,
     turn_index: parseInt(task.turn_index, 10) || 0,
     parent_task_id: task.parent_task_id || null,

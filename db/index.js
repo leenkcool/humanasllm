@@ -246,6 +246,40 @@ CREATE TABLE IF NOT EXISTS knowledge_entries (
 
 CREATE INDEX IF NOT EXISTS idx_knowledge_scope ON knowledge_entries(scope, project_code);
 CREATE INDEX IF NOT EXISTS idx_knowledge_tenant ON knowledge_entries(tenant_id);
+
+CREATE TABLE IF NOT EXISTS task_reviews (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id),
+  status VARCHAR(20) NOT NULL DEFAULT 'draft',
+  reviewer_id INTEGER REFERENCES users(id),
+  reviewer_name VARCHAR(64),
+  score_completeness INTEGER,
+  score_accuracy INTEGER,
+  score_actionable INTEGER,
+  score_boundary INTEGER,
+  score_total NUMERIC(4,2),
+  note TEXT,
+  revision_note TEXT,
+  reviewed_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (task_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_reviews_status ON task_reviews(status);
+
+CREATE TABLE IF NOT EXISTS task_feedback (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id),
+  resolved BOOLEAN NOT NULL DEFAULT false,
+  rating INTEGER,
+  comment TEXT,
+  reporter VARCHAR(64),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (task_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_feedback_resolved ON task_feedback(resolved);
 `;
 
 function createAdapter() {

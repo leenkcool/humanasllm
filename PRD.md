@@ -2,6 +2,21 @@
 
 > 本项目所有验证过的功能需求在此记录。任何二次开发（AI Agent 或人）完成并验证后，**必须**在此追加条目（日期 + 功能描述），并 git commit + push。
 
+## 2026-10-30 - 答复效果回流（数据飞轮第一环）
+- 描述：新增 `task_feedback` 表 + `services/feedbackService.js` + `POST /v1/tasks/:id/feedback`（上游回传 `{resolved, rating, comment}`，幂等覆盖）。上游能表达「这条答复到底解决了没有」，这是此前完全缺失的一环。
+- 自动重开：`resolved=false` 且任务在 7 天内完成且无后续轮次 → **自动重开为同一会话的追问**（复用多轮追问模型，`parent_task_id` 指向原任务，受保护类继承分级），人工继续跟进而不是让上游自己重派。
+- 统计：`GET /api/workbench/feedback` 返回答复有效率（总数/已解决/百分比/平均评分），按分级、按工程师拆分；工作台治理区新增「答复有效率」与「反馈数」卡片。
+- 前端：任务详情展示上游反馈（已解决/未解决徽标 + 星级 + 备注）。
+- 验证：集成 5（幂等/校验/重开判定/自动重开/统计拆分）通过
+
+## 2026-10-30 - 答复审核（质量分层：单人审核 + confidential 抽检）
+- 描述：**答复审核**——新增 `task_reviews` 表 + `services/reviewService.js` + `routes/reviews.js` + 工作台「答复审核」页。答复状态机独立于任务状态机：`draft → delivered`，`needs_revision` 可退回再提交（任务状态保持 completed）。
+- 分级策略（用户已确认单人审核）：`general` **免审**直接放行；`ops` / `confidential` **单人审核**（同级工程师或 admin 均可审，同一个人不能审自己的答复）；`confidential` 额外进 admin 抽检队列（抽检不阻塞放行）。
+- 质量评分：完整性 / 准确性 / 可操作性 / 边界说明 四维各 1-5 分，等权平均得总分；审核与退回记录**写入审计哈希链**（`review` action），防篡改。
+- 上游可见性：未放行时 `/v1/tasks/:id` 的 `content` 返回「答复待审核（状态：reviewing）」且 `review_status` 标明状态；放行后正常返回正文。**兼容**：`general` 类免审，行为与之前一致。
+- 前端：任务详情「答复审核」面板（状态徽标 + 四维得分 + 退回原因 + 通过/退回按钮 + admin 抽检按钮）；工作台独立「答复审核」页（待审队列 + 统计卡片，侧栏徽标显示待审数）。
+- 验证：单测 7 + 集成 6（免审/需审/退回重提/自审拦截/抽检/统计）通过
+
 ## 2026-10-30 - 项目成员 + 知识库（答复复用，三级作用域）
 - 描述：**项目成员机制**（此前完全缺失）——新增 `project_members` 表（owner/member/viewer），建项目者自动成为 owner；`/api/projects/:id/members` 支持列表/添加/移除（admin 或项目 owner 可管理，成员可退出）。**兼容策略**：历史项目无成员记录时视为「租户内可见」，不锁死既有项目。
 - 描述：**知识库**——新增 `knowledge_entries` 表 + `services/knowledgeService.js` + `routes/knowledge.js` + 工作台「知识库」页。三级作用域：`project`（仅项目成员 + admin）/ `tenant`（同租户全员）/ `global`（所有租户）。统一可见性判定 `visibleClause()`，列表/详情/检索共用一份口径。

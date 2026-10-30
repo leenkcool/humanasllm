@@ -27,6 +27,7 @@ test('审计哈希链：完整 + 篡改检测', async () => {
   } finally {
     await db.run('DELETE FROM task_logs WHERE task_id = ?', [lastId]);
     await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [lastId]);
+    await db.run('DELETE FROM task_reviews WHERE task_id = ?', [lastId]);
     await db.run('DELETE FROM tasks WHERE id = ?', [lastId]);
   }
 });

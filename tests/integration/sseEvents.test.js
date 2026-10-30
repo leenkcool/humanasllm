@@ -105,6 +105,7 @@ test('SSE 中途状态推送：受理→接单→完成→[DONE]', async () => {
       await db.run('DELETE FROM task_logs WHERE task_id = ?', [taskId]);
       await db.run('DELETE FROM request_logs WHERE task_id = ?', [taskId]);
       await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [taskId]);
+      await db.run('DELETE FROM task_reviews WHERE task_id = ?', [taskId]);
       await db.run('DELETE FROM tasks WHERE id = ?', [taskId]);
     }
     await db.run('DELETE FROM users WHERE id = ?', [engineerId]);
@@ -138,6 +139,7 @@ test('SSE 默认行为不变：不传 stream_events 立即受理并结束', asyn
       await db.run('DELETE FROM task_logs WHERE task_id = ?', [taskId]);
       await db.run('DELETE FROM request_logs WHERE task_id = ?', [taskId]);
       await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [taskId]);
+      await db.run('DELETE FROM task_reviews WHERE task_id = ?', [taskId]);
       await db.run('DELETE FROM tasks WHERE id = ?', [taskId]);
     }
     await db.run('DELETE FROM tenants WHERE id = ?', [tenantId]);

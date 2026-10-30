@@ -17,6 +17,7 @@ test('createTaskFromRequest 按 tenantId 落库（多租户隔离基础）', asy
     await db.run('DELETE FROM task_logs WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM request_logs WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [taskId]);
+    await db.run('DELETE FROM task_reviews WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM tasks WHERE id = ?', [taskId]);
   } finally {
     await db.run('DELETE FROM tenants WHERE id = ?', [tenantId]);
@@ -41,6 +42,7 @@ test('不同租户任务互不可见（读隔离数据层面）', async () => {
     await db.run('DELETE FROM task_logs WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM request_logs WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM billing_ledger WHERE task_id = ?', [taskId]);
+    await db.run('DELETE FROM task_reviews WHERE task_id = ?', [taskId]);
     await db.run('DELETE FROM tasks WHERE id = ?', [taskId]);
   } finally {
     await db.run('DELETE FROM tenants WHERE id IN (?, ?)', [ta, tb]);

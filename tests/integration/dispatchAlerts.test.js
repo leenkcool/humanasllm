@@ -58,6 +58,7 @@ async function cleanup(s, taskIds) {
     await s.db.run('DELETE FROM request_logs WHERE task_id = ?', [id]);
     await s.db.run('DELETE FROM billing_ledger WHERE task_id = ?', [id]);
   }
+  for (const id of taskIds) await s.db.run('DELETE FROM task_reviews WHERE task_id = ?', [id]);
   for (const id of taskIds) await s.db.run('DELETE FROM tasks WHERE id = ?', [id]);
   await s.db.run('DELETE FROM alerts WHERE tenant_id IN (?, ?)', [s.tA, s.tB]);
   await s.db.run('DELETE FROM users WHERE id IN (?, ?, ?)', [s.adminA, s.engMatch, s.engBusy]);

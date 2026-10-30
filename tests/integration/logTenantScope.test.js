@@ -37,8 +37,10 @@ async function getJson(base, path, tenantId) {
 test('日志接口按租户隔离：B 不可列举/审计 A 的日志（Issue #3）', async () => {
   await initDatabase();
   const db = getDb();
-  const { lastId: ta } = await db.run('INSERT INTO tenants (code, name) VALUES (?, ?)', ['log-iso-a', '日志租户A']);
-  const { lastId: tb } = await db.run('INSERT INTO tenants (code, name) VALUES (?, ?)', ['log-iso-b', '日志租户B']);
+  // 唯一后缀：避免同一库中重复运行撞 tenants.code 唯一约束
+  const stamp = `${process.pid}-${Date.now().toString(36)}`;
+  const { lastId: ta } = await db.run('INSERT INTO tenants (code, name) VALUES (?, ?)', [`log-iso-a-${stamp}`, '日志租户A']);
+  const { lastId: tb } = await db.run('INSERT INTO tenants (code, name) VALUES (?, ?)', [`log-iso-b-${stamp}`, '日志租户B']);
   const taskIds = [];
   try {
     // 各建一个任务（createTaskFromRequest 会自动写一条 task_logs）
@@ -89,7 +91,9 @@ test('日志接口按租户隔离：B 不可列举/审计 A 的日志（Issue #3
     await db.run('DELETE FROM task_logs WHERE task_id IN (?, ?)', taskIds);
     await db.run('DELETE FROM request_logs WHERE task_id IN (?, ?)', taskIds);
     await db.run('DELETE FROM request_logs WHERE tenant_id IN (?, ?)', [ta, tb]);
-    await db.run('DELETE FROM billing_ledger WHERE task_id = ANY(?)', [taskIds]);
+    await db.run('DELETE FROM billing_ledger WHERE task_id IN (?, ?)', taskIds);
+    await db.run('DELETE FROM task_reviews WHERE task_id IN (?, ?)', taskIds);
+    await db.run('DELETE FROM alerts WHERE task_id IN (?, ?)', taskIds);
     await db.run('DELETE FROM tasks WHERE id IN (?, ?)', taskIds);
     await db.run('DELETE FROM tenants WHERE id IN (?, ?)', [ta, tb]);
   }
