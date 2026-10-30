@@ -128,6 +128,7 @@ window.HLM = window.HLM || {};
           ${task.category && task.category !== 'general' ? `<span class="tag ${task.category}" title="${esc(t('category.hint.' + task.category))}">${t('category.' + task.category)}</span>` : ''}
           ${task.rule_name ? `<span class="chip" title="${esc(t('task.ruleHint'))}">${t('task.rule')}: ${esc(task.rule_name)}</span>` : ''}
           ${task.skills ? `<span class="chip">${t('task.skills')}: ${esc(task.skills)}</span>` : ''}
+          ${task.template_id ? `<span class="chip" title="${esc(t('tpl.source'))}">${t('tpl.source')} #${task.template_id}</span>` : ''}
           ${task.stream ? '<span class="tag pending">stream</span>' : ''}
           <span class="chip">model: ${esc(task.model)}</span>
           ${task.project_code ? `<span class="chip">${t('task.project')} ${esc(task.project_name || task.project_code)}</span>` : ''}

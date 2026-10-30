@@ -119,7 +119,7 @@ async function logRequest(taskId, direction, payload, model, tenantId) {
 }
 
 /** 上游请求接入 → 创建 pending 任务（多租户：上游 API key 路由租户，无则默认租户） */
-async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenantIdParam }) {
+async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenantIdParam, templateId, origin }) {
   const db = getDb();
   const priority = parsed.extra.priority || 'medium';
   let tenantId = tenantIdParam;
@@ -138,14 +138,16 @@ async function createTaskFromRequest({ parsed, chatId, created, tenantId: tenant
 
   const { lastId } = await db.run(
     `INSERT INTO tasks
-       (upstream_request_id, model, stream, priority, category, rule_id, project_code, callback_url, meta_tags, request_payload, status, timeout_at, tenant_id, skills)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?, ?)`,
+       (upstream_request_id, model, stream, priority, category, rule_id, project_code, callback_url, meta_tags, request_payload, status, timeout_at, tenant_id, skills, template_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'pending', NOW() + interval '1 minute' * ?, ?, ?, ?)`,
     [chatId, parsed.model, parsed.stream, priority, category, ruleId, projectCode, callbackUrl,
       metaTags ? JSON.stringify(metaTags) : null,
       JSON.stringify(payload),
-      timeoutMinutes('pending', priority), tenantId, skills]
+      timeoutMinutes('pending', priority), tenantId, skills, templateId || null]
   );
-  await addLog(lastId, 'create', null, { status: 'pending' }, null, '上游请求接入');
+  await addLog(lastId, 'create', null,
+    templateId ? { status: 'pending', template_id: templateId } : { status: 'pending' },
+    null, origin || '上游请求接入');
   ws.broadcast('task:new', { id: lastId });
   const firstUser = parsed.messages.find(m => m.role === 'user');
   const summary = firstUser && typeof firstUser.content === 'string' ? firstUser.content.slice(0, 60) : '';
@@ -374,7 +376,16 @@ function startTimeoutScanner() {
 /** 校验任务审计哈希链完整性（治理层「留痕是人的证据」，可证明未被篡改） */
 async function verifyAuditChain(taskId) {
   const logs = rows(await getDb().exec('SELECT * FROM task_logs WHERE task_id = ? ORDER BY id', [taskId]));
-  let prevHash = null, valid = true, brokenAt = null;
+  return verifyAuditChainFromLogs(logs);
+}
+
+/**
+ * 从已取出的日志数组校验哈希链（供报告批量复核复用，避免 N+1 查询）
+ * @param {Array} logs 按 id 升序的 task_logs 行
+ * @returns {{valid:boolean, broken_at:number|null, count:number}}
+ */
+function verifyAuditChainFromLogs(logs) {
+  let valid = true, brokenAt = null;
   for (const l of logs) {
     const h = hashPayload({
       prevHash: l.prev_hash, action: l.action,
@@ -382,7 +393,6 @@ async function verifyAuditChain(taskId) {
       actor: l.actor_name || '系统', remark: l.remark || null,
     });
     if (h !== l.hash) { valid = false; brokenAt = l.id; break; }
-    prevHash = l.hash;
   }
   return { valid, broken_at: brokenAt, count: logs.length };
 }
@@ -392,4 +402,5 @@ module.exports = {
   createTaskFromRequest, transition, claimTask, completeTask,
   rejectTask, pauseTask, resumeTask, requeueTask, cancelTask, reopenTask,
   qualityCheck, startTimeoutScanner, timeoutTask, verifyAuditChain,
+  timeoutMinutes, hashPayload, verifyAuditChainFromLogs,
 };

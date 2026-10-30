@@ -16,6 +16,7 @@ const ruleRoutes = require('./rules');
 const tenantRoutes = require('./tenants');
 const gatewayRoutes = require('./gateway');
 const prdRoutes = require('./prd');
+const templateRoutes = require('./templates');
 
 module.exports = function (app) {
   // 工作台 REST
@@ -40,6 +41,9 @@ module.exports = function (app) {
 
   // 分级规则管理（治理配置后台，admin）
   app.use('/api/rules', ruleRoutes);
+
+  // 工单模板库（常用任务模板化，一键建单）
+  app.use('/api/templates', templateRoutes);
 
   // 租户管理（多租户 v1）
   app.use('/api/tenants', tenantRoutes);

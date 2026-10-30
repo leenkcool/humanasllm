@@ -125,15 +125,43 @@ async function poll(fn, max = 20) {
   ok('数据资产导出', ds.status === 200);
   const install = await api('GET', '/api/gateway/install?tool=agents');
   ok('网关安装包(agents→AGENTS.md)', install.status === 200 && install.data.data.files[0].path === 'AGENTS.md');
-  const users = await api('GET', '/api/users', null, token);
-  const u0 = users.data.data[0];
+  const userz = await api('GET', '/api/users', null, token);
+  const u0 = userz.data.data[0];
   ok('用户列表含租户+统计', 'tenant_name' in u0 && 'completed' in u0);
+
+  // 7.1 工单模板（模板建单 + /v1 传 template_id）
+  const tplList = await api('GET', '/api/templates', null, token);
+  ok('模板列表(含示例)', tplList.status === 200 && Array.isArray(tplList.data.data));
+  const tplNew = await api('POST', '/api/templates', {
+    name: 'smoke-模板', category: 'ops', priority: 'high', skills: 'postgres,ops',
+    payload_template: { messages: [{ role: 'user', content: '冒烟模板默认需求' }] },
+  }, token);
+  ok('新建模板', tplNew.status === 200 && tplNew.data.success && !!tplNew.data.data.id);
+  const tplId = tplNew.data.data.id;
+  const tplUse = await api('POST', `/api/templates/${tplId}/apply`, { overrides: { messages: [{ role: 'user', content: '冒烟模板建单' }] } }, token);
+  ok('模板一键建单', tplUse.status === 200 && !!tplUse.data.data.task_id);
+  if (tplUse.data && tplUse.data.data) {
+    const tplTask = await api('GET', '/api/tasks/' + tplUse.data.data.task_id, null, token);
+    ok('模板建单写入 template_id', tplTask.status === 200 && tplTask.data.data.template_id === tplId);
+  }
+  const tplV1 = await api('POST', '/v1/chat/completions', {
+    model: 'human-llm', template_id: tplId, project_code: MARK,
+    messages: [{ role: 'user', content: '冒烟 /v1 模板建单' }],
+  });
+  ok('/v1 传 template_id 建单', tplV1.status === 200 && !!tplV1.data.task_id);
+  const tplBad = await api('POST', '/v1/chat/completions', {
+    model: 'human-llm', template_id: 99999999, messages: [{ role: 'user', content: 'x' }],
+  });
+  ok('/v1 非法 template_id 拒绝(400)', tplBad.status === 400);
+
 
   // 8. 权限边界 / 多工具安装 / 服务器端安装越界 / 租户隔离
   const engLogin = await api('POST', '/api/auth/login', { username: 'engineer1', password: 'admin123' });
   const engToken = engLogin.data.data.token;
   const forbidden = await api('GET', '/api/rules', null, engToken);
   ok('工程师无权访问规则(403)', forbidden.status === 403);
+  const tplForbidden = await api('POST', '/api/templates', { name: 'smoke-禁止' }, engToken);
+  ok('工程师无权建模板(403)', tplForbidden.status === 403);
 
   const instOpen = await api('GET', '/api/gateway/install?tool=opencode');
   ok('多工具安装(opencode→AGENTS+command)', instOpen.status === 200 && instOpen.data.data.files.length === 2 && instOpen.data.data.files[1].path.includes('.opencode'));
@@ -156,6 +184,7 @@ async function poll(fn, max = 20) {
   await db.run(`DELETE FROM request_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_code = $1)`, [MARK]);
   await db.run(`DELETE FROM tasks WHERE project_code = $1`, [MARK]);
   await db.run(`DELETE FROM approvals WHERE requester = $1`, [MARK]);
+  await db.run(`DELETE FROM task_templates WHERE name LIKE 'smoke-%'`, []);
   await db.run(`DELETE FROM projects WHERE code LIKE 'smoke-%'`, []);
   await db.run(`DELETE FROM users WHERE username = 'smokeiso'`, []);
   await db.run(`DELETE FROM tenants WHERE code = 'smoke-iso'`, []);

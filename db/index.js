@@ -66,6 +66,28 @@ CREATE TABLE IF NOT EXISTS task_rules (
 
 CREATE INDEX IF NOT EXISTS idx_task_rules_enabled ON task_rules(enabled);
 
+CREATE TABLE IF NOT EXISTS task_templates (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  category VARCHAR(20) NOT NULL DEFAULT 'general',
+  priority VARCHAR(10) NOT NULL DEFAULT 'medium',
+  skills TEXT,
+  project_code TEXT,
+  system_prompt TEXT,
+  payload_template JSONB NOT NULL DEFAULT '{}',
+  default_meta_tags JSONB,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  use_count INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER REFERENCES users(id),
+  tenant_id INTEGER,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_templates_tenant ON task_templates(tenant_id, enabled);
+
+
 CREATE TABLE IF NOT EXISTS task_logs (
   id SERIAL PRIMARY KEY,
   task_id INTEGER NOT NULL REFERENCES tasks(id),
@@ -132,6 +154,27 @@ CREATE TABLE IF NOT EXISTS tenants (
   name VARCHAR(128) NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS alerts (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  approval_id INTEGER REFERENCES approvals(id),
+  level INTEGER NOT NULL DEFAULT 1,
+  kind VARCHAR(32) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'active',
+  title VARCHAR(255) NOT NULL,
+  detail TEXT,
+  tenant_id INTEGER,
+  acked_by INTEGER REFERENCES users(id),
+  acked_at TIMESTAMP,
+  resolved_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
+CREATE INDEX IF NOT EXISTS idx_alerts_tenant ON alerts(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_alerts_task ON alerts(task_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
 `;
 
 function createAdapter() {
@@ -175,8 +218,20 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE task_logs ADD COLUMN IF NOT EXISTS hash TEXT`);
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(128)`);
   await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMP`);
+  // 工单模板：任务溯源（模板删除后仍保留 id，前端降级展示）
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS template_id INTEGER`);
+  // 告警升级序列：提醒次数 / 上次提醒时间 / 当前升级级别（单调递增用于去重）
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS remind_count INTEGER NOT NULL DEFAULT 0`);
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS last_reminded_at TIMESTAMP`);
+  await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS escalation_level INTEGER NOT NULL DEFAULT 0`);
+  await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS remind_count INTEGER NOT NULL DEFAULT 0`);
+  await db.exec(`ALTER TABLE approvals ADD COLUMN IF NOT EXISTS last_reminded_at TIMESTAMP`);
+  // 智能派单：按处理人 + 状态聚合负载
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_assignee_status ON tasks(assignee_id, status)`);
   // ===== 分级策略引擎种子规则（幂等：task_rules 为空时播种） =====
   await seedRules();
+  // ===== 工单模板示例（幂等：task_templates 为空时播种，开源开箱即可见） =====
+  await seedTemplates();
   return db;
 }
 
@@ -218,6 +273,32 @@ async function seedRules() {
     await db.run(
       'INSERT INTO task_rules (name, category, match_field, keywords, priority) VALUES (?, ?, ?, ?, ?)',
       [name, category, field, keywords, priority]);
+  }
+}
+
+/** 播种工单模板示例（幂等：按名称判重；让开源访客开箱即可见模板能力） */
+async function seedTemplates() {
+  const db = getDb();
+  const templates = [
+    ['代码审查', '按团队规范审查改动，输出问题清单与修复建议', 'general', 'medium', 'node,review',
+      '你是资深代码审查员。逐条检查：边界条件、错误处理、SQL 注入、并发安全。输出分级问题清单与最小修复建议。'],
+    ['数据库迁移', '生产库结构变更（DDL）+ 备份验证，需人工执行', 'ops', 'high', 'postgres,ops',
+      '执行数据库迁移：1) 先全量备份并校验 2) 按顺序应用 DDL 3) 记录回滚步骤 4) 提交验收说明。'],
+    ['安全巡检', '合规/安全巡检与整改记录，涉密不出口', 'confidential', 'high', 'security,compliance',
+      '执行安全巡检：端口暴露、证书有效期、审计日志、权限最小化。输出整改项与责任人。'],
+  ];
+  for (const [name, description, category, priority, skills, system_prompt] of templates) {
+    const dup = await db.exec('SELECT id FROM task_templates WHERE name = ?', [name]);
+    if (dup[0] && dup[0].values.length) {
+      // 兼容旧版种子（曾绑定 default 租户）：示例模板统一为全局，所有租户开箱可见
+      await db.run('UPDATE task_templates SET tenant_id = NULL WHERE name = ? AND tenant_id IS NOT NULL', [name]);
+      continue;
+    }
+    await db.run(
+      `INSERT INTO task_templates (name, description, category, priority, skills, system_prompt, payload_template, tenant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, NULL)`,
+      [name, description, category, priority, skills, system_prompt,
+        JSON.stringify({ messages: [{ role: 'user', content: `请执行「${name}」相关任务，并提交完整产出。` }] })]);
   }
 }
 

@@ -2,7 +2,7 @@
  * 状态机定义与校验（任务 / 审批）
  * 独立单例：所有状态流转统一在此定义与校验，避免散落各处
  *
- * 任务：pending → processing → completed | returned | paused
+ * 任务：pending → processing → completed | returned | paused | cancelled
  *      returned → pending(重派) | processing | cancelled
  *      completed → returned(打回重做)
  *      pending → completed(AI 降级代答直达终态)
@@ -10,7 +10,7 @@
  */
 const TASK_TRANSITIONS = {
   pending: ['processing', 'returned', 'cancelled', 'completed'],
-  processing: ['completed', 'returned', 'paused'],
+  processing: ['completed', 'returned', 'paused', 'cancelled'],
   returned: ['pending', 'processing', 'cancelled'],
   paused: ['processing', 'returned', 'cancelled'],
   completed: ['returned'],

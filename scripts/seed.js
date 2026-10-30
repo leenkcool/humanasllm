@@ -12,23 +12,24 @@ async function seed() {
   const db = getDb();
 
   const accounts = [
-    { username: 'admin', password: 'admin123', role: 'admin', name: '管理员', email: 'admin@p390.local' },
-    { username: 'engineer1', password: 'admin123', role: 'engineer', name: '工程师-张', email: 'engineer1@p390.local' },
-    { username: 'engineer2', password: 'admin123', role: 'engineer', name: '工程师-李', email: 'engineer2@p390.local' },
+    { username: 'admin', password: 'admin123', role: 'admin', name: '管理员', email: 'admin@p390.local', skills: 'manage,review' },
+    { username: 'engineer1', password: 'admin123', role: 'engineer', name: '工程师-张', email: 'engineer1@p390.local', skills: 'postgres,ops,linux,node' },
+    { username: 'engineer2', password: 'admin123', role: 'engineer', name: '工程师-李', email: 'engineer2@p390.local', skills: 'vue,node,frontend,review' },
   ];
 
   for (const acc of accounts) {
     const exists = await db.exec('SELECT id, email FROM users WHERE username = ?', [acc.username]);
     if (exists.length > 0 && exists[0].values.length > 0) {
-      // 已存在用户：补充邮箱（缺失时）
+      // 已存在用户：补充邮箱与技能标签（缺失时），供智能派单演示使用
       await db.run('UPDATE users SET email = COALESCE(email, ?) WHERE username = ?', [acc.email, acc.username]);
-      console.log(`[种子] 用户 ${acc.username} 已存在，补充邮箱`);
+      await db.run('UPDATE users SET skills = COALESCE(skills, ?) WHERE username = ?', [acc.skills, acc.username]);
+      console.log(`[种子] 用户 ${acc.username} 已存在，补充邮箱/技能`);
       continue;
     }
     const hash = bcryptjs.hashSync(acc.password, 10);
     await db.run(
-      'INSERT INTO users (username, email, password, role, name, is_active) VALUES (?, ?, ?, ?, ?, true)',
-      [acc.username, acc.email, hash, acc.role, acc.name]
+      'INSERT INTO users (username, email, password, role, name, skills, is_active) VALUES (?, ?, ?, ?, ?, ?, true)',
+      [acc.username, acc.email, hash, acc.role, acc.name, acc.skills]
     );
     console.log(`[种子] 已创建用户: ${acc.username} / ${acc.password} (${acc.role})`);
   }

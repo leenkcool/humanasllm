@@ -14,6 +14,7 @@ const aiRelay = require('../services/aiRelay');
 const aiShift = require('../services/aiShift');
 const taskView = require('../services/taskView');
 const sseStream = require('../services/sseStream');
+const templates = require('../services/templateService');
 const { getTenantByUpstreamKey, resolveCallerTenantId } = require('../middleware/auth');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
@@ -91,14 +92,33 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
   const chatId = encoder.makeId();
   const created = Math.floor(Date.now() / 1000);
 
+  // 工单模板：上游传 template_id 时套用模板默认值（不传则行为完全不变）
+  let parsedForTask = parsed;
+  let templateId = null;
+  const rawTemplateId = parsed.extra && parsed.extra.template_id;
+  if (rawTemplateId !== undefined && rawTemplateId !== null && rawTemplateId !== '') {
+    const tid = parseInt(rawTemplateId);
+    const t = Number.isFinite(tid) ? await templates.getTemplate(tid) : null;
+    if (!t || !t.enabled || !templates.templateVisible(t, callerTenantId)) {
+      return res.status(400).json(encoder.makeError(400, 'template not found', 'invalid_request_error'));
+    }
+    parsedForTask = templates.mergeIntoParsed(t, parsed);
+    templateId = t.id;
+  }
+
   // 接入 → 创建人工任务（pending）→ 推送工作台（上游 API key 路由租户）
   let taskId;
   try {
-    const createdRes = await queue.createTaskFromRequest({ parsed, chatId, created, tenantId: callerTenantId });
+    const createdRes = await queue.createTaskFromRequest({
+      parsed: parsedForTask, chatId, created, tenantId: callerTenantId, templateId,
+    });
     taskId = createdRes.taskId;
   } catch (e) {
     console.error('[创建任务失败]', e.message);
     return res.status(500).json(encoder.makeError(500, '任务创建失败', 'server_error'));
+  }
+  if (templateId) {
+    await templates.bumpUseCount(templateId).catch(() => {});
   }
   await queue.logRequest(taskId, 'in', req.body, parsed.model, callerTenantId);
 

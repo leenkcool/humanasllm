@@ -43,6 +43,7 @@ window.HLM = window.HLM || {};
     { id: 'logs', label: () => t('nav.logs'), icon: 'logs', show: () => true },
     { id: 'approvals', label: () => t('nav.approvals'), icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
     { id: 'projects', label: () => t('nav.projects'), icon: 'folder', show: () => true },
+    { id: 'templates', label: () => t('nav.templates'), icon: 'template', show: () => true },
     { id: 'gateway', label: () => t('nav.gateway'), icon: 'bot', show: () => true },
     { id: 'prd', label: () => t('nav.prd'), icon: 'file', show: () => true },
     { id: 'users', label: () => t('nav.users'), icon: 'users', show: () => (currentUser.role === 'admin') },
@@ -287,6 +288,18 @@ window.HLM = window.HLM || {};
     await loadProjects();
   }
 
+  // ===== 工单模板页 =====
+  async function renderTemplates() {
+    const content = $('#content');
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">${t('page.templates.title')}</div><div class="page-desc">${t('page.templates.desc')}</div></div>
+        <div class="spacer"></div>
+        ${currentUser.role === 'admin' ? `<button class="btn primary" onclick="window.HLM.Templates.promptSave()">${Icons.plus}${t('tpl.create')}</button>` : ''}
+        <button class="btn" onclick="window.HLM.Templates.load()">${t('common.refresh')}</button></div>
+      <div id="templatesBox"></div>`;
+    await HLM.Templates.load();
+  }
+
   // ===== 接入配置（生成 SKILL/AGENT + 在线微调） =====
   let _gwTool = 'claude';
   let _gwFiles = [];       // 当前工具文件列表 [{path, content}]
@@ -522,7 +535,7 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, projects: renderProjects, gateway: renderGateway, prd: renderPrd, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, projects: renderProjects, templates: renderTemplates, gateway: renderGateway, prd: renderPrd, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');
