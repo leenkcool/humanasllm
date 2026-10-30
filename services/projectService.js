@@ -43,6 +43,10 @@ async function createProject({ code, name, description, createdBy, tenantId }) {
     'INSERT INTO projects (code, name, description, created_by, tenant_id) VALUES (?, ?, ?, ?, ?)',
     [code, name, description || null, createdBy || null, tenantId || null]
   );
+  // 建项目者自动成为 owner（项目级权限的起点）
+  if (createdBy) {
+    await require('./projectMemberService').ensureOwner({ projectCode: code, userId: createdBy, tenantId });
+  }
   return { id: lastId, code, name };
 }
 

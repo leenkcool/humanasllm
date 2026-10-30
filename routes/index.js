@@ -20,6 +20,7 @@ const templateRoutes = require('./templates');
 const dispatchRoutes = require('./dispatch');
 const alertRoutes = require('./alerts');
 const billingRoutes = require('./billing');
+const knowledgeRoutes = require('./knowledge');
 const backupRoutes = require('./backup');
 
 module.exports = function (app) {
@@ -60,6 +61,9 @@ module.exports = function (app) {
 
   // 数据备份（工作台触发 + 历史）
   app.use('/api/backup', backupRoutes);
+
+  // 知识库（答复复用：project / tenant / global 三级作用域）
+  app.use('/api/knowledge', knowledgeRoutes);
 
   // 租户管理（多租户 v1）
   app.use('/api/tenants', tenantRoutes);

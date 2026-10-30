@@ -212,6 +212,40 @@ CREATE TABLE IF NOT EXISTS billing_ledger (
 
 CREATE INDEX IF NOT EXISTS idx_billing_ledger_tenant ON billing_ledger(tenant_id, period);
 CREATE INDEX IF NOT EXISTS idx_billing_ledger_period ON billing_ledger(period);
+
+CREATE TABLE IF NOT EXISTS project_members (
+  id SERIAL PRIMARY KEY,
+  project_code VARCHAR(64) NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  role VARCHAR(20) NOT NULL DEFAULT 'member',
+  tenant_id INTEGER,
+  added_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (project_code, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_code);
+
+CREATE TABLE IF NOT EXISTS knowledge_entries (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  category VARCHAR(20) NOT NULL DEFAULT 'general',
+  scope VARCHAR(16) NOT NULL DEFAULT 'tenant',
+  project_code VARCHAR(64),
+  problem TEXT NOT NULL,
+  solution TEXT NOT NULL,
+  tags TEXT,
+  source_task_id INTEGER REFERENCES tasks(id),
+  tenant_id INTEGER,
+  author_id INTEGER REFERENCES users(id),
+  use_count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_scope ON knowledge_entries(scope, project_code);
+CREATE INDEX IF NOT EXISTS idx_knowledge_tenant ON knowledge_entries(tenant_id);
 `;
 
 function createAdapter() {
@@ -270,6 +304,12 @@ async function initDatabase() {
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id INTEGER`);
   await db.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS turn_index INTEGER NOT NULL DEFAULT 0`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_conversation ON tasks(conversation_id, turn_index)`);
+  // 知识库相似度检索：pg_trgm 扩展（托管 PG 无权限时静默降级为 ILIKE）
+  await db.exec(`CREATE EXTENSION IF NOT EXISTS pg_trgm`).catch((e) => {
+    console.error('[迁移] pg_trgm 不可用，知识库检索降级为 ILIKE：', e.message);
+  });
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_knowledge_trgm ON knowledge_entries USING gin (problem gin_trgm_ops)`)
+    .catch(() => {});
   // ===== 分级策略引擎种子规则（幂等：task_rules 为空时播种） =====
   await seedRules();
   // ===== 工单模板示例（幂等：task_templates 为空时播种，开源开箱即可见） =====

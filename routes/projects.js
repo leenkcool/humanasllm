@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const project = require('../services/projectService');
+const members = require('../services/projectMemberService');
 const approval = require('../services/approvalService');
 const { authenticate, requireRole } = require('../middleware/auth');
 
@@ -78,6 +79,78 @@ router.post('/:id/archive', authenticate, requireRole('admin'), async (req, res)
     res.json({ success: true, data: p });
   } catch (e) {
     res.status(e.status || 500).json({ success: false, message: e.message });
+  }
+});
+
+// ===== 项目成员（项目级权限，知识库作用域依赖此判定） =====
+
+/** 当前用户是否为该项目成员（admin 视为全部可访问） */
+async function ensureProjectAccess(req, res, id) {
+  const p = await project.getProject(parseInt(id));
+  if (!p || p.tenant_id !== req.tenant_id) {
+    res.status(404).json({ success: false, message: '项目不存在' });
+    return null;
+  }
+  const ok = await members.isMember({
+    projectCode: p.code, userId: req.user.id, role: req.user.role, tenantId: req.tenant_id,
+  });
+  if (!ok) {
+    res.status(403).json({ success: false, message: '你不是该项目成员' });
+    return null;
+  }
+  return p;
+}
+
+// 成员列表
+router.get('/:id/members', authenticate, async (req, res) => {
+  try {
+    const p = await ensureProjectAccess(req, res, req.params.id);
+    if (!p) return;
+    res.json({ success: true, data: await members.listMembers(p.code, req.tenant_id) });
+  } catch (e) {
+    console.error('[成员列表失败]', e.message);
+    res.status(500).json({ success: false, message: '获取项目成员失败' });
+  }
+});
+
+// 添加/更新成员（admin 或项目 owner）
+router.post('/:id/members', authenticate, async (req, res) => {
+  try {
+    const p = await project.getProject(parseInt(req.params.id));
+    if (!p || p.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '项目不存在' });
+    const isAdmin = req.user.role === 'admin';
+    const mine = (await members.listMembers(p.code, req.tenant_id))
+      .find(m => m.user_id === req.user.id && m.role === 'owner');
+    if (!isAdmin && !mine) return res.status(403).json({ success: false, message: '仅管理员或项目 owner 可管理成员' });
+    const r = await members.addMember({
+      projectCode: p.code, userId: parseInt(req.body.user_id),
+      role: req.body.role || 'member', tenantId: req.tenant_id,
+      actor: { id: req.user.id, name: req.user.name || req.user.username },
+    });
+    if (!r.ok) return res.status(400).json({ success: false, message: r.message });
+    res.json({ success: true, data: r });
+  } catch (e) {
+    console.error('[添加成员失败]', e.message);
+    res.status(500).json({ success: false, message: '添加项目成员失败' });
+  }
+});
+
+// 移除成员
+router.delete('/:id/members/:userId', authenticate, async (req, res) => {
+  try {
+    const p = await project.getProject(parseInt(req.params.id));
+    if (!p || p.tenant_id !== req.tenant_id) return res.status(404).json({ success: false, message: '项目不存在' });
+    const isAdmin = req.user.role === 'admin';
+    const mine = (await members.listMembers(p.code, req.tenant_id))
+      .find(m => m.user_id === req.user.id && m.role === 'owner');
+    // 允许成员移除自己
+    const self = parseInt(req.params.userId) === req.user.id;
+    if (!isAdmin && !mine && !self) return res.status(403).json({ success: false, message: '无权限移除该项目成员' });
+    await members.removeMember({ projectCode: p.code, userId: parseInt(req.params.userId), tenantId: req.tenant_id });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[移除成员失败]', e.message);
+    res.status(500).json({ success: false, message: '移除项目成员失败' });
   }
 });
 

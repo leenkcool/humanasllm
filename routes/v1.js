@@ -16,6 +16,7 @@ const taskView = require('../services/taskView');
 const sseStream = require('../services/sseStream');
 const templates = require('../services/templateService');
 const conversations = require('../services/conversationService');
+const knowledge = require('../services/knowledgeService');
 const { getTenantByUpstreamKey, resolveCallerTenantId } = require('../middleware/auth');
 
 // 可选：上游 API-Key 校验（配置 UPSTREAM_API_KEY 后生效）
@@ -74,6 +75,35 @@ router.post('/chat/completions', requireUpstreamKey, async (req, res) => {
     } catch (e) {
       console.error('[AI 中继失败]', e.message);
       return res.status(502).json(encoder.makeError(502, 'AI 中继失败: ' + e.message, 'server_error'));
+    }
+  }
+
+  // 知识库自动命中（opt-in use_knowledge）：命中已知答案直接返回，不进人工队列
+  // 只命中 global / 同租户 tenant 且非涉密的条目；project 条目不参与（上游无项目成员身份）
+  if (parsed.extra && parsed.extra.use_knowledge === true) {
+    const firstUser = parsed.messages.find(m => m.role === 'user');
+    const q = firstUser && typeof firstUser.content === 'string' ? firstUser.content : '';
+    const hit = await knowledge.matchForUpstream({ text: q, tenantId: callerTenantId });
+    if (hit) {
+      await queue.logRequest(null, 'in', req.body, parsed.model, callerTenantId).catch(() => {});
+      await knowledge.bumpUse(hit.id).catch(() => {});
+      const content = hit.solution;
+      await queue.logRequest(null, 'out', { content, source: 'knowledge', knowledge_id: hit.id },
+        parsed.model, callerTenantId).catch(() => {});
+      const kid = encoder.makeId();
+      const kcreated = Math.floor(Date.now() / 1000);
+      if (parsed.stream) {
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        for (const line of encoder.makeStreamChunks({ id: kid, model: parsed.model, created: kcreated, content })) res.write(line);
+        res.end();
+        return;
+      }
+      const out = encoder.makeChatCompletion({ id: kid, model: parsed.model, created: kcreated, content });
+      out.source = 'knowledge';
+      out.knowledge_id = hit.id;
+      return res.json(out);
     }
   }
 

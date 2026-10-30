@@ -267,3 +267,9 @@ td .mono { font-family: Consolas, monospace; font-size: 12px; background: var(--
 .conv-a { font-size: 12px; color: var(--muted); margin-top: 5px; padding-left: 8px; border-left: 2px solid var(--border); white-space: pre-wrap; word-break: break-word; }
 .conv-a.muted { font-style: italic; }
 
+
+/* ===== 知识库：相似答复卡片 ===== */
+.kb-sim { border-left: 3px solid var(--primary); background: var(--surface); border-radius: 0 6px 6px 0; padding: 7px 10px; margin-bottom: 6px; cursor: pointer; }
+.kb-sim:hover { background: var(--primary-weak); }
+.kb-sim-t { font-size: 12px; font-weight: 600; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.kb-sim-s { font-size: 12px; color: var(--muted); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }

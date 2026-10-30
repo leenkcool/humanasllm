@@ -2,6 +2,15 @@
 
 > 本项目所有验证过的功能需求在此记录。任何二次开发（AI Agent 或人）完成并验证后，**必须**在此追加条目（日期 + 功能描述），并 git commit + push。
 
+## 2026-10-30 - 项目成员 + 知识库（答复复用，三级作用域）
+- 描述：**项目成员机制**（此前完全缺失）——新增 `project_members` 表（owner/member/viewer），建项目者自动成为 owner；`/api/projects/:id/members` 支持列表/添加/移除（admin 或项目 owner 可管理，成员可退出）。**兼容策略**：历史项目无成员记录时视为「租户内可见」，不锁死既有项目。
+- 描述：**知识库**——新增 `knowledge_entries` 表 + `services/knowledgeService.js` + `routes/knowledge.js` + 工作台「知识库」页。三级作用域：`project`（仅项目成员 + admin）/ `tenant`（同租户全员）/ `global`（所有租户）。统一可见性判定 `visibleClause()`，列表/详情/检索共用一份口径。
+- **硬约束**：`confidential` 类条目只能存为 `project` 作用域或作者私有，**永不进入 tenant/global 共享池**——「数据不出网关」在知识库上的延续（服务层校验 + 集成测试锁定）。
+- 相似检索：`pg_trgm` + GIN 索引（迁移时自动建扩展，不可用则降级为 ILIKE）；中文三元组相似度偏低，额外叠加关键词兜底召回。实测相似度 0.44 命中。
+- 三个入口：任务详情侧栏「相似历史答复」（答复时参考）、已完成任务「沉淀为知识条目」（自动预填问题/答复/标签/作用域）、独立知识库页（按作用域/分级/关键词筛选）。
+- 上游可选：`/v1/chat/completions` 传 `use_knowledge: true` 时命中 global/同租户 tenant 且相似度 ≥0.7 直接返回（`source: 'knowledge'`），**默认关闭**；project 条目不参与（上游无项目成员身份）。
+- 验证：集成 6（项目隔离/跨租户/涉密拒绝/相似检索/权限）通过；全量 160 项、冒烟 64 项、UI 12 页全通过
+
 ## 2026-10-30 - 多轮追问（会话上下文延续）
 - 描述：新增 `services/conversationService.js`——同一会话的多轮任务通过 `conversation_id` 串成时间线。上游首次请求自动生成会话 id 并随 `task_id` 返回（`conversation_id` / `turn_index`）；追问时带上该 id，新任务挂到同一会话，`turn_index` 递增、`parent_task_id` 指向上轮。**不传 `conversation_id` 时行为完全不变**（零破坏）。
 - 关键约束：**追问继承首轮分级**——首轮被判 `confidential`/`ops`，后续轮次一律沿用，不允许因追问内容变无害而降级；项目强制继承，优先级/技能在上游未指定时继承，上游显式值仍优先。

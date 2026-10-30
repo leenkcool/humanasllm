@@ -45,6 +45,7 @@ window.HLM = window.HLM || {};
     { id: 'approvals', label: () => t('nav.approvals'), icon: 'key', show: () => true, badge: () => window._pendingApprovals || 0 },
     { id: 'alerts', label: () => t('nav.alerts'), icon: 'bells', show: () => true, badge: () => window._activeAlerts || 0 },
     { id: 'projects', label: () => t('nav.projects'), icon: 'folder', show: () => true },
+    { id: 'knowledge', label: () => t('nav.knowledge'), icon: 'bible', show: () => true },
     { id: 'templates', label: () => t('nav.templates'), icon: 'template', show: () => true },
     { id: 'billing', label: () => t('nav.billing'), icon: 'zap', show: () => true },
     { id: 'gateway', label: () => t('nav.gateway'), icon: 'bot', show: () => true },
@@ -328,6 +329,32 @@ window.HLM = window.HLM || {};
     await HLM.Alerts.load();
   }
 
+  // ===== 知识库页 =====
+  async function renderKnowledge() {
+    const content = $('#content');
+    content.innerHTML = `
+      <div class="topbar"><div><div class="page-title">${t('page.knowledge.title')}</div><div class="page-desc">${t('page.knowledge.desc')}</div></div>
+        <div class="spacer"></div>
+        <input class="form-input" id="kbKeyword" placeholder="${esc(t('kb.search'))}" style="width:200px;">
+        <select class="form-select" id="kbScopeFilter" style="width:130px;">
+          <option value="">${t('kb.allScopes')}</option>
+          <option value="project">${t('kb.scope.project')}</option>
+          <option value="tenant">${t('kb.scope.tenant')}</option>
+          <option value="global">${t('kb.scope.global')}</option>
+        </select>
+        <select class="form-select" id="kbCatFilter" style="width:120px;">
+          <option value="">${t('common.all')}</option>
+          <option value="general">${t('category.general')}</option>
+          <option value="confidential">${t('category.confidential')}</option>
+          <option value="ops">${t('category.ops')}</option>
+        </select>
+        <button class="btn" onclick="window.HLM.Knowledge.search()">${t('common.filter')}</button>
+        <button class="btn primary" onclick="window.HLM.Knowledge.promptSave()">${Icons.plus}${t('kb.create')}</button></div>
+      <div style="margin-bottom:10px;color:var(--muted);font-size:12px;" id="kbCount"></div>
+      <div id="kbBox"></div>`;
+    await HLM.Knowledge.load();
+  }
+
   // ===== 工单模板页 =====
   async function renderTemplates() {
     const content = $('#content');
@@ -582,7 +609,7 @@ window.HLM = window.HLM || {};
   }
 
   // ===== 路由 =====
-  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, alerts: renderAlerts, projects: renderProjects, templates: renderTemplates, billing: renderBilling, gateway: renderGateway, prd: renderPrd, users: renderUsers };
+  const routes = { dashboard: renderDashboard, queue: renderQueue, mine: renderMine, logs: renderLogs, approvals: renderApprovals, alerts: renderAlerts, projects: renderProjects, knowledge: renderKnowledge, templates: renderTemplates, billing: renderBilling, gateway: renderGateway, prd: renderPrd, users: renderUsers };
 
   async function route() {
     const page = (location.hash.replace('#/', '') || 'dashboard');

@@ -6,7 +6,7 @@
  *   离线时回落到 offline.html。PWA 属于增强能力，任何异常都不得影响主应用。
  */
 
-const VERSION = 'p390-v2';
+const VERSION = 'p390-v3';
 const CACHE_NAME = VERSION;
 
 // 预缓存外壳。注意：列表中任何一项缺失都不应导致整个安装失败（见 install 中逐个 add）。
@@ -14,7 +14,7 @@ const SHELL = [
   '/workbench.html', '/mobile.html', '/login.html', '/offline.html',
   '/css/style.css', '/css/mobile.css',
   '/js/i18n.js', '/js/utils.js', '/js/api.js', '/js/ws.js',
-  '/js/templates.js', '/js/dispatch.js', '/js/alerts.js', '/js/billing.js',
+  '/js/knowledge.js', '/js/templates.js', '/js/dispatch.js', '/js/alerts.js', '/js/billing.js',
   '/js/ui.js', '/js/app.js', '/js/pwa.js', '/js/mobile.js',
   '/socket.io/socket.io.js',
   '/manifest.json', '/icons/icon-192.png'

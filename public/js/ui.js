@@ -162,6 +162,7 @@ window.HLM = window.HLM || {};
         <div class="ctx"><div class="k">${t('task.context', { n: messages.length })}</div>${msgsHtml}</div>
         ${toolsHtml}
         ${resultHtml}
+        ${['processing', 'paused'].includes(task.status) ? `<div class="ctx"><div class="k">${t('kb.similar')}</div><div id="kbSimilarBox"></div></div>` : ''}
         ${['pending', 'returned'].includes(task.status) ? `<div class="ctx" id="dispatchPanel"><div class="k">${t('dispatch.title')}</div><div id="dispatchBox"><span style="color:var(--muted);font-size:12px;">${t('dispatch.loading')}</span></div></div>` : ''}
         <div class="ctx"><div class="k">${t('task.audit')} <button class="btn sm" onclick="window.HLM.UI.verifyChain(${task.id})">${t('task.verifyChain')}</button></div><pre style="font-size:11px;">${(task.logs || []).map(l => `[${fmt(l.created_at)}] ${esc(l.action)} — ${esc(l.actor_name || t('task.system'))}${l.remark ? ' · ' + esc(l.remark) : ''}`).join('\n') || t('task.none')}</pre><div id="chainBox"></div></div>
       `;
@@ -169,6 +170,7 @@ window.HLM = window.HLM || {};
       const foot = actionButtons(task);
       openModal(t('task.detailTitle', { id: task.id }), body, foot, 'lg');
       if (['pending', 'returned'].includes(task.status)) HLM.Dispatch.suggest(task.id);
+      if (['processing', 'paused'].includes(task.status)) HLM.Knowledge.similarForTask(task.id);
     } catch (e) {
       toast(e.message, 'error');
     }
@@ -236,7 +238,9 @@ window.HLM = window.HLM || {};
       btns += `<button class="btn danger" onclick="window.HLM.UI.promptReject(${id})">${t('task.reject')}</button>`;
     }
     if (task.status === 'returned') btns += `<button class="btn primary" onclick="window.HLM.UI.doAction('claim', ${id})">${t('task.claimAgain')}</button>`;
-    if (task.status === 'returned' || task.status === 'paused') btns += `<button class="btn" onclick="window.HLM.UI.promptRequeue(${id})">${t('task.requeue')}</button>`;    if (task.status === 'completed' && isOwner) btns += `<button class="btn danger" onclick="window.HLM.UI.promptReopen(${id})">${t('task.reopen')}</button>`;
+    if (task.status === 'returned' || task.status === 'paused') btns += `<button class="btn" onclick="window.HLM.UI.promptRequeue(${id})">${t('task.requeue')}</button>`;
+    if (task.status === 'completed') btns += `<button class="btn" onclick="window.HLM.Knowledge.promptFromTask(${id})">${t('kb.fromTask')}</button>`;
+    if (task.status === 'completed' && isOwner) btns += `<button class="btn danger" onclick="window.HLM.UI.promptReopen(${id})">${t('task.reopen')}</button>`;
     if (!['completed', 'cancelled'].includes(task.status)) btns += `<button class="btn danger" onclick="window.HLM.UI.promptCancel(${id})">${t('task.cancel')}</button>`;
     return btns;
   }
