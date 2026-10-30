@@ -280,6 +280,62 @@ AI 向人类提审批（资源/权限/项目申请），**异步受理**：创�
 | POST | `/api/backup/run` | admin | 异步触发备份，进度走 Socket.IO `backup:progress` |
 | GET | `/api/backup/status` | admin | 是否在跑 + 最近结果 |
 
+### 多轮追问（会话）
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/v1/chat/completions` + `conversation_id` | 追问：挂到同一会话，`turn_index` 递增、`parent_task_id` 指向上轮；不传则新建会话 |
+| GET | `/v1/tasks/:id` | 带会话的任务额外返回 `conversation.turns`（每轮问题+答复摘要） |
+
+响应新增字段：`conversation_id`、`turn_index`（一次性返回与回查均有）。
+约束：**追问继承首轮分级**（`confidential`/`ops` 不因追问内容变无害而降级）；非法/跨租户会话 400；上限 50 轮。
+
+### 项目成员
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/projects/:id/members` | 成员列表（需为成员或 admin） |
+| POST | `/api/projects/:id/members` | `{user_id, role}` 添加/更新（admin 或项目 owner） |
+| DELETE | `/api/projects/:id/members/:userId` | 移除（admin/owner，成员可退出） |
+
+建项目者自动成为 `owner`；历史项目无成员记录时按租户内可见（兼容）。
+
+### 知识库
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/knowledge?scope=&category=&keyword=&page=&size=` | 列表（按可见性过滤） |
+| GET | `/api/knowledge/:id` | 详情 |
+| POST | `/api/knowledge` | `{title*, problem*, solution*, scope, category, project_code, tags, source_task_id}` |
+| PUT | `/api/knowledge/:id` | 更新（作者或 admin） |
+| DELETE | `/api/knowledge/:id` | 删除（作者或 admin） |
+| GET | `/api/knowledge/similar?task_id=` 或 `?text=` | 相似历史答复（答复任务时参考） |
+| GET | `/api/knowledge/from-task/:taskId` | 已完成任务的一键沉淀草稿（预填） |
+
+**三级作用域**：`project`（仅项目成员 + admin）/ `tenant`（同租户）/ `global`（所有租户）。
+**硬约束**：`confidential` 类只能 `project` 作用域或作者私有，永不进共享池。
+`/v1/chat/completions` 可选 `use_knowledge: true`（默认关闭）：命中 global/tenant 且相似度 ≥0.7 直接返回，`source: "knowledge"`。
+
+### 答复审核
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/reviews/pending` | JWT | 待审核队列 |
+| GET | `/api/reviews/spot-check` | admin | 待抽检队列（confidential 已放行） |
+| GET | `/api/reviews/stats` | JWT | 审核统计 + 平均分 |
+| GET | `/api/reviews/:taskId` | JWT | 某任务审核记录 |
+| POST | `/api/reviews/:taskId/approve` | JWT | `{scores:{completeness,accuracy,actionable,boundary}, note}` 审核通过并放行 |
+| POST | `/api/reviews/:taskId/revision` | JWT | `{reason}` 退回修改 |
+| POST | `/api/reviews/:taskId/resubmit` | 处理人 | 重新提交（回到待审） |
+| POST | `/api/reviews/:taskId/spot-check` | admin | `{pass, note}` 抽检 |
+
+**分级策略**：`general` 免审（直接放行）；`ops`/`confidential` 单人审核；`confidential` 另加 admin 抽检（不阻塞放行）。不能审核自己的答复。
+**上游可见性**：未放行时 `/v1/tasks/:id` 的 `content` 返回「答复待审核」，`review_status` 为 `reviewing`/`needs_revision`/`delivered`。
+
+### 答复效果回流
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/v1/tasks/:id/feedback` | `{resolved*, rating?, comment?}` 上游回传是否解决（幂等覆盖） |
+| GET | `/api/workbench/feedback` | 答复有效率统计（总数/已解决/百分比/平均分，按分级与工程师拆分） |
+
+`resolved=false` 且在 7 天内完成且无后续轮次 → **自动重开为同会话追问**（返回 `reopened_task_id`）。
+
 ---
 
 ## 三、错误码
